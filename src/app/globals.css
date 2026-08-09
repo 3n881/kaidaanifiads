@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #0a2342;
+
+  /* Brand palette — matches the live site's compiled CSS tokens
+     (--brand-teal is actually a dark NAVY, --brand-gold is golden yellow). */
+  --color-brand-teal: #0a2342;
+  --color-brand-gold: #ffd301;
+
+  /* Navy scale (900 = exact brand navy #0A2342) used across the UI. */
+  --color-brand-50: #eef2f7;
+  --color-brand-100: #d9e1ec;
+  --color-brand-200: #b7c5d8;
+  --color-brand-300: #8aa0ba;
+  --color-brand-400: #6c849d;
+  --color-brand-500: #45607e;
+  --color-brand-600: #0a2342; /* primary — buttons, matches bg-brand-teal */
+  --color-brand-700: #081b33; /* hover (≈ navy/90) */
+  --color-brand-800: #0a2342;
+  --color-brand-900: #0a2342; /* headings / footer */
+
+  /* Gold accent scale */
+  --color-gold-50: #fffbe6;
+  --color-gold-100: #fff3b0;
+  --color-gold-400: #ffdd33;
+  --color-gold-500: #ffd301;
+  --color-gold-600: #e6be00;
+
+  /* Discount / sale accent (red→orange gradient endpoints + solids) */
+  --color-sale-500: #f97316;
+  --color-sale-600: #e9690c;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+
+  /* WhatsApp */
+  --color-whatsapp: #25d366;
+
+  --font-sans: var(--font-lato), var(--font-devanagari), system-ui, sans-serif;
+  --font-deva: var(--font-devanagari), var(--font-lato), system-ui, sans-serif;
+
+  --radius: 0.65rem;
+
+  --shadow-card: 0 1px 3px rgba(10, 35, 66, 0.08), 0 8px 24px rgba(10, 35, 66, 0.06);
+  --shadow-cardhover: 0 10px 30px rgba(10, 35, 66, 0.16);
+  --shadow-gold: 0 20px 25px -5px rgba(255, 211, 1, 0.2);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Keyboard focus visibility (accessibility) */
+:focus-visible {
+  outline: 2px solid var(--color-brand-teal);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Skip-to-content link, visible only when focused */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  transform: translateY(-150%);
+  transition: transform 0.2s ease;
+  background: var(--color-brand-teal);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-deva {
+  font-family: var(--font-deva);
+}
+
+.container-x {
+  width: 100%;
+  max-width: 72rem; /* max-w-6xl — matches the live site */
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-x {
+    padding-inline: 1.5rem;
+  }
+}
+
+/* iOS safe-area padding for the mobile bottom nav */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Discount / sale badge gradient used by the live site */
+.badge-sale {
+  background-image: linear-gradient(to right, #dc2626, #ea580c);
+}
+/* Combo / special gradient used by the live site */
+.badge-combo {
+  background-image: linear-gradient(to right, #9333ea, #4f46e5);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Matches the live site exactly */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes bounce-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 4s ease-in-out infinite;
+}
