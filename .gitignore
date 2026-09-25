@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated client-onboarding artifacts (local handoff files)
+/client-onboarding/
+/scripts/create_client_intake.mjs

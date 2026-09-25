@@ -7,27 +7,27 @@ import { SITE } from "@/data/catalog";
 const FAQS: Array<{ q: string; a: string }> = [
   {
     q: "पेमेंट सुरक्षित आहे का?",
-    a: "होय. पेमेंट Razorpay या विश्वासार्ह गेटवेद्वारे होते — Google Pay, PhonePe, Paytm, UPI किंवा कार्डने. तुमची कार्ड/बँक माहिती आमच्याकडे साठवली जात नाही.",
+    a: "होय. पेमेंट Razorpay च्या सुरक्षित checkout मधून होते. UPI, Google Pay, PhonePe, Paytm आणि Card उपलब्ध आहेत. तुमची payment माहिती आमच्या server वर साठवली जात नाही.",
   },
   {
-    q: "पेमेंट केल्यावर ई-बुक कसे मिळेल?",
-    a: "पेमेंट यशस्वी होताच तुम्ही दिलेल्या व्हॉट्सॲप नंबरवर PDF ची डाउनलोड लिंक लगेच पाठवली जाते. तुम्ही ‘माझी पुस्तके’ पानावरही ती पाहू शकता.",
+    q: "खरेदीसाठी account किंवा मोबाईल नंबर आवश्यक आहे का?",
+    a: "नाही. तुम्ही कोणतेही account तयार न करता आणि नाव किंवा नंबर न देता थेट पेमेंट करू शकता. पेमेंटनंतर WhatsApp delivery आणि My Books access साठी नंबर देणे पूर्णपणे ऐच्छिक आहे.",
   },
   {
-    q: "ही Physical पुस्तके आहेत का?",
-    a: "नाही. ही फक्त Digital PDF E-Books आहेत. कोणतीही छापील (Printed) प्रत पाठवली जात नाही, त्यामुळे शिपिंग शुल्कही नाही.",
+    q: "पेमेंटनंतर ई-बुक कसे मिळेल?",
+    a: "पेमेंट यशस्वी होताच PDF डाउनलोड आपोआप सुरू करण्याचा प्रयत्न होतो आणि स्क्रीनवर स्वतंत्र Download बटनही दिसते. नंबर दिल्यास तीच लिंक WhatsApp वर पाठवली जाते.",
   },
   {
-    q: "परतावा (Refund) मिळतो का?",
-    a: "डिजिटल उत्पादन असल्याने, एकदा PDF लिंक पाठवली/डाउनलोड झाल्यावर परतावा शक्य नाही. पेमेंट होऊनही लिंक मिळाली नसेल, तर आम्ही ती पुन्हा पाठवतो किंवा पूर्ण परतावा देतो.",
+    q: "ही Physical पुस्तकाची प्रत आहे का?",
+    a: "नाही. ही फक्त Digital PDF E-Books आहेत. कोणतीही Printed प्रत courier ने पाठवली जात नाही.",
   },
   {
-    q: "पुस्तके कोणत्या भाषेत आहेत?",
-    a: "बहुतांश पुस्तके सोप्या मराठीत आहेत; काही हिंदीत उपलब्ध आहेत. प्रत्येक पुस्तकावर भाषा नमूद केलेली असते.",
+    q: "परतावा (Refund) मिळेल का?",
+    a: "Digital product असल्यामुळे PDF लिंक मिळाल्यानंतर किंवा फाइल डाउनलोड झाल्यानंतर सामान्यतः refund उपलब्ध नसतो. Duplicate charge किंवा technical delivery failure असल्यास support शी संपर्क करा.",
   },
   {
-    q: "मदतीसाठी संपर्क कसा करावा?",
-    a: `कोणतीही अडचण आल्यास आमच्या सपोर्ट टीमला व्हॉट्सॲप करा: ${SITE.supportPhone}. आम्ही सोम–शनि, सकाळी ९ ते संध्याकाळी ६ या वेळेत उपलब्ध असतो.`,
+    q: "अडचण आल्यास काय करावे?",
+    a: `आमच्या सपोर्ट टीमला WhatsApp करा: ${SITE.supportPhone}. आम्ही सोम–शनि, सकाळी ९ ते संध्याकाळी ६ या वेळेत उपलब्ध असतो.`,
   },
 ];
 
@@ -45,20 +45,21 @@ export default function Faq() {
             वारंवार विचारले जाणारे प्रश्न
           </h2>
           <p className="font-deva mt-2 text-brand-500">
-            तुमच्या मनातील शंकांची उत्तरे इथे मिळतील.
+            खरेदीपूर्वी तुमच्या प्रश्नांची उत्तरे येथे मिळवा.
           </p>
         </div>
 
         <div className="space-y-3">
-          {FAQS.map((item, i) => {
-            const isOpen = open === i;
+          {FAQS.map((item, index) => {
+            const isOpen = open === index;
             return (
               <div
-                key={i}
+                key={item.q}
                 className="overflow-hidden rounded-2xl border border-brand-100 bg-white"
               >
                 <button
-                  onClick={() => setOpen(isOpen ? null : i)}
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : index)}
                   aria-expanded={isOpen}
                   className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
                 >
@@ -66,6 +67,7 @@ export default function Faq() {
                     {item.q}
                   </span>
                   <ChevronDown
+                    aria-hidden="true"
                     className={`h-5 w-5 flex-shrink-0 text-brand-teal transition-transform duration-300 ${
                       isOpen ? "rotate-180" : ""
                     }`}

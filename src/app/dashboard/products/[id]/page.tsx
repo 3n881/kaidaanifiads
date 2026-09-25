@@ -28,7 +28,7 @@ export default async function EditProductPage({
   ]);
 
   return (
-    <AdminShell active="products" title="पुस्तक संपादित करा">
+    <AdminShell active="products" title="Edit product" description="Update the content or files and save. Changes appear on the public store automatically.">
       <ProductForm
         product={product}
         ebookOptions={ebookOptions}

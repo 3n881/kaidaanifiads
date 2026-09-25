@@ -18,7 +18,7 @@ export default function Page() {
         {
           heading: "2. How You Receive Your Ebook",
           body: [
-            "Immediately after a successful payment, the download link for your ebook is sent to the WhatsApp number you entered at checkout. You can also access it on the ‘माझी पुस्तके (My Books)’ page using your WhatsApp number.",
+            "Immediately after successful payment, the website displays the download link and attempts to start the download automatically. No account or mobile number is required. You may optionally provide a WhatsApp number after payment to receive the link there and access the purchase later through ‘माझी पुस्तके (My Books)’.",
           ],
         },
         {

@@ -4,6 +4,8 @@ import crypto from "crypto";
 const KEY_ID = process.env.RAZORPAY_KEY_ID ?? "";
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET ?? "";
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET ?? "";
+const ORDER_ACCESS_SECRET =
+  KEY_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export const isRazorpayConfigured = Boolean(KEY_ID && KEY_SECRET);
 export const razorpayKeyId = KEY_ID;
@@ -76,4 +78,21 @@ export function verifyPaymentSignature(
     .update(`${orderId}|${paymentId}`)
     .digest("hex");
   return safeEqual(expected, signature);
+}
+
+/** Server-signed proof for the optional post-payment contact form. */
+export function createOrderAccessToken(orderId: string): string {
+  if (!ORDER_ACCESS_SECRET) return "";
+  return crypto
+    .createHmac("sha256", ORDER_ACCESS_SECRET)
+    .update(`order-contact:${orderId}`)
+    .digest("hex");
+}
+
+export function verifyOrderAccessToken(
+  orderId: string,
+  token: string,
+): boolean {
+  if (!orderId || !token || !ORDER_ACCESS_SECRET) return false;
+  return safeEqual(createOrderAccessToken(orderId), token);
 }

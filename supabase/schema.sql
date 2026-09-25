@@ -54,10 +54,24 @@ create table if not exists public.orders (
 create index if not exists orders_whatsapp_idx on public.orders (whatsapp_number);
 create index if not exists orders_rzp_order_idx on public.orders (razorpay_order_id);
 
+-- ---------------------------------------------- guided client onboarding
+-- One company-owned settings record. It stores approved public content and
+-- checklist statuses only. Never store passwords, OTPs, API keys or KYC files.
+create table if not exists public.store_settings (
+  id            text primary key default 'main',
+  business      jsonb not null default '{}'::jsonb,
+  content       jsonb not null default '{}'::jsonb,
+  integrations  jsonb not null default '{}'::jsonb,
+  launch        jsonb not null default '{}'::jsonb,
+  updated_at    timestamptz default now()
+);
+insert into public.store_settings (id) values ('main') on conflict (id) do nothing;
+
 -- --------------------------------------------------------- Row Level Security
 alter table public.products    enable row level security;
 alter table public.combo_items enable row level security;
 alter table public.orders      enable row level security;
+alter table public.store_settings enable row level security;
 
 -- Public (anon) may read only ACTIVE products + combo mappings.
 drop policy if exists "public read active products" on public.products;

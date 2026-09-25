@@ -12,13 +12,13 @@ export default function Page() {
         {
           heading: "1. What Data We Hold",
           body: [
-            "We store your name, WhatsApp number and order history so we can deliver your ebooks and provide support.",
+            "Every payment creates a transaction record. We store a name and WhatsApp number only when you choose to provide them after payment for WhatsApp delivery, My Books access, or support.",
           ],
         },
         {
           heading: "2. How to Request Deletion",
           body: [
-            "Email us at support@kaydyachaanifaydyach.com or message us on WhatsApp from your registered number with the subject ‘Data Deletion Request’. We will verify your identity and delete your personal data within 30 days.",
+            "Email us at support@kaydyachaanifaydyach.com with your payment reference, or message us from the WhatsApp number you provided, using the subject ‘Data Deletion Request’. We will verify the request and delete eligible personal data within 30 days.",
           ],
         },
         {

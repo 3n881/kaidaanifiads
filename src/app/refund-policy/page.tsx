@@ -24,7 +24,7 @@ export default function Page() {
         {
           heading: "3. How to Request a Refund",
           body: [
-            "Contact us on WhatsApp or email with your payment reference and registered WhatsApp number within 7 days of the transaction. Approved refunds are processed to the original payment method within 5–7 business days.",
+            "Contact us on WhatsApp or email with your Razorpay payment reference within 7 days of the transaction. If you optionally provided a WhatsApp number, include it as well. Approved refunds are processed to the original payment method within 5–7 business days.",
           ],
         },
       ]}

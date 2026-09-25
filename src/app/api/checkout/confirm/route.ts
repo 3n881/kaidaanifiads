@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { verifyPaymentSignature } from "@/lib/razorpay";
+import {
+  createOrderAccessToken,
+  verifyPaymentSignature,
+} from "@/lib/razorpay";
 import { fulfillOrder } from "@/lib/delivery";
 
 export const runtime = "nodejs";
@@ -45,5 +48,9 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await fulfillOrder(order.id);
-  return NextResponse.json({ ok: true, downloadUrl: result.downloadUrl });
+  return NextResponse.json({
+    ok: true,
+    downloadUrl: result.downloadUrl,
+    accessToken: createOrderAccessToken(order.id),
+  });
 }

@@ -12,7 +12,7 @@ export default function Page() {
         {
           heading: "1. Digital Products",
           body: [
-            "All products sold on this website are digital PDF ebooks. No physical goods are shipped. After successful payment, a download link is delivered to your WhatsApp number.",
+            "All products sold on this website are digital PDF ebooks. No physical goods are shipped. After successful payment, a download link is displayed immediately. WhatsApp delivery is optional and is available if you provide a number after payment.",
           ],
         },
         {

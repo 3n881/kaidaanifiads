@@ -46,10 +46,13 @@ export async function fulfillOrder(
   const downloadUrl = await createSignedPdfUrl(product?.pdf_path ?? null);
 
   let delivered = false;
-  if (downloadUrl) {
+  const hasWhatsApp = /^[6-9]\d{9}$/.test(
+    String(order.whatsapp_number ?? "").replace(/\D/g, "").slice(-10),
+  );
+  if (downloadUrl && hasWhatsApp) {
     delivered = await sendWhatsAppDelivery({
       phone: order.whatsapp_number,
-      name: order.name,
+      name: order.name && order.name !== "Guest" ? order.name : "Customer",
       productTitle: product?.title ?? "",
       downloadLink: downloadUrl,
     });

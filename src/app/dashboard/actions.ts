@@ -108,7 +108,7 @@ export async function saveProduct(formData: FormData) {
   }
 
   revalidatePublic(slug, isCombo);
-  redirect("/dashboard");
+  redirect("/dashboard/products");
 }
 
 export async function deleteProduct(id: number) {
@@ -124,6 +124,37 @@ export async function toggleActive(id: number, active: boolean) {
   const admin = getSupabaseAdmin();
   await admin.from("products").update({ active }).eq("id", id);
   revalidatePublic();
+}
+
+const SETTINGS_SCOPES = ["business", "content", "integrations", "launch"] as const;
+
+/** Saves approved public content and checklist states. Secrets are rejected. */
+export async function saveStoreSettings(formData: FormData) {
+  await requireAdmin();
+  const scope = String(formData.get("scope") || "");
+  if (!SETTINGS_SCOPES.includes(scope as (typeof SETTINGS_SCOPES)[number])) {
+    throw new Error("Invalid settings section");
+  }
+
+  const blocked = /password|secret|api[_ -]?key|otp|token/i;
+  const values: Record<string, string | boolean> = {};
+  for (const [key, raw] of formData.entries()) {
+    if (key === "scope" || key === "return_to" || key.startsWith("$")) continue;
+    if (blocked.test(key)) throw new Error("Secrets cannot be saved here");
+    values[key] = raw === "on" ? true : String(raw).trim().slice(0, 5000);
+  }
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("store_settings").upsert(
+    { id: "main", [scope]: values, updated_at: new Date().toISOString() },
+    { onConflict: "id" },
+  );
+  if (error) throw new Error(error.message);
+
+  const returnTo = String(formData.get("return_to") || "/dashboard/setup");
+  revalidatePath("/dashboard");
+  revalidatePath(returnTo);
+  redirect(returnTo);
 }
 
 /** Re-runs delivery for an order (re-sends the WhatsApp link). Admin only. */

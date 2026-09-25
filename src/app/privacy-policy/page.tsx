@@ -12,13 +12,13 @@ export default function Page() {
         {
           heading: "1. Information We Collect",
           body: [
-            "When you place an order we collect your name and WhatsApp mobile number so we can deliver your PDF ebook. Payment is processed by our payment gateway (Razorpay); we do not store your card, UPI or bank details on our servers.",
+            "You can purchase without creating an account or providing a name or mobile number. If you voluntarily add a name and WhatsApp number after payment, we store them only to send the download link, provide My Books access, and support your order. Payment is processed by Razorpay; we do not store your card, UPI or bank details.",
           ],
         },
         {
           heading: "2. How We Use Your Information",
           body: [
-            "Your details are used solely to process your order, deliver the purchased ebook link on WhatsApp, and provide customer support. We may send you order-related messages on the WhatsApp number you provide.",
+            "Optional contact details are used solely to deliver the purchased ebook link on WhatsApp, provide purchase recovery through My Books, and offer order support. We send only order-related messages unless you separately consent to marketing.",
           ],
         },
         {

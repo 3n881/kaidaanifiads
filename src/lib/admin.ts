@@ -35,6 +35,37 @@ export interface AdminOrder {
   created_at: string;
 }
 
+export interface StoreSettings {
+  business: Record<string, string | boolean>;
+  content: Record<string, string | boolean>;
+  integrations: Record<string, string | boolean>;
+  launch: Record<string, string | boolean>;
+}
+
+const EMPTY_SETTINGS: StoreSettings = {
+  business: {},
+  content: {},
+  integrations: {},
+  launch: {},
+};
+
+export async function getStoreSettings(): Promise<StoreSettings> {
+  await requireAdmin();
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("store_settings")
+    .select("business, content, integrations, launch")
+    .eq("id", "main")
+    .maybeSingle();
+  if (error || !data) return EMPTY_SETTINGS;
+  return {
+    business: (data.business ?? {}) as StoreSettings["business"],
+    content: (data.content ?? {}) as StoreSettings["content"],
+    integrations: (data.integrations ?? {}) as StoreSettings["integrations"],
+    launch: (data.launch ?? {}) as StoreSettings["launch"],
+  };
+}
+
 /** All products for the admin table (includes inactive). Admin-guarded. */
 export async function getAdminProducts(): Promise<AdminProduct[]> {
   await requireAdmin();

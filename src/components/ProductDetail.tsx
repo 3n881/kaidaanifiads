@@ -21,9 +21,9 @@ import Carousel from "./Carousel";
 
 const MINI_STEPS = [
   { n: "1", label: "बटन दाबा", en: "Click" },
-  { n: "2", label: "माहिती भरा", en: "Fill Info" },
-  { n: "3", label: "पेमेंट करा", en: "Pay" },
-  { n: "✓", label: "PDF मिळवा", en: "Get PDF" },
+  { n: "2", label: "पेमेंट करा", en: "Pay" },
+  { n: "3", label: "PDF मिळवा", en: "Download" },
+  { n: "✓", label: "WhatsApp ऐच्छिक", en: "Optional" },
 ];
 
 export default async function ProductDetail({

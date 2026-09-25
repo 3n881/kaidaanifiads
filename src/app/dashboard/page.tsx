@@ -1,140 +1,39 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus, Pencil, BookOpen, Package, Eye, EyeOff } from "lucide-react";
+import { BookOpen, Package, ShoppingBag, ArrowRight } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import DeleteProductButton from "@/components/admin/DeleteProductButton";
-import { getAdminProducts } from "@/lib/admin";
+import { StepLink } from "@/components/admin/OnboardingUI";
+import { getAdminOrders, getAdminProducts, getStoreSettings } from "@/lib/admin";
 
-export const metadata: Metadata = {
-  title: "Admin — Products",
-  robots: { index: false, follow: false },
-};
-
+export const metadata: Metadata = { title: "Store overview", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const products = await getAdminProducts();
+  const [products, orders, settings] = await Promise.all([getAdminProducts(), getAdminOrders(), getStoreSettings()]);
   const ebooks = products.filter((p) => !p.is_combo);
-  const combos = products.filter((p) => p.is_combo);
+  const completeProducts = products.filter((p) => p.title && p.price > 0 && p.cover_image && (p.is_combo || p.pdf_path));
+  const setupDone = Boolean(settings.business.brand_name && settings.business.support_email && settings.business.support_whatsapp);
+  const contentDone = Boolean(settings.content.hero_title && settings.content.about_text);
+  const integrationsDone = ["supabase", "razorpay", "interakt", "domain"].every((key) => settings.integrations[key] === "ready");
 
-  return (
-    <AdminShell
-      active="products"
-      title="Products"
-      action={
-        <Link
-          href="/dashboard/products/new"
-          className="inline-flex items-center gap-2 self-start rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-teal/90"
-        >
-          <Plus className="h-4 w-4" /> नवीन पुस्तक
-        </Link>
-      }
-    >
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat icon={BookOpen} label="ई-बुक्स" value={ebooks.length} />
-        <Stat icon={Package} label="कॉम्बो" value={combos.length} />
-        <Stat
-          icon={Eye}
-          label="Active"
-          value={products.filter((p) => p.active).length}
-        />
-        <Stat
-          icon={EyeOff}
-          label="Hidden"
-          value={products.filter((p) => !p.active).length}
-        />
-      </div>
-
-      <div className="mt-8 overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-[var(--shadow-card)]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-brand-50/60 text-xs uppercase text-brand-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">ID</th>
-                <th className="px-4 py-3 font-semibold">Title</th>
-                <th className="px-4 py-3 font-semibold">Type</th>
-                <th className="px-4 py-3 font-semibold">Lang</th>
-                <th className="px-4 py-3 font-semibold">Price</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-50">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-brand-50/40">
-                  <td className="px-4 py-3 text-brand-400">{p.id}</td>
-                  <td className="font-deva max-w-[260px] truncate px-4 py-3 font-medium text-brand-900">
-                    {p.title}
-                    {p.featured && (
-                      <span className="ml-2 rounded bg-brand-gold/20 px-1.5 py-0.5 text-[10px] font-bold text-brand-teal">
-                        ★
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        p.is_combo
-                          ? "bg-brand-teal/10 text-brand-teal"
-                          : "bg-brand-100 text-brand-700"
-                      }`}
-                    >
-                      {p.is_combo ? "Combo" : "Ebook"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-brand-600">{p.language}</td>
-                  <td className="px-4 py-3 text-brand-700">
-                    <span className="text-brand-300 line-through">
-                      ₹{p.mrp}
-                    </span>{" "}
-                    <b>₹{p.price}</b>
-                  </td>
-                  <td className="px-4 py-3">
-                    {p.active ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600">
-                        <Eye className="h-3.5 w-3.5" /> Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-400">
-                        <EyeOff className="h-3.5 w-3.5" /> Hidden
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/dashboard/products/${p.id}`}
-                        className="inline-flex items-center gap-1 rounded-lg border border-brand-200 px-2.5 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Edit
-                      </Link>
-                      <DeleteProductButton id={p.id} title={p.title} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </AdminShell>
-  );
-}
-
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-2xl border border-brand-100 bg-white p-4 shadow-[var(--shadow-card)]">
-      <Icon className="h-5 w-5 text-brand-500" />
-      <p className="mt-2 text-2xl font-extrabold text-brand-900">{value}</p>
-      <p className="font-deva text-xs text-brand-400">{label}</p>
+  return <AdminShell active="overview" title="Store overview" description="Complete one clear step at a time. You can return and edit anything later.">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Stat icon={BookOpen} label="Ebooks" value={ebooks.length} />
+      <Stat icon={Package} label="Combos" value={products.length - ebooks.length} />
+      <Stat icon={ShoppingBag} label="Orders" value={orders.length} />
+      <div className="rounded-2xl bg-brand-teal p-4 text-white"><p className="text-2xl font-extrabold">{products.length ? Math.round((completeProducts.length / products.length) * 100) : 0}%</p><p className="mt-2 text-xs text-white/70">Catalogue ready</p></div>
     </div>
-  );
+
+    <div className="mt-7 grid gap-6 lg:grid-cols-[1fr_340px]">
+      <section><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold text-brand-900">Get ready to launch</h2><Link href="/dashboard/launch" className="text-xs font-bold text-brand-teal">Full checklist</Link></div><div className="grid gap-3">
+        <StepLink href="/dashboard/setup" title="Business and contact details" detail="Brand, support details and public business information" complete={setupDone} />
+        <StepLink href="/dashboard/products" title="Add books and PDFs" detail={`${completeProducts.length} of ${products.length || 1} products ready`} complete={products.length > 0 && completeProducts.length === products.length} />
+        <StepLink href="/dashboard/content" title="Website content" detail="Homepage, about text and social links" complete={contentDone} />
+        <StepLink href="/dashboard/integrations" title="Payments and delivery" detail="Razorpay, Interakt, domain and database status" complete={integrationsDone} />
+      </div></section>
+      <aside className="rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]"><h2 className="font-bold text-brand-900">Quick action</h2><p className="mt-1 text-sm text-brand-500">Add one book at a time. We generate the URL and technical values for you.</p><Link href="/dashboard/products/new" className="mt-5 flex items-center justify-between rounded-xl bg-brand-gold px-4 py-3 text-sm font-bold text-brand-900">Add an ebook <ArrowRight className="h-4 w-4" /></Link><Link href="/dashboard/products/new?type=combo" className="mt-2 flex items-center justify-between rounded-xl border border-brand-200 px-4 py-3 text-sm font-bold text-brand-700">Build a combo <ArrowRight className="h-4 w-4" /></Link></aside>
+    </div>
+  </AdminShell>;
 }
+
+function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) { return <div className="rounded-2xl border border-brand-100 bg-white p-4 shadow-[var(--shadow-card)]"><Icon className="h-5 w-5 text-brand-500" /><p className="mt-2 text-2xl font-extrabold text-brand-900">{value}</p><p className="text-xs text-brand-400">{label}</p></div>; }
