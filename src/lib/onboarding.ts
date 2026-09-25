@@ -6,6 +6,8 @@ export interface ProgressItem {
   href: string;
   complete: boolean;
   missing: string[];
+  completedCount: number;
+  totalCount: number;
 }
 
 const present = (value: unknown) =>
@@ -75,18 +77,22 @@ export function getOnboardingProgress(
   ]);
 
   const items: ProgressItem[] = [
-    { key: "business", label: "Business and brand", href: "/dashboard/setup", complete: businessMissing.length === 0, missing: businessMissing },
-    { key: "products", label: "Books and files", href: "/dashboard/products", complete: productMissing.length === 0, missing: productMissing },
-    { key: "content", label: "Website content", href: "/dashboard/content", complete: contentMissing.length === 0, missing: contentMissing },
-    { key: "integrations", label: "Payments and delivery", href: "/dashboard/integrations", complete: integrationMissing.length === 0, missing: integrationMissing },
-    { key: "launch", label: "Review and approval", href: "/dashboard/launch", complete: approvalMissing.length === 0, missing: approvalMissing },
+    { key: "business", label: "Business and brand", href: "/dashboard/setup", complete: businessMissing.length === 0, missing: businessMissing, completedCount: 10 - businessMissing.length, totalCount: 10 },
+    { key: "products", label: "Books and files", href: "/dashboard/products", complete: productMissing.length === 0, missing: productMissing, completedCount: productMissing.length === 0 ? 1 : 0, totalCount: 1 },
+    { key: "content", label: "Website content", href: "/dashboard/content", complete: contentMissing.length === 0, missing: contentMissing, completedCount: 4 - contentMissing.length, totalCount: 4 },
+    { key: "integrations", label: "Payments and delivery", href: "/dashboard/integrations", complete: integrationMissing.length === 0, missing: integrationMissing, completedCount: 6 - integrationMissing.length, totalCount: 6 },
+    { key: "launch", label: "Review and approval", href: "/dashboard/launch", complete: approvalMissing.length === 0, missing: approvalMissing, completedCount: 3 - approvalMissing.length, totalCount: 3 },
   ];
   const completed = items.filter((item) => item.complete).length;
+  const completedRequirements = items.reduce((sum, item) => sum + item.completedCount, 0);
+  const totalRequirements = items.reduce((sum, item) => sum + item.totalCount, 0);
   return {
     items,
     completed,
     total: items.length,
-    percent: Math.round((completed / items.length) * 100),
+    completedRequirements,
+    totalRequirements,
+    percent: Math.round((completedRequirements / totalRequirements) * 100),
     readyProducts,
     next: items.find((item) => !item.complete) ?? null,
   };
