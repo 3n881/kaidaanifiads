@@ -31,6 +31,17 @@ async function uploadFile(
   slug: string,
 ): Promise<string> {
   const admin = getSupabaseAdmin();
+  const isCover = bucket === "covers";
+  const maxBytes = isCover ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new Error(`${isCover ? "Image" : "PDF"} must be smaller than ${isCover ? 5 : 50} MB`);
+  }
+  if (isCover && !file.type.startsWith("image/")) {
+    throw new Error("Cover must be an image file");
+  }
+  if (!isCover && file.type !== "application/pdf") {
+    throw new Error("Ebook file must be a PDF");
+  }
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
   const path = `${slug}-${Date.now()}.${ext}`;
   const { error } = await admin.storage
