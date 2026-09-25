@@ -104,6 +104,10 @@ export async function saveProduct(formData: FormData) {
       await admin
         .from("combo_items")
         .insert(memberIds.map((product_id) => ({ combo_id: id, product_id })));
+      await admin
+        .from("products")
+        .update({ set_size: memberIds.length })
+        .eq("id", id);
     }
   }
 
@@ -141,6 +145,28 @@ export async function saveStoreSettings(formData: FormData) {
   for (const [key, raw] of formData.entries()) {
     if (key === "scope" || key === "return_to" || key.startsWith("$")) continue;
     if (blocked.test(key)) throw new Error("Secrets cannot be saved here");
+    if (raw instanceof File) {
+      if (raw.size === 0) continue;
+      const allowedFiles: Record<string, string> = {
+        logo_file: "logo_url",
+        favicon_file: "favicon_url",
+        testimonial_1_photo_file: "testimonial_1_photo_url",
+        testimonial_2_photo_file: "testimonial_2_photo_url",
+        testimonial_3_photo_file: "testimonial_3_photo_url",
+      };
+      if (!allowedFiles[key] || (scope !== "business" && scope !== "content")) {
+        throw new Error("Unsupported settings file");
+      }
+      if (!raw.type.startsWith("image/") || raw.size > 5 * 1024 * 1024) {
+        throw new Error("Brand images must be under 5 MB");
+      }
+      values[allowedFiles[key]] = await uploadFile(
+        "covers",
+        raw,
+        `settings-${allowedFiles[key].replace("_url", "")}`,
+      );
+      continue;
+    }
     values[key] = raw === "on" ? true : String(raw).trim().slice(0, 5000);
   }
 

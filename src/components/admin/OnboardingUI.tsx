@@ -18,3 +18,12 @@ export function StepLink({ href, title, detail, complete }: { href: string; titl
 export function SaveButton({ children = "Save and continue" }: { children?: React.ReactNode }) {
   return <button type="submit" className="rounded-xl bg-brand-teal px-5 py-3 text-sm font-bold text-white transition hover:bg-brand-700">{children}</button>;
 }
+
+export function ProgressBar({ percent, label = "Setup progress" }: { percent: number; label?: string }) {
+  return <div className="rounded-2xl border border-brand-100 bg-white p-4 shadow-[var(--shadow-card)]"><div className="flex items-center justify-between gap-3"><span className="text-sm font-bold text-brand-900">{label}</span><span className="text-sm font-extrabold text-brand-teal">{percent}%</span></div><div className="mt-3 h-2.5 overflow-hidden rounded-full bg-brand-100" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><div className="h-full rounded-full bg-brand-teal transition-[width] duration-500" style={{ width: `${percent}%` }} /></div></div>;
+}
+
+export function MissingItems({ items }: { items: string[] }) {
+  if (items.length === 0) return <p className="text-xs font-semibold text-green-600">All required information in this section is complete.</p>;
+  return <div className="rounded-xl bg-amber-50 px-4 py-3 text-amber-900"><p className="text-xs font-bold">Still required</p><p className="mt-1 text-xs leading-relaxed">{items.join(" · ")}</p></div>;
+}
