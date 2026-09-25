@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Mail, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -17,16 +16,17 @@ export default function AdminLogin() {
     setStatus("sending");
     setMessage("");
     try {
-      const supabase = createClient();
       const next =
         new URLSearchParams(window.location.search).get("next") || "/dashboard";
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        },
+      const response = await fetch("/api/auth/magic-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), next }),
       });
-      if (error) throw error;
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error || "Login link could not be sent.");
+      }
       setStatus("sent");
     } catch (err) {
       setStatus("error");
