@@ -89,7 +89,16 @@ export async function POST(req: NextRequest) {
   }
 
   // ---------------------- LIVE: create a Razorpay order --------------------
-  const rzp = await createRazorpayOrder(product.price, `rcpt_${Date.now()}`);
+  let rzp;
+  try {
+    rzp = await createRazorpayOrder(product.price, `rcpt_${Date.now()}`);
+  } catch (error) {
+    console.error("Unable to create Razorpay order", error);
+    return NextResponse.json(
+      { error: "Payment gateway authentication failed. Please contact support." },
+      { status: 503 },
+    );
+  }
   const { data: order, error } = await admin
     .from("orders")
     .insert({
