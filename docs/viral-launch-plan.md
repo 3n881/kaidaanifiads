@@ -27,7 +27,8 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 | 5 | Cloudflare configuration + AWS hosting | Cloudflare rules + AWS options (5b) written · **setup pending — owner** |
 | 6 | Observability & funnel | funnel view + log tags done · dashboards/alerts pending |
 | 7 | Load & failure testing | k6 scripts written (`loadtest/`) · **runs pending (needs staging)** |
-| 8 | Launch runbook | pending |
+| 8 | Go-live & per-Reel runbook | pending |
+| 9 | Supabase / Razorpay outage handling | **code done & tested** (simulated outage) · owner settings pending |
 
 ### Your next actions (in order)
 
@@ -400,6 +401,43 @@ Every Reel (2–3× a week):
 - [ ] Weekly: Supabase egress vs the 250 GB allowance; Lightsail CPU peaks.
 - [ ] Last resort only: Cloudflare "Under Attack" mode (it challenges real buyers).
 
+### Phase 9 — Supabase & Razorpay outage handling
+
+Two app servers remove the server as a single point of failure. **Supabase and Razorpay are managed services we cannot duplicate on this budget**, so the goal is: *never take money we can't record, never lose a payment that went through, and always tell the buyer what's happening.*
+
+**What happens during an outage (tested 2026-09-26 by black-holing Supabase in the production Docker image):**
+
+| Situation | Buyer sees | System does | Result |
+|---|---|---|---|
+| Supabase down/slow — browsing | Book pages load normally | Served from Cloudflare + prerendered/ISR cache; failed ISR refreshes keep the last good page | ✅ no impact |
+| Supabase down — tap Buy | "Payments are busy, try again in a minute" + **Try again** button (after ≤ 8 s) | Checkout refuses before creating a Razorpay order | ✅ no money taken for an unrecordable order |
+| Supabase goes down **after** payment | Order page: "System busy — your payment is safe, this page updates itself" (auto-refresh ~10 min; saved in My Books) | Confirm answers 503 + order link; webhook answers **503 so Razorpay redelivers** | ✅ paid order recorded once the DB is back |
+| DB back, but confirm + webhook both missed | Order page shows download as soon as it's opened | Order page asks Razorpay directly for captured payments; **cron sweep every 10 min** does the same for buyers who closed the tab | ✅ no lost payment even without webhooks |
+| Supabase Storage down (DB up) | Download page: "busy, try again — your purchase is safe" + back link | Download answers 503; nothing counted against the cap | ✅ retry works when Storage returns |
+| Razorpay API down — tap Buy | "Payments are busy, try again" + **Try again** | Checkout retries Razorpay once (8 s timeout each), then 503 | ✅ |
+| Razorpay popup (checkout.js) fails to load | "Payment window could not be loaded" + **Try again** | — | ✅ |
+| Razorpay webhooks delayed/down | Nothing — download is immediate | Confirm verifies the signature locally (no Razorpay API call) | ✅ |
+
+Code (all done, `[x]`):
+- [x] 9.1 Supabase client timeouts (8 s; admin uploads 120 s) and **automatic client retries off** (they turned one timeout into ~40 s). Measured: every failing path answers in ~8 s.
+- [x] 9.2 `DatabaseUnavailableError` — database errors are never reported as "not found".
+- [x] 9.3 Webhook: 503 on database errors → Razorpay redelivers (previously answered 200 and the payment was silently dropped).
+- [x] 9.4 Confirm: 503 + order URL; order page: "system busy, payment safe" state instead of 404.
+- [x] 9.5 Checkout: bilingual busy message, `retryable`, Razorpay 8 s timeout + one retry; Buy modal **Try again** button.
+- [x] 9.6 Download: readable bilingual error pages with a link back to the order.
+- [x] 9.7 Reconciliation: order page checks Razorpay for pending orders (`src/lib/reconcile.ts`); `POST /api/cron/reconcile` (Bearer `CRON_SECRET`) sweeps the last 48 h; `.github/workflows/reconcile.yml` runs it every 10 min.
+
+Operational (owner):
+- [ ] 9.8 `CRON_SECRET` (`openssl rand -hex 32`) in `/opt/kaf/app.env` on both servers **and** as a GitHub secret.
+- [ ] 9.9 Razorpay: **auto-capture ON** (reconciliation only trusts `captured`); tell your Razorpay account manager the expected volume and spikes so risk checks don't hold payments; confirm per-day/per-transaction limits on the account; subscribe to status.razorpay.com.
+- [ ] 9.10 Supabase: Pro plan (no pausing), subscribe to status.supabase.com, spend cap on, keep daily backups.
+- [ ] 9.11 Cloudflare: **Always Online** on (serves cached pages if both servers are unreachable).
+- [ ] 9.12 Drill once on staging: block Supabase → tap Buy (busy message) → restore → check a pending test order turns paid via the order page / cron.
+
+Not done on purpose (budget / complexity; revisit if outages actually hurt):
+- A second payment gateway (Cashfree/PhonePe PG) as automatic fallback — second KYC + integration.
+- Taking payments while Supabase is down and recording them later — risks charging for books we can't deliver during the same outage (Storage is on Supabase too).
+
 ### Later (P2)
 
 - [ ] Trim font weights (7 → 3–4 files).
@@ -422,7 +460,8 @@ Every Reel (2–3× a week):
 | 2026-09-26 | — | Migrations 001/002 applied by owner and verified | — |
 | 2026-09-26 | 5b | Budget plan: Lightsail + Cloudflare Free + Supabase Pro | `021dce0` |
 | 2026-09-26 | 5b | Docker/Caddy/rolling deploy/CI for Lightsail (1–2 servers), `/api/health`, runbook | `1c352ca`, `29d1c4c` |
-| 2026-09-26 | 5b/8 | Decision: two always-on servers (recurring creator Reels, not a campaign); per-Reel runbook | this push |
+| 2026-09-26 | 5b/8 | Decision: two always-on servers (recurring creator Reels, not a campaign); per-Reel runbook | `08d0766` |
+| 2026-09-26 | 9 | Supabase/Razorpay outage handling: timeouts, no client retries, 503 for webhook redelivery, busy states, Try again, Razorpay reconciliation + cron | this push |
 
 ## 5. Files added / changed
 
@@ -456,3 +495,4 @@ Every Reel (2–3× a week):
 | `WHATSAPP_SEND_LIMIT` | no | 3 per order |
 | `AUTO_WHATSAPP_ON_PAYMENT` | no | false |
 | `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | for instant purge | purge skipped |
+| `CRON_SECRET` | for the reconciliation sweep | sweep disabled (401) |

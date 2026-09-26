@@ -72,7 +72,7 @@ One server handles roughly 100× that. Capacity is not the reason for the second
 | Cloudflare | Add the domain (Free plan). **SSL/TLS → Origin Server → Create certificate** (15 years, `kaydyachaanifaydyach.com`, `*.kaydyachaanifaydyach.com`) — the **same** cert/key goes on both servers |
 | Cloudflare | **Traffic → Load Balancing → enable** (US$5/month) |
 | Cloudflare | API token with only *Zone → Cache Purge* → `CLOUDFLARE_API_TOKEN`; Zone ID → `CLOUDFLARE_ZONE_ID` |
-| GitHub → Settings → Secrets and variables → Actions | **Secrets:** `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`), `LIGHTSAIL_SSH_KEY`. **Variables:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `LIGHTSAIL_HOSTS` = `"<ip-A> <ip-B>"`, and `DEPLOY_ENABLED=true` **last** |
+| GitHub → Settings → Secrets and variables → Actions | **Secrets:** `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`), `LIGHTSAIL_SSH_KEY`, `CRON_SECRET` (`openssl rand -hex 32`, same value as in `app.env`). **Variables:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `LIGHTSAIL_HOSTS` = `"<ip-A> <ip-B>"`, and `DEPLOY_ENABLED=true` **last** |
 | GitHub → Developer settings | Classic token with only `read:packages` (servers pull the image) |
 
 ## 2. Create both servers
@@ -105,7 +105,7 @@ nano app.env                   # from app.env.example — MUST be identical on b
 echo <read:packages token> | docker login ghcr.io -u 3n881 --password-stdin
 ```
 
-`app.env` must match byte-for-byte on both servers. The critical values are `ORDER_ACCESS_SECRET` (order and download links), the Razorpay keys, and the Supabase keys.
+`app.env` must match byte-for-byte on both servers. The critical values are `ORDER_ACCESS_SECRET` (order and download links), `CRON_SECRET`, the Razorpay keys, and the Supabase keys.
 Keep a copy in a password manager. When a value changes, update both servers, then redeploy.
 
 ## 5. Lock both firewalls (from your laptop, AWS CLI configured)
@@ -165,6 +165,8 @@ curl -sk --max-time 5 https://<ip-A>/ ; echo "exit=$?"      # must time out (fir
 
 ## 8. Monitoring
 
+- **Reconciliation:** Actions → "Reconcile payments" runs every 10 minutes. A red run means the site or Supabase was unreachable. Server logs show `[reconcile] recovered paid order` whenever it rescued a payment.
+
 - Cloudflare → Load Balancing → pool health, plus the e-mail alert when a server drops.
 - Lightsail → Metrics → alarms on each server: CPU > 70 % for 5 min, status check failed.
 - Free uptime monitor (e.g. UptimeRobot) on `https://kaydyachaanifaydyach.com/api/health`.
@@ -190,4 +192,4 @@ curl -sk --max-time 5 https://<ip-A>/ ; echo "exit=$?"      # must time out (fir
 | Order / download links | HMAC with the shared `ORDER_ACCESS_SECRET` → valid on either server |
 | Admin login | Supabase cookie session, nothing in server memory |
 | Page cache (ISR) | Per container. After an admin edit, other containers refresh within ≤ 5 min. The Cloudflare HTML rule respects origin TTL, so the edge never holds a stale copy longer than that. |
-| Single points left | **Supabase** (managed, Pro) and **Razorpay**. Cached pages survive both, but checkout needs both. |
+| Single points left | **Supabase** (managed, Pro) and **Razorpay**. Cached pages survive both. Checkout fails safely with a "try again" message, and payments made just before an outage are recovered by webhook redelivery, the order page, and the 10-minute reconciliation sweep. See `docs/viral-launch-plan.md` → Phase 9. |
