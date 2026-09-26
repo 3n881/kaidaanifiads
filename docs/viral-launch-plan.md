@@ -32,7 +32,7 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 1. ~~Run migrations 001 + 002~~ ✅ done (verified 2026-09-26: columns, functions, view exist; anon cannot call the functions or read the funnel).
 2. Add env vars: `ORDER_ACCESS_SECRET`, `ADMIN_EMAILS`, Razorpay **test** keys + webhook secret (see `.env.local.example`).
 3. Dashboard → upload a PDF for every ebook; tick member books on every combo.
-4. Hosting = **AWS** → pick Option A (ECS Fargate, recommended) or B in Phase 5b; then Phase 5 Cloudflare rules apply as written.
+4. Hosting = **AWS Lightsail** (budget ₹7,000/month incl. Supabase — see Phase 5b) → Dockerfile next; then Phase 5 Cloudflare rules apply as written.
 5. One Razorpay **test-mode** purchase on a phone, opened from an Instagram link → tick 1.14.
 6. Run `supabase/checks/verify.sql` → tick Phase 4.
 7. Stand up staging + Cloudflare rules → run `loadtest/` → tick Phase 7.
@@ -80,7 +80,7 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 | Product covers (`cover_image`) | **0** — all books show gradient placeholders |
 | Orders in DB | 0 |
 | Migrations 001 / 002 applied | **yes** (verified) |
-| Hosting target | **AWS** (decided) — option A/B pending, see Phase 5b |
+| Hosting target | **AWS Lightsail** single instance + Cloudflare Free + Supabase Pro (≈ ₹3,300/month of ₹7,000 budget) |
 
 ---
 
@@ -314,15 +314,44 @@ Cloudflare stays in front as the CDN (Phase 5 rules apply unchanged); AWS only r
 | C. AWS Amplify Hosting | Managed Next.js hosting on AWS CloudFront | Git-push deploys, no Docker | Has its own CDN — putting the Cloudflare proxy in front double-caches (same issue as Vercel); **check Amplify supported Next.js versions before choosing (we are on 16.3)** | Only if Cloudflare is DNS-only |
 | D. OpenNext / SST on Lambda + CloudFront | Serverless Next.js | Scales to zero and to spikes | Most moving parts (S3 + DynamoDB + SQS for ISR); Next 16 support depends on the OpenNext release | Not needed — Cloudflare already absorbs spikes |
 
-Recommended setup (Option A):
-- [ ] `next.config.ts` → `output: "standalone"`; multi-stage `Dockerfile` (node 22-alpine, `sharp` included). *(code — ready to add once confirmed)*
-- [ ] ECR repository; ECS cluster; task 0.5 vCPU / 1 GB, **min 2 tasks**, target-tracking scale-out at 60 % CPU, max 6.
-- [ ] Secrets in AWS Secrets Manager / SSM → task env (Supabase service role, Razorpay, Interakt, `ORDER_ACCESS_SECRET`, Cloudflare token). Never baked into the image.
-- [ ] ALB listener 443 with an ACM certificate (for Cloudflare Full (strict)); health check `/about` (static, no DB).
-- [ ] ALB security group: inbound 443 **only from Cloudflare IP ranges** (origin protection).
-- [ ] CloudWatch Logs (search the `[checkout]`, `[webhook]` … tags); alarms on ALB 5xx, target response time, task CPU/memory.
-- [ ] Deploy: GitHub Actions → build image → push ECR → update ECS service (rolling, min healthy 100 %).
-- [ ] Build-time env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` must be present at `docker build` (inlined into client JS).
+#### Budget decision: ₹7,000 / month total (Supabase + AWS)
+
+Option A (Fargate ≈ ₹5,000–6,000 incl. ALB + public IPv4 charges) plus Supabase Pro (≈ ₹2,100) exceeds the budget. **Chosen: Option B on Lightsail, with a documented upgrade path.** Prices are approximate (≈ ₹85/US$) — confirm Mumbai pricing in the AWS console.
+
+| Item | Plan | ≈ US$/mo | ≈ ₹/mo |
+|---|---|---|---|
+| Cloudflare | Free plan (CDN, SSL, WAF custom rules, 1 rate-limit rule) | 0 | 0 |
+| AWS Lightsail (Mumbai) | 2 GB RAM / 2 vCPU instance, static IP + ~3 TB transfer included | ~12 | ~1,000 |
+| Lightsail snapshots | daily automatic snapshots (~40 GB) | ~2 | ~170 |
+| Supabase | Pro (8 GB DB, 100 GB storage, 250 GB egress, daily backups, never pauses) | 25 | ~2,100 |
+| **Total** | | **~39** | **~3,300** |
+| Headroom | Supabase egress overage, second instance later | | ~3,700 |
+
+Why one small instance is enough: Cloudflare serves ~99 % of anonymous traffic; the origin only handles checkout / confirm / webhook / download redirects and ISR refreshes every 5 min — light JSON calls that a 2 GB box serves at hundreds of requests/second.
+
+Single-instance risk and mitigations:
+- Cached pages stay up if the box is down (Cloudflare serve-stale).
+- Razorpay retries webhooks for up to 24 h, so payments during a short outage still complete.
+- Docker `restart: always` + Lightsail CPU/status alarms + a free uptime monitor on `/about`.
+- Daily snapshots → restore to a new instance in minutes.
+- Do **not** use Supabase Free for production: it pauses on inactivity and has 5 GB egress.
+
+Watch these costs:
+- **Supabase egress** — PDFs download from Supabase via signed URLs (not through Cloudflare). 250 GB is included (e.g. 5 MB PDF ≈ 50,000 downloads); overage ≈ US$0.09/GB. Keep PDFs compressed (< 5 MB).
+- Covers are also served by Supabase (~30 KB each after Phase 3); 1 M views ≈ 30 GB. If needed later, proxy `/covers/*` through Cloudflare to cache them.
+
+Upgrade path (when revenue/traffic justifies): second Lightsail instance + Lightsail load balancer (~US$18) ≈ ₹5,700 total, or move to Option A.
+
+Setup checklist (Option B, Lightsail):
+- [ ] `next.config.ts` → `output: "standalone"`; multi-stage `Dockerfile` (node 22-alpine, `sharp` included) + `docker-compose.yml` with `restart: always`. *(code — next step)*
+- [ ] Lightsail instance in `ap-south-1` (same region as Supabase if possible), Ubuntu LTS, attach static IP, enable automatic snapshots.
+- [ ] Caddy or nginx on the box terminating TLS with a **Cloudflare Origin CA certificate** (for Full (strict)); proxy to the Next.js container.
+- [ ] Lightsail firewall: 443 (and 80) **only from Cloudflare IP ranges**; SSH only from your IP.
+- [ ] Secrets in a root-only `.env` on the server (not in the image, not in git).
+- [ ] Build-time env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` present at `docker build` (inlined into client JS).
+- [ ] Deploy: GitHub Actions → build image → push to GHCR/ECR → SSH `docker compose pull && up -d` (or build on the box).
+- [ ] Monitoring: Lightsail alarms (CPU, status check), free uptime monitor on `/about`, `docker logs` search by `[checkout]`, `[webhook]` tags.
+- [ ] Supabase: upgrade to Pro; set spend cap on; region noted.
 
 ### Phase 6 — Observability & funnel — P1
 
