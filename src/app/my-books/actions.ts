@@ -2,69 +2,49 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
-import { createSignedPdfUrl } from "@/lib/delivery";
+import { isInteraktConfigured } from "@/lib/interakt";
+import { normalizePhone } from "@/lib/orders";
+import { sendOrderOnWhatsApp } from "@/lib/delivery";
 
-export interface PurchasedBook {
-  id: string;
-  title: string;
-  slug: string | null;
-  isCombo: boolean;
-  amount: number;
-  createdAt: string;
-  downloadUrl: string | null;
-}
+// Max orders re-sent per request (bounds cost if someone owns many orders).
+const MAX_ORDERS_PER_REQUEST = 10;
 
-interface OrderRow {
-  id: string;
-  amount: number;
-  created_at: string;
-  download_url: string | null;
-  products:
-    | { title: string; slug: string; is_combo: boolean; pdf_path: string | null }
-    | { title: string; slug: string; is_combo: boolean; pdf_path: string | null }[]
-    | null;
-}
-
-export async function lookupOrders(
+/**
+ * Sends the buyer's order links to their own WhatsApp number. Never returns
+ * links or purchase details to the browser, so typing someone else's number
+ * reveals nothing — only the number's owner receives the messages. The reply
+ * is identical whether or not purchases exist (no enumeration). Each order's
+ * WhatsApp sends are capped in the database.
+ */
+export async function sendMyBooks(
   whatsapp: string,
-): Promise<{ error?: string; orders: PurchasedBook[] }> {
-  const phone = (whatsapp ?? "").replace(/\D/g, "").slice(-10);
-  if (!/^[6-9]\d{9}$/.test(phone)) {
-    return { error: "कृपया वैध १० अंकी व्हॉट्सॲप नंबर भरा.", orders: [] };
+): Promise<{ error?: string; ok?: boolean }> {
+  const phone = normalizePhone(whatsapp);
+  if (!phone) return { error: "कृपया वैध १० अंकी व्हॉट्सॲप नंबर भरा." };
+  if (!hasServiceRole || !isInteraktConfigured) {
+    return { error: "ही सुविधा सध्या उपलब्ध नाही. कृपया WhatsApp सपोर्टशी संपर्क करा." };
   }
-  if (!hasServiceRole) return { orders: [] };
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("orders")
-    .select(
-      "id, amount, created_at, download_url, products(title, slug, is_combo, pdf_path)",
-    )
-    .eq("whatsapp_number", phone)
+    .select("id")
     .eq("status", "paid")
-    .order("created_at", { ascending: false });
+    .or(`whatsapp_number.eq.${phone},buyer_contact.eq.${phone}`)
+    .order("created_at", { ascending: false })
+    .limit(MAX_ORDERS_PER_REQUEST);
 
-  if (error) return { error: "लुकअप अयशस्वी.", orders: [] };
+  if (error) {
+    console.error("[my-books] lookup failed", error.message);
+    return { error: "लुकअप अयशस्वी. कृपया पुन्हा प्रयत्न करा." };
+  }
 
-  const rows = (data ?? []) as unknown as OrderRow[];
-  const orders = await Promise.all(
-    rows.map(async (o) => {
-      const p = Array.isArray(o.products) ? o.products[0] : o.products;
-      // Regenerate a fresh signed URL (stored one may have expired).
-      const downloadUrl = p?.pdf_path
-        ? await createSignedPdfUrl(p.pdf_path)
-        : o.download_url;
-      return {
-        id: o.id,
-        title: p?.title ?? "पुस्तक",
-        slug: p?.slug ?? null,
-        isCombo: p?.is_combo ?? false,
-        amount: o.amount,
-        createdAt: o.created_at,
-        downloadUrl,
-      };
-    }),
-  );
-
-  return { orders };
+  for (const order of data ?? []) {
+    try {
+      await sendOrderOnWhatsApp(order.id, { phone });
+    } catch (sendError) {
+      console.error("[my-books] send failed", sendError);
+    }
+  }
+  return { ok: true };
 }

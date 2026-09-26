@@ -43,7 +43,6 @@ export interface Product {
   /** Uploaded cover image URL (from the `covers` bucket). Falls back to gradient. */
   coverImage?: string;
   /** Object path of the PDF in the private `pdfs` bucket. */
-  pdfPath?: string;
 }
 
 /** Deterministic gradient placeholder cover for a given product id. */

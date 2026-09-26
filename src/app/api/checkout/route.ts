@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
@@ -7,7 +8,7 @@ import {
   razorpayKeyId,
   createRazorpayOrder,
 } from "@/lib/razorpay";
-import { fulfillOrder } from "@/lib/delivery";
+import { getDeliverableItems, orderPagePath } from "@/lib/orders";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
 
-  const slug = (body.slug ?? "").trim();
+  const slug = String(body.slug ?? "").trim().slice(0, 120);
   if (!slug) {
     return NextResponse.json({ error: "product is required" }, { status: 400 });
   }
@@ -32,9 +33,10 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = getSupabaseAdmin();
+  // Price is always read from the database — never from the browser.
   const { data: product } = await admin
     .from("products")
-    .select("id, title, price, slug, is_combo, pdf_path")
+    .select("id, title, price, slug")
     .eq("slug", slug)
     .eq("active", true)
     .maybeSingle();
@@ -43,14 +45,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "product not found" }, { status: 404 });
   }
 
-  if (!product.pdf_path) {
+  // Don't take money for something we can't deliver (single PDF, or the
+  // member books' PDFs for a combo).
+  const items = await getDeliverableItems(product.id);
+  if (items.length === 0) {
     return NextResponse.json(
       { error: "This ebook is temporarily unavailable for download." },
       { status: 409 },
     );
   }
 
+  const orderId = randomUUID();
   const guestOrder = {
+    id: orderId,
     name: "Guest",
     whatsapp_number: "",
     product_id: product.id,
@@ -68,48 +75,43 @@ export async function POST(req: NextRequest) {
         { status: 503 },
       );
     }
-    const { data: order, error } = await admin
-      .from("orders")
-      .insert({
-        ...guestOrder,
-        status: "paid",
-      })
-      .select("id")
-      .single();
-    if (error || !order) {
+    const { error } = await admin.from("orders").insert({
+      ...guestOrder,
+      status: "paid",
+      paid_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("[checkout] demo order insert failed", error);
       return NextResponse.json({ error: "order creation failed" }, { status: 500 });
     }
-    const result = await fulfillOrder(order.id);
     return NextResponse.json({
       testMode: true,
-      orderId: order.id,
-      accessToken: createOrderAccessToken(order.id),
-      downloadUrl: result.downloadUrl,
+      orderId,
+      accessToken: createOrderAccessToken(orderId),
+      orderUrl: orderPagePath(orderId),
+      productTitle: product.title,
     });
   }
 
   // ---------------------- LIVE: create a Razorpay order --------------------
   let rzp;
   try {
-    rzp = await createRazorpayOrder(product.price, `rcpt_${Date.now()}`);
+    rzp = await createRazorpayOrder(product.price, orderId);
   } catch (error) {
-    console.error("Unable to create Razorpay order", error);
+    console.error("[checkout] Razorpay order failed", error);
     return NextResponse.json(
-      { error: "Payment gateway authentication failed. Please contact support." },
+      { error: "Payment gateway is busy. Please try again in a moment." },
       { status: 503 },
     );
   }
-  const { data: order, error } = await admin
-    .from("orders")
-    .insert({
-      ...guestOrder,
-      razorpay_order_id: rzp.id,
-      status: "created",
-    })
-    .select("id")
-    .single();
 
-  if (error || !order) {
+  const { error } = await admin.from("orders").insert({
+    ...guestOrder,
+    razorpay_order_id: rzp.id,
+    status: "created",
+  });
+  if (error) {
+    console.error("[checkout] order insert failed", error);
     return NextResponse.json({ error: "order creation failed" }, { status: 500 });
   }
 
@@ -118,8 +120,9 @@ export async function POST(req: NextRequest) {
     keyId: razorpayKeyId,
     amount: rzp.amount,
     currency: rzp.currency,
-    orderId: order.id,
-    accessToken: createOrderAccessToken(order.id),
+    orderId,
+    accessToken: createOrderAccessToken(orderId),
+    orderUrl: orderPagePath(orderId),
     productTitle: product.title,
   });
 }

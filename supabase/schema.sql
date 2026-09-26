@@ -47,12 +47,13 @@ create table if not exists public.orders (
   razorpay_payment_id text,
   status             text not null default 'created'
                      check (status in ('created','paid','failed')),
-  delivered          boolean default false,
-  download_url       text,
+  delivered          boolean default false,   -- WhatsApp message sent
+  download_url       text,                    -- legacy; no longer written
   created_at         timestamptz default now()
 );
 create index if not exists orders_whatsapp_idx on public.orders (whatsapp_number);
-create index if not exists orders_rzp_order_idx on public.orders (razorpay_order_id);
+-- Payment idempotency, download tracking and recovery columns/functions live
+-- in supabase/migrations/001_viral_readiness.sql — run it after this file.
 
 -- ---------------------------------------------- guided client onboarding
 -- One company-owned settings record. It stores approved public content and

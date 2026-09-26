@@ -32,6 +32,8 @@ export interface AdminOrder {
   razorpay_payment_id: string | null;
   status: string;
   delivered: boolean | null;
+  buyer_contact: string | null;
+  download_count: number | null;
   created_at: string;
 }
 

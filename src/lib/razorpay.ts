@@ -4,8 +4,13 @@ import crypto from "crypto";
 const KEY_ID = process.env.RAZORPAY_KEY_ID ?? "";
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET ?? "";
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET ?? "";
+// Signs /order and /api/download links. Prefer a dedicated secret so rotating
+// payment keys doesn't invalidate customers' saved order links.
 const ORDER_ACCESS_SECRET =
-  KEY_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  process.env.ORDER_ACCESS_SECRET ||
+  KEY_SECRET ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "";
 
 export const isRazorpayConfigured = Boolean(KEY_ID && KEY_SECRET);
 export const razorpayKeyId = KEY_ID;
@@ -17,7 +22,8 @@ export interface RazorpayOrder {
   status: string;
 }
 
-/** Creates a Razorpay order (amount in rupees → paise). */
+/** Creates a Razorpay order (amount in rupees → paise). `receipt` is our
+ *  order UUID so Razorpay dashboard rows map back to `orders.id`. */
 export async function createRazorpayOrder(
   amountRupees: number,
   receipt: string,
@@ -34,6 +40,7 @@ export async function createRazorpayOrder(
       amount: Math.round(amountRupees * 100),
       currency: "INR",
       receipt,
+      notes: { order_id: receipt },
     }),
     cache: "no-store",
   });
@@ -80,7 +87,8 @@ export function verifyPaymentSignature(
   return safeEqual(expected, signature);
 }
 
-/** Server-signed proof for the optional post-payment contact form. */
+/** Server-signed proof of order ownership: gates the /order page, downloads
+ *  and the optional post-payment contact form. */
 export function createOrderAccessToken(orderId: string): string {
   if (!ORDER_ACCESS_SECRET) return "";
   return crypto

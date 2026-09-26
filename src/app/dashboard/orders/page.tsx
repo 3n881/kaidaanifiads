@@ -37,7 +37,8 @@ export default async function OrdersPage() {
                   <th className="px-4 py-3 font-semibold">WhatsApp</th>
                   <th className="px-4 py-3 font-semibold">Amount</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Delivered</th>
+                  <th className="px-4 py-3 font-semibold">WhatsApp sent</th>
+                  <th className="px-4 py-3 font-semibold">Downloads</th>
                   <th className="px-4 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -51,7 +52,7 @@ export default async function OrdersPage() {
                       {o.name}
                     </td>
                     <td className="px-4 py-3 text-brand-600">
-                      {o.whatsapp_number}
+                      {o.whatsapp_number || (o.buyer_contact ? `${o.buyer_contact} (Razorpay)` : "—")}
                     </td>
                     <td className="px-4 py-3 font-semibold text-brand-800">
                       ₹{o.amount}
@@ -71,6 +72,9 @@ export default async function OrdersPage() {
                     </td>
                     <td className="px-4 py-3">
                       {o.delivered ? "✅" : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-brand-600">
+                      {o.download_count ?? 0}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {o.status === "paid" && <ResendButton orderId={o.id} />}

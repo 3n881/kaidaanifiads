@@ -1,67 +1,88 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase/server";
 import { sendWhatsAppDelivery } from "./interakt";
+import { normalizePhone, orderPageUrl } from "./orders";
 
-const SIGNED_URL_TTL = 60 * 60 * 24 * 30; // 30 days
+// Signed URLs are minted per click by /api/download and only need to survive
+// the redirect, so they expire quickly — a forwarded link is useless.
+const SIGNED_URL_TTL = 60 * 5; // 5 minutes
 
-/** Creates a time-limited signed download URL for a private PDF. */
+// Max WhatsApp messages per order (customer-triggered). Bounds Interakt cost
+// and stops the contact form / My Books being used to spam numbers.
+const WHATSAPP_SEND_LIMIT = Number(process.env.WHATSAPP_SEND_LIMIT || 3);
+
+// Send the order link to the phone the buyer entered in Razorpay checkout,
+// without waiting for the optional form. Off unless explicitly enabled.
+const AUTO_WHATSAPP_ON_PAYMENT = process.env.AUTO_WHATSAPP_ON_PAYMENT === "true";
+
+/** Creates a short-lived signed download URL for a private PDF. */
 export async function createSignedPdfUrl(
   pdfPath: string | null,
+  downloadName?: string,
 ): Promise<string | null> {
   if (!pdfPath) return null;
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.storage
     .from("pdfs")
-    .createSignedUrl(pdfPath, SIGNED_URL_TTL);
-  if (error) return null;
+    .createSignedUrl(pdfPath, SIGNED_URL_TTL, {
+      download: downloadName ?? true,
+    });
+  if (error) {
+    console.error("[delivery] signed URL failed", error.message);
+    return null;
+  }
   return data.signedUrl;
 }
 
 /**
- * Fulfils a paid order: generates the signed PDF link, sends it on WhatsApp
- * (Interakt), and marks the order delivered. Idempotent — skips if already
- * delivered, so the webhook and client-confirm can both call it safely.
+ * Sends the customer their order page link on WhatsApp (Interakt). The link
+ * opens /order/{id}, which mints fresh short-lived download URLs — the raw
+ * file URL is never sent. Capped per order unless `force` (admin resend).
  */
-export async function fulfillOrder(
+export async function sendOrderOnWhatsApp(
   orderId: string,
-): Promise<{ downloadUrl: string | null; delivered: boolean }> {
+  opts: { force?: boolean; phone?: string } = {},
+): Promise<boolean> {
   const admin = getSupabaseAdmin();
-
   const { data: order } = await admin
     .from("orders")
-    .select("*")
+    .select("id, name, status, whatsapp_number, buyer_contact, products(title)")
     .eq("id", orderId)
     .maybeSingle();
-  if (!order) return { downloadUrl: null, delivered: false };
-  if (order.delivered && order.download_url) {
-    return { downloadUrl: order.download_url, delivered: true };
-  }
+  if (!order || order.status !== "paid") return false;
 
-  const { data: product } = await admin
-    .from("products")
-    .select("title, pdf_path")
-    .eq("id", order.product_id)
-    .maybeSingle();
-
-  const downloadUrl = await createSignedPdfUrl(product?.pdf_path ?? null);
-
-  let delivered = false;
-  const hasWhatsApp = /^[6-9]\d{9}$/.test(
-    String(order.whatsapp_number ?? "").replace(/\D/g, "").slice(-10),
+  const phone = normalizePhone(
+    opts.phone || order.whatsapp_number || order.buyer_contact,
   );
-  if (downloadUrl && hasWhatsApp) {
-    delivered = await sendWhatsAppDelivery({
-      phone: order.whatsapp_number,
-      name: order.name && order.name !== "Guest" ? order.name : "Customer",
-      productTitle: product?.title ?? "",
-      downloadLink: downloadUrl,
+  if (!phone) return false;
+
+  if (!opts.force) {
+    const { data: allowed, error } = await admin.rpc("claim_whatsapp_send", {
+      p_order: orderId,
+      p_limit: WHATSAPP_SEND_LIMIT,
     });
+    if (error || !allowed) return false;
   }
 
-  await admin
-    .from("orders")
-    .update({ download_url: downloadUrl, delivered })
-    .eq("id", orderId);
+  const product = Array.isArray(order.products) ? order.products[0] : order.products;
+  const sent = await sendWhatsAppDelivery({
+    phone,
+    name: order.name && order.name !== "Guest" ? order.name : "Customer",
+    productTitle: (product as { title?: string } | null)?.title ?? "",
+    downloadLink: orderPageUrl(orderId),
+  });
+  if (sent) {
+    await admin.from("orders").update({ delivered: true }).eq("id", orderId);
+  }
+  return sent;
+}
 
-  return { downloadUrl, delivered };
+/** Runs once when an order first becomes paid. */
+export async function onOrderPaid(orderId: string): Promise<void> {
+  if (!AUTO_WHATSAPP_ON_PAYMENT) return;
+  try {
+    await sendOrderOnWhatsApp(orderId);
+  } catch (error) {
+    console.error("[delivery] auto WhatsApp failed", error);
+  }
 }

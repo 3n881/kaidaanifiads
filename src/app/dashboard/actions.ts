@@ -194,14 +194,11 @@ export async function saveStoreSettings(formData: FormData) {
   redirect(returnTo);
 }
 
-/** Re-runs delivery for an order (re-sends the WhatsApp link). Admin only. */
+/** Re-sends the order link on WhatsApp. Admin only; bypasses the per-order cap. */
 export async function resendDelivery(orderId: string) {
   await requireAdmin();
-  const admin = getSupabaseAdmin();
-  // Force re-delivery by clearing the delivered flag first.
-  await admin.from("orders").update({ delivered: false }).eq("id", orderId);
-  const { fulfillOrder } = await import("@/lib/delivery");
-  await fulfillOrder(orderId);
+  const { sendOrderOnWhatsApp } = await import("@/lib/delivery");
+  await sendOrderOnWhatsApp(orderId, { force: true });
   revalidatePath("/dashboard/orders");
 }
 

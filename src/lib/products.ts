@@ -12,6 +12,11 @@ import {
 } from "@/data/catalog";
 
 // Row shape returned by Supabase (snake_case).
+// Public catalog columns only — never pdf_path (private storage paths stay
+// server-side; the pages are cached and shipped to every visitor).
+const PUBLIC_COLUMNS =
+  "id, slug, title, short_description, description, mrp, price, pages, language, is_combo, set_size, rating, category, cover_image, featured, active";
+
 interface ProductRow {
   id: number;
   slug: string;
@@ -27,7 +32,6 @@ interface ProductRow {
   rating: number | string | null;
   category: Category | null;
   cover_image: string | null;
-  pdf_path: string | null;
   featured: boolean | null;
   active: boolean | null;
 }
@@ -49,7 +53,6 @@ function rowToProduct(r: ProductRow): Product {
     category: r.category ?? "Other",
     cover: gradientForId(r.id),
     coverImage: r.cover_image ?? undefined,
-    pdfPath: r.pdf_path ?? undefined,
     featured: Boolean(r.featured),
     active: r.active ?? true,
   };
@@ -68,7 +71,7 @@ const loadFromSupabase = cache(async (): Promise<Product[]> => {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("products")
-    .select("*")
+    .select(PUBLIC_COLUMNS)
     .eq("active", true)
     .order("sort_order", { ascending: true })
     .order("id", { ascending: false });
@@ -137,7 +140,7 @@ export async function getComboBooks(comboId: number): Promise<Product[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("combo_items")
-    .select("product_id, products:product_id(*)")
+    .select(`product_id, products:product_id(${PUBLIC_COLUMNS})`)
     .eq("combo_id", comboId);
   if (error || !data) return [];
   return (data as unknown as { products: ProductRow | null }[])
