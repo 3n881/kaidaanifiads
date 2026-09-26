@@ -90,9 +90,9 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 
 | Route | Rendering | DB per request | Cacheable | Cloudflare | Edge TTL | Security notes |
 |---|---|---|---|---|---|---|
-| `/` | ISR 5m | no | yes | cache | 1h + purge | — |
-| `/ebooks`, `/combos` | ISR 5m | no | yes | cache | 1h + purge | `?lang=` handled client-side |
-| `/ebooks/[slug]`, `/combos/[slug]` | SSG+ISR 5m | no | **yes — primary landing** | cache | 1h + purge | Instagram adds `igsh`/`fbclid`/`utm_*` → strip from cache key |
+| `/` | ISR 5m | no | yes | cache | 5m (origin) + purge | — |
+| `/ebooks`, `/combos` | ISR 5m | no | yes | cache | 5m (origin) + purge | `?lang=` handled client-side |
+| `/ebooks/[slug]`, `/combos/[slug]` | SSG+ISR 5m | no | **yes — primary landing** | cache | 5m (origin) + purge | Instagram adds `igsh`/`fbclid`/`utm_*` → strip from cache key |
 | `/about`, `/contact`, `/terms`, policies | static | no | yes | cache | 1d | — |
 | `/my-books` | static shell + server action | action only | no | bypass | — | fixed enumeration hole |
 | `/order/[id]` *(new)* | dynamic | yes | **never** | bypass | — | token in URL, `no-referrer`, noindex |
@@ -278,7 +278,7 @@ Cache Rules (in this order):
 | 2 | `static-immutable` | `starts_with(http.request.uri.path, "/_next/static/")` | Eligible | 1 year | respect origin (`immutable`) | Content-hashed. No risk. |
 | 3 | `next-image` | `http.request.uri.path eq "/_next/image"` | Eligible; full query string in key | 30 days | 7 days | Protects origin CPU. Risk: same-URL replacement stays stale → keep versioned names. |
 | 4 | `public-assets` | `http.request.uri.path in {"/favicon.ico" "/robots.txt" "/sitemap.xml"} or starts_with(http.request.uri.path, "/brand/")` | Eligible | 1 day | 1 day | Logo change needs purge. |
-| 5 | `public-html` | `http.request.method in {"GET" "HEAD"} and (http.request.uri.path eq "/" or starts_with(http.request.uri.path, "/ebooks") or starts_with(http.request.uri.path, "/combos") or http.request.uri.path in {"/about" "/contact" "/terms" "/privacy-policy" "/refund-policy" "/shipping-policy" "/cancellation-policy" "/data-deletion"})` | Eligible; **Cache key → Query string → include only `_rsc`**; serve stale while revalidating | 1 hour | respect origin | Absorbs viral traffic. `_rsc` must stay in the key (RSC vs HTML). Risk: ≤ 1 h stale → purge on save. |
+| 5 | `public-html` | `http.request.method in {"GET" "HEAD"} and (http.request.uri.path eq "/" or starts_with(http.request.uri.path, "/ebooks") or starts_with(http.request.uri.path, "/combos") or http.request.uri.path in {"/about" "/contact" "/terms" "/privacy-policy" "/refund-policy" "/shipping-policy" "/cancellation-policy" "/data-deletion"})` | Eligible; **Cache key → Query string → include only `_rsc`**; serve stale while revalidating | **respect origin** (`s-maxage=300`) | respect origin | Absorbs viral traffic. `_rsc` must stay in the key (RSC vs HTML). Do **not** override to 1 h: each app container/server has its own ISR cache, so after an edit a purge can refetch a copy up to 5 min old — with origin TTL it self-heals in ≤ 5 min; with a 1 h override it could stick for an hour. With Tiered Cache, origin sees ~1 request per page per 5 min. |
 
 **Never** add a global "Cache Everything" rule.
 
@@ -340,17 +340,24 @@ Watch these costs:
 - **Supabase egress** — PDFs download from Supabase via signed URLs (not through Cloudflare). 250 GB is included (e.g. 5 MB PDF ≈ 50,000 downloads); overage ≈ US$0.09/GB. Keep PDFs compressed (< 5 MB).
 - Covers are also served by Supabase (~30 KB each after Phase 3); 1 M views ≈ 30 GB. If needed later, proxy `/covers/*` through Cloudflare to cache them.
 
-Upgrade path (when revenue/traffic justifies): second Lightsail instance + Lightsail load balancer (~US$18) ≈ ₹5,700 total, or move to Option A.
+Upgrade path: second Lightsail instance in another zone + **Cloudflare Load Balancing** (~US$5) ≈ ₹4,900 total — code is ready; impact and steps in `docs/deploy-lightsail.md` → "Adding a second server". Recommended ~1 week before a big campaign (hourly billing).
 
 Setup checklist (Option B, Lightsail):
-- [ ] `next.config.ts` → `output: "standalone"`; multi-stage `Dockerfile` (node 22-alpine, `sharp` included) + `docker-compose.yml` with `restart: always`. *(code — next step)*
-- [ ] Lightsail instance in `ap-south-1` (same region as Supabase if possible), Ubuntu LTS, attach static IP, enable automatic snapshots.
-- [ ] Caddy or nginx on the box terminating TLS with a **Cloudflare Origin CA certificate** (for Full (strict)); proxy to the Next.js container.
-- [ ] Lightsail firewall: 443 (and 80) **only from Cloudflare IP ranges**; SSH only from your IP.
-- [ ] Secrets in a root-only `.env` on the server (not in the image, not in git).
-- [ ] Build-time env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` present at `docker build` (inlined into client JS).
-- [ ] Deploy: GitHub Actions → build image → push to GHCR/ECR → SSH `docker compose pull && up -d` (or build on the box).
-- [ ] Monitoring: Lightsail alarms (CPU, status check), free uptime monitor on `/about`, `docker logs` search by `[checkout]`, `[webhook]` tags.
+- [x] `next.config.ts` → `output: "standalone"` + `deploymentId`; multi-stage `Dockerfile` (node 22-alpine, non-root, healthcheck); `.dockerignore` excludes every `.env*`.
+- [x] `deploy/docker-compose.yml`: Caddy + **two app containers** (`restart: always`, 700 MB limit, log rotation, healthchecks).
+- [x] `deploy/Caddyfile`: Cloudflare Origin cert, zstd/gzip, 60 MB uploads, load-balance app1/app2 with health checks + retry.
+- [x] `deploy/deploy.sh`: zero-downtime rolling restart; on failure rolls back only the replaced container. **Tested locally:** 0 failed requests during deploy and during a broken-image rollback.
+- [x] `deploy/setup-server.sh` (Docker, swap, unattended upgrades), `deploy/lightsail-firewall.sh` (80/443 Cloudflare-only, SSH your IP), `deploy/app.env.example`.
+- [x] `.github/workflows/deploy.yml`: build once → GHCR (tag = SHA) → SSH rolling deploy to each host in `LIGHTSAIL_HOSTS`. Off until `DEPLOY_ENABLED=true`.
+- [x] `/api/health` (no DB) for Caddy/Docker/Cloudflare LB.
+- [x] Runbook: `docs/deploy-lightsail.md` (incl. second server).
+- [ ] **(owner)** Lightsail instance in `ap-south-1` (same region as Supabase if possible), Ubuntu 24.04, 2 GB, static IP, automatic snapshots.
+- [ ] **(owner)** Cloudflare Origin CA certificate → `/opt/kaf/certs/`.
+- [ ] **(owner)** Run `deploy/lightsail-firewall.sh`.
+- [ ] **(owner)** `/opt/kaf/app.env` (chmod 600) from `deploy/app.env.example`.
+- [ ] **(owner)** GitHub secrets/variables per `docs/deploy-lightsail.md` §1 (public Supabase values are build args; `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` is a build secret).
+- [ ] **(owner)** Set `DEPLOY_ENABLED=true` → first deploy.
+- [ ] **(owner)** Lightsail alarms (CPU, status check), uptime monitor on `/api/health`.
 - [ ] Supabase: upgrade to Pro; set spend cap on; region noted.
 
 ### Phase 6 — Observability & funnel — P1
@@ -403,6 +410,8 @@ Record per run: RPS, p50/p95/p99, error rate, Next CPU/memory, Supabase CPU/API,
 | 2026-09-26 | 4/6/7 | `supabase/checks/verify.sql`, migration 002, k6 scripts + drills | `29cb18f` |
 | 2026-09-26 | 1.17 | Mobile above-the-fold landing + sticky Buy bar | `a33c5d5` |
 | 2026-09-26 | — | Migrations 001/002 applied by owner and verified | — |
+| 2026-09-26 | 5b | Budget plan: Lightsail + Cloudflare Free + Supabase Pro | `021dce0` |
+| 2026-09-26 | 5b | Docker/Caddy/rolling deploy/CI for Lightsail (1–2 servers), `/api/health`, runbook | this push |
 
 ## 5. Files added / changed
 
