@@ -135,10 +135,10 @@ export default function Hero() {
               {/* the emblem — big white circle, gently bouncing (float, -20px like the live site) */}
               <div className="animate-float relative z-10 h-full w-full overflow-hidden rounded-full bg-white shadow-2xl ring-4 ring-white/10">
                 <Image
-                  src="/brand/hero.png"
+                  src="/brand/hero.webp"
                   alt="कायद्याचं आणि फायद्याचं — Official Platform Logo"
                   fill
-                  priority
+                  preload
                   sizes="(max-width: 640px) 320px, (max-width: 1024px) 384px, 448px"
                   className="object-cover"
                 />

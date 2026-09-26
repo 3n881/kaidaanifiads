@@ -1,5 +1,6 @@
 "use server";
 
+import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -7,6 +8,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
 import { purgePublicPages } from "@/lib/cdn";
+import { COVER_WIDTHS, coverVariantPath } from "@/lib/covers";
 
 async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/");
@@ -57,6 +59,38 @@ async function uploadFile(
   return path; // private PDF: store the path, sign it at delivery time
 }
 
+/**
+ * Product covers: resized to 200/400/800 px WebP at upload so phones never
+ * download the multi-MB original. Names are versioned (`slug-v<ts>-<w>.webp`)
+ * and cached for a year — a new upload gets a new URL, so no purge needed.
+ * Returns the public URL of the 800 px variant (the others are derived).
+ */
+async function uploadCover(file: File, slug: string): Promise<string> {
+  if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+    throw new Error("Cover must be an image under 5 MB");
+  }
+  const admin = getSupabaseAdmin();
+  const input = Buffer.from(await file.arrayBuffer());
+  const base = `${slug}-v${Date.now()}`;
+  for (const width of COVER_WIDTHS) {
+    const output = await sharp(input)
+      .rotate()
+      .resize({ width, withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toBuffer();
+    const { error } = await admin.storage
+      .from("covers")
+      .upload(coverVariantPath(base, width), output, {
+        contentType: "image/webp",
+        cacheControl: "31536000",
+        upsert: false,
+      });
+    if (error) throw new Error(`Cover upload failed: ${error.message}`);
+  }
+  return admin.storage.from("covers").getPublicUrl(coverVariantPath(base, 800)).data
+    .publicUrl;
+}
+
 /** Create or update a product from the admin form. */
 export async function saveProduct(formData: FormData) {
   await requireAdmin();
@@ -95,7 +129,7 @@ export async function saveProduct(formData: FormData) {
   // Optional file uploads
   const cover = formData.get("cover_file");
   if (cover instanceof File && cover.size > 0) {
-    row.cover_image = await uploadFile("covers", cover, slug);
+    row.cover_image = await uploadCover(cover, slug);
   }
   const pdf = formData.get("pdf_file");
   if (pdf instanceof File && pdf.size > 0) {

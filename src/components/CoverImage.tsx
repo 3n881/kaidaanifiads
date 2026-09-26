@@ -1,27 +1,43 @@
-import Image from "next/image";
 import type { Product } from "@/data/catalog";
+import { coverSrc, coverSrcSet } from "@/lib/covers";
+
+const CARD_SIZES = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px";
 
 /**
  * Book cover. Shows the uploaded image when the admin has set one; otherwise
  * falls back to a branded navy gradient with the title overlaid.
+ *
+ * Covers are pre-resized WebP variants served straight from Supabase Storage
+ * (no /_next/image round-trip). `priority` is only for the one LCP cover on a
+ * detail page; every other cover lazy-loads.
  */
 export default function CoverImage({
   product,
   className = "",
+  priority = false,
+  sizes = CARD_SIZES,
 }: {
   product: Product;
   className?: string;
+  priority?: boolean;
+  sizes?: string;
 }) {
   if (product.coverImage) {
+    const srcSet = coverSrcSet(product.coverImage);
     return (
       <div className={`relative overflow-hidden ${className}`}>
-        <Image
-          src={product.coverImage}
+        {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized variants, see above */}
+        <img
+          src={coverSrc(product.coverImage)}
+          srcSet={srcSet ?? undefined}
+          sizes={srcSet ? sizes : undefined}
           alt={product.title}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
-          className="object-cover"
-          unoptimized
+          width={600}
+          height={800}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
         />
       </div>
     );

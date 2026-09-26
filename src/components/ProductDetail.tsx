@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { preconnect } from "react-dom";
+import { preconnect, preload } from "react-dom";
 import {
   FileText,
   Zap,
@@ -14,6 +14,7 @@ import { LANGUAGE_LABELS, discountPercent, categoryOf } from "@/lib/catalog";
 import { getRelated, getComboBooks } from "@/lib/products";
 import { SITE } from "@/data/catalog";
 import CoverImage from "./CoverImage";
+import { coverSrc, coverSrcSet } from "@/lib/covers";
 import BuyButton from "./BuyButton";
 import ExpandableText from "./ExpandableText";
 import DisclaimerBanner from "./DisclaimerBanner";
@@ -34,6 +35,15 @@ export default async function ProductDetail({
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
+  // The cover is this page's LCP element — start fetching it from <head>.
+  if (product.coverImage) {
+    const srcSet = coverSrcSet(product.coverImage);
+    preload(coverSrc(product.coverImage), {
+      as: "image",
+      fetchPriority: "high",
+      ...(srcSet ? { imageSrcSet: srcSet, imageSizes: "(max-width: 768px) 90vw, 400px" } : {}),
+    });
+  }
   const pct = discountPercent(product);
   const backHref = product.isCombo ? "/combos" : "/ebooks";
   const backLabel = product.isCombo ? "कॉम्बो पॅक्स" : "ई-बुक्स";
@@ -88,7 +98,12 @@ export default async function ProductDetail({
         {/* Cover */}
         <div className="lg:sticky lg:top-24 lg:self-start">
           <div className="relative overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
-            <CoverImage product={product} className="aspect-[3/4] w-full" />
+            <CoverImage
+              product={product}
+              className="aspect-[3/4] w-full"
+              priority
+              sizes="(max-width: 768px) 90vw, 400px"
+            />
             {pct > 0 && (
               <span className="badge-sale absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold text-white shadow">
                 {pct}% सवलत

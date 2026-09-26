@@ -45,9 +45,9 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
           <Image
             src="/brand/logo.png"
             alt="कायद्याचं आणि फायद्याचं"
-            width={662}
-            height={115}
-            priority
+            width={230}
+            height={40}
+            loading="eager"
             className="h-8 w-auto object-contain transition-transform group-hover:scale-105 sm:h-10"
           />
         </Link>

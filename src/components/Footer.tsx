@@ -39,8 +39,8 @@ export default function Footer() {
             <Image
               src="/brand/logo.png"
               alt="कायद्याचं आणि फायद्याचं"
-              width={662}
-              height={115}
+              width={253}
+              height={44}
               className="h-11 w-auto object-contain"
             />
           </div>

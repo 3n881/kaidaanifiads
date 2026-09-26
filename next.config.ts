@@ -38,6 +38,9 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "60mb" },
   },
   images: {
+    // Optimised brand images are cached by Cloudflare too; a month here keeps
+    // the optimiser from re-encoding them every 4 hours (Next 16 default).
+    minimumCacheTTL: 60 * 60 * 24 * 31,
     remotePatterns: [
       // Supabase Storage (public cover images)
       ...(supabaseHostname
