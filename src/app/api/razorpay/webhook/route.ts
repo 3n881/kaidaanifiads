@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { markOrderPaid, normalizePhone } from "@/lib/orders";
 import { onOrderPaid } from "@/lib/delivery";
@@ -22,9 +22,23 @@ interface PaymentEntity {
  * order.paid and payment.failed; set RAZORPAY_WEBHOOK_SECRET to its secret.
  *
  * Idempotent: duplicate or out-of-order deliveries never double-fulfil.
- * Always answers 2xx for verified events so Razorpay doesn't retry forever.
+ * Answers 2xx once an event is handled (or can never be handled); answers
+ * 503 when Supabase is down so Razorpay redelivers it later (Razorpay retries
+ * with backoff for ~24 h) — a paid order is never dropped by an outage.
  */
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req);
+  } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      console.error("[webhook] database unavailable — asking Razorpay to retry", error.message);
+      return new NextResponse("temporarily unavailable", { status: 503 });
+    }
+    throw error;
+  }
+}
+
+async function handle(req: NextRequest) {
   const raw = await req.text();
   const signature = req.headers.get("x-razorpay-signature");
 
@@ -45,22 +59,24 @@ export async function POST(req: NextRequest) {
   if (!payment || !rzpOrderId) return NextResponse.json({ ok: true });
 
   const admin = getSupabaseAdmin();
-  const { data: order } = await admin
+  const { data: order, error: lookupError } = await admin
     .from("orders")
     .select("id, amount, status, buyer_contact")
     .eq("razorpay_order_id", rzpOrderId)
     .maybeSingle();
+  if (lookupError) throw new DatabaseUnavailableError("webhook order lookup", lookupError);
   if (!order) {
     console.error("[webhook] unknown razorpay order", rzpOrderId);
     return NextResponse.json({ ok: true });
   }
 
   if (event.event === "payment.failed") {
-    await admin
+    const { error } = await admin
       .from("orders")
       .update({ status: "failed" })
       .eq("id", order.id)
       .eq("status", "created");
+    if (error) throw new DatabaseUnavailableError("mark failed", error);
     return NextResponse.json({ ok: true });
   }
 

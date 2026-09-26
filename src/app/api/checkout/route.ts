@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
 import {
   createOrderAccessToken,
@@ -12,7 +12,22 @@ import { getDeliverableItems, orderPagePath } from "@/lib/orders";
 
 export const runtime = "nodejs";
 
+// Shown in the Buy modal when Supabase or Razorpay is down/slow. We never take
+// money while we can't record or deliver the order.
+const BUSY_MESSAGE =
+  "पेमेंट सेवा सध्या व्यस्त आहे. कृपया 1-2 मिनिटांनी पुन्हा प्रयत्न करा. / Payments are busy right now — please try again in a minute.";
+
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req);
+  } catch (error) {
+    if (!(error instanceof DatabaseUnavailableError)) throw error;
+    console.error("[checkout] database unavailable", error.message);
+    return NextResponse.json({ error: BUSY_MESSAGE, retryable: true }, { status: 503 });
+  }
+}
+
+async function handle(req: NextRequest) {
   let body: { slug?: string };
   try {
     body = await req.json();
@@ -34,12 +49,13 @@ export async function POST(req: NextRequest) {
 
   const admin = getSupabaseAdmin();
   // Price is always read from the database — never from the browser.
-  const { data: product } = await admin
+  const { data: product, error: productError } = await admin
     .from("products")
     .select("id, title, price, slug")
     .eq("slug", slug)
     .eq("active", true)
     .maybeSingle();
+  if (productError) throw new DatabaseUnavailableError("checkout product", productError);
 
   if (!product) {
     return NextResponse.json({ error: "product not found" }, { status: 404 });
@@ -99,10 +115,7 @@ export async function POST(req: NextRequest) {
     rzp = await createRazorpayOrder(product.price, orderId);
   } catch (error) {
     console.error("[checkout] Razorpay order failed", error);
-    return NextResponse.json(
-      { error: "Payment gateway is busy. Please try again in a moment." },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: BUSY_MESSAGE, retryable: true }, { status: 503 });
   }
 
   const { error } = await admin.from("orders").insert({
@@ -112,7 +125,7 @@ export async function POST(req: NextRequest) {
   });
   if (error) {
     console.error("[checkout] order insert failed", error);
-    return NextResponse.json({ error: "order creation failed" }, { status: 500 });
+    return NextResponse.json({ error: BUSY_MESSAGE, retryable: true }, { status: 503 });
   }
 
   return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyPaymentSignature } from "@/lib/razorpay";
 import { markOrderPaid, orderPagePath } from "@/lib/orders";
+import { DatabaseUnavailableError } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -38,11 +39,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid signature" }, { status: 400 });
   }
 
-  const result = await markOrderPaid({
-    razorpayOrderId,
-    razorpayPaymentId: paymentId,
-    orderId,
-  });
+  let result;
+  try {
+    result = await markOrderPaid({
+      razorpayOrderId,
+      razorpayPaymentId: paymentId,
+      orderId,
+    });
+  } catch (error) {
+    if (!(error instanceof DatabaseUnavailableError)) throw error;
+    // Payment is genuine (signature verified) but we can't record it right
+    // now. Send the buyer to their order page, which keeps checking; the
+    // Razorpay webhook (retried until the DB is back) marks it paid.
+    console.error("[confirm] database unavailable", error.message);
+    return NextResponse.json(
+      { error: "temporarily unavailable", orderUrl: orderPagePath(orderId) },
+      { status: 503 },
+    );
+  }
   if (!result) {
     console.error("[confirm] verified payment for unknown order", razorpayOrderId);
     return NextResponse.json({ error: "order not found" }, { status: 404 });

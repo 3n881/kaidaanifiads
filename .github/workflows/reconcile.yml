@@ -1,0 +1,28 @@
+# Every 10 minutes: ask the site to mark paid any order Razorpay captured but
+# we never recorded (e.g. during a Supabase outage). Safety net only — the
+# confirm route, webhook and order page handle the normal cases.
+# Disabled until DEPLOY_ENABLED=true and the CRON_SECRET secret is set (same
+# value as CRON_SECRET in /opt/kaf/app.env on both servers).
+name: Reconcile payments
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  reconcile:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run reconciliation sweep
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          curl -fsS --max-time 90 -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${SITE}/api/cron/reconcile"

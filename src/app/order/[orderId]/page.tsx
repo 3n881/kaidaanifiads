@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock, Download, MessageCircle, XCircle } from "lucide-react";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
 import { verifyOrderAccessToken } from "@/lib/razorpay";
 import { getDeliverableItems } from "@/lib/orders";
+import { reconcileOrder } from "@/lib/reconcile";
 import { SITE } from "@/data/catalog";
 import { OrderMemory, PendingRefresh, WhatsAppOptIn } from "@/components/order/OrderClient";
 import InAppBrowserHint from "@/components/order/InAppBrowserHint";
@@ -36,12 +37,29 @@ export default async function OrderPage({
   if (!hasServiceRole || !verifyOrderAccessToken(orderId, token)) notFound();
 
   const admin = getSupabaseAdmin();
-  const { data: order } = await admin
-    .from("orders")
-    .select("id, status, amount, created_at, product_id, whatsapp_number, products(title, slug, is_combo)")
-    .eq("id", orderId)
-    .maybeSingle();
+  const loadOrder = () =>
+    admin
+      .from("orders")
+      .select("id, status, amount, created_at, product_id, whatsapp_number, razorpay_order_id, products(title, slug, is_combo)")
+      .eq("id", orderId)
+      .maybeSingle();
+  let { data: order, error: orderError } = await loadOrder();
+  // Supabase down/slow: the token proves this is a real order, so never 404 —
+  // reassure the buyer and keep checking until the database is back.
+  if (orderError) return <SystemBusy orderId={orderId} token={token} />;
   if (!order) notFound();
+
+  // Still unpaid here? Ask Razorpay directly — covers payments whose confirm
+  // and webhook both failed (e.g. during a database outage).
+  if (order.status === "created") {
+    try {
+      if (await reconcileOrder(order)) ({ data: order, error: orderError } = await loadOrder());
+    } catch (error) {
+      if (!(error instanceof DatabaseUnavailableError)) throw error;
+    }
+    if (orderError) return <SystemBusy orderId={orderId} token={token} />;
+    if (!order) notFound();
+  }
 
   const product = (Array.isArray(order.products) ? order.products[0] : order.products) as
     | { title: string; slug: string; is_combo: boolean }
@@ -86,7 +104,15 @@ export default async function OrderPage({
     );
   }
 
-  const items = await getDeliverableItems(order.product_id);
+  let items;
+  try {
+    items = await getDeliverableItems(order.product_id);
+  } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      return <SystemBusy orderId={orderId} token={token} title={title} />;
+    }
+    throw error;
+  }
   const downloadHref = (itemId: number) =>
     `/api/download/${orderId}?t=${token}&item=${itemId}`;
 
@@ -137,6 +163,34 @@ export default async function OrderPage({
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> डाउनलोडमध्ये अडचण? WhatsApp करा
         </a>
       </div>
+    </div>
+  );
+}
+
+function SystemBusy({
+  orderId,
+  token,
+  title = "तुमची ऑर्डर",
+}: {
+  orderId: string;
+  token: string;
+  title?: string;
+}) {
+  return (
+    <div className="container-x max-w-md py-12 text-center">
+      <OrderMemory orderId={orderId} token={token} title={title} />
+      <Clock className="mx-auto h-12 w-12 text-brand-teal" aria-hidden="true" />
+      <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">
+        सिस्टम सध्या व्यस्त आहे
+      </h1>
+      <p className="font-deva mt-2 text-sm text-brand-600">
+        तुमचे पेमेंट सुरक्षित आहे. हे पान आपोआप अपडेट होईल आणि पुस्तक डाउनलोड होईल —
+        कृपया हे पान बंद करू नका. (हे पान “माझी पुस्तके” मध्येही सेव्ह झाले आहे.)
+      </p>
+      <p className="mt-1 text-xs text-brand-500">
+        Your payment is safe. This page will update by itself in a few minutes.
+      </p>
+      <PendingRefresh maxTries={60} intervalMs={10000} />
     </div>
   );
 }

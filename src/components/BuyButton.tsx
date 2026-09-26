@@ -78,6 +78,8 @@ export default function BuyButton({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Bumping the key remounts the modal = a fresh checkout attempt.
+  const [attempt, setAttempt] = useState(0);
   return (
     <>
       <button
@@ -95,7 +97,14 @@ export default function BuyButton({
         <Download className="h-4 w-4" aria-hidden="true" />
         {label}
       </button>
-      {open && <BuyModal product={product} onClose={() => setOpen(false)} />}
+      {open && (
+        <BuyModal
+          key={attempt}
+          product={product}
+          onClose={() => setOpen(false)}
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      )}
     </>
   );
 }
@@ -103,9 +112,11 @@ export default function BuyButton({
 function BuyModal({
   product,
   onClose,
+  onRetry,
 }: {
   product: Product;
   onClose: () => void;
+  onRetry: () => void;
 }) {
   const [step, setStep] = useState<Step>("processing");
   const [error, setError] = useState<string | null>(null);
@@ -263,8 +274,15 @@ function BuyModal({
             </p>
             <button
               type="button"
+              onClick={onRetry}
+              className="font-deva mt-1 w-full rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-teal/90"
+            >
+              पुन्हा प्रयत्न करा / Try again
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              className="mt-1 w-full rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-teal/90"
+              className="w-full rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
             >
               बंद करा
             </button>

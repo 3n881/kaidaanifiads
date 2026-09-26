@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { ADMIN_UPLOAD_TIMEOUT_MS, getSupabaseAdmin } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
 import { purgePublicPages } from "@/lib/cdn";
@@ -35,7 +35,7 @@ async function uploadFile(
   file: File,
   slug: string,
 ): Promise<string> {
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseAdmin(ADMIN_UPLOAD_TIMEOUT_MS);
   const isCover = bucket === "covers";
   const maxBytes = isCover ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
   if (file.size > maxBytes) {
@@ -69,7 +69,7 @@ async function uploadCover(file: File, slug: string): Promise<string> {
   if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
     throw new Error("Cover must be an image under 5 MB");
   }
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseAdmin(ADMIN_UPLOAD_TIMEOUT_MS);
   const input = Buffer.from(await file.arrayBuffer());
   const base = `${slug}-v${Date.now()}`;
   for (const width of COVER_WIDTHS) {

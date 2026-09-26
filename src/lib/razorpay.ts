@@ -28,26 +28,45 @@ export async function createRazorpayOrder(
   amountRupees: number,
   receipt: string,
 ): Promise<RazorpayOrder> {
-  const res = await fetch("https://api.razorpay.com/v1/orders", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization:
-        "Basic " +
-        Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString("base64"),
-    },
-    body: JSON.stringify({
-      amount: Math.round(amountRupees * 100),
-      currency: "INR",
-      receipt,
-      notes: { order_id: receipt },
-    }),
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`Razorpay order failed: ${res.status} ${await res.text()}`);
+  const request = () =>
+    fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: razorpayAuthHeader(),
+      },
+      body: JSON.stringify({
+        amount: Math.round(amountRupees * 100),
+        currency: "INR",
+        receipt,
+        notes: { order_id: receipt },
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(RAZORPAY_TIMEOUT_MS),
+    });
+
+  // One quick retry on a timeout / 5xx / 429: a blip shouldn't cost a sale.
+  // A duplicate unpaid Razorpay order is harmless (it simply expires).
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      res = await request();
+      if (res.ok || (res.status < 500 && res.status !== 429)) break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  if (!res || !res.ok) {
+    throw new Error(`Razorpay order failed: ${res?.status} ${await res?.text()}`);
   }
   return (await res.json()) as RazorpayOrder;
+}
+
+const RAZORPAY_TIMEOUT_MS = 8_000;
+
+export function razorpayAuthHeader(): string {
+  return "Basic " + Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString("base64");
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -103,4 +122,48 @@ export function verifyOrderAccessToken(
 ): boolean {
   if (!orderId || !token || !ORDER_ACCESS_SECRET) return false;
   return safeEqual(createOrderAccessToken(orderId), token);
+}
+
+export interface RazorpayPayment {
+  id: string;
+  order_id: string | null;
+  amount: number;
+  status: string; // created | authorized | captured | refunded | failed
+  contact?: string;
+  email?: string;
+}
+
+async function razorpayGet<T>(path: string): Promise<T> {
+  const res = await fetch(`https://api.razorpay.com/v1${path}`, {
+    headers: { Authorization: razorpayAuthHeader() },
+    cache: "no-store",
+    signal: AbortSignal.timeout(RAZORPAY_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Razorpay GET ${path} failed: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+/** Payments attempted against one Razorpay order (for reconciliation). */
+export async function fetchOrderPayments(razorpayOrderId: string): Promise<RazorpayPayment[]> {
+  const data = await razorpayGet<{ items: RazorpayPayment[] }>(
+    `/orders/${encodeURIComponent(razorpayOrderId)}/payments`,
+  );
+  return data.items ?? [];
+}
+
+/** All payments created in a time window, newest first (paginated). */
+export async function listPayments(
+  fromUnix: number,
+  toUnix: number,
+  maxPages = 20,
+): Promise<RazorpayPayment[]> {
+  const all: RazorpayPayment[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const data = await razorpayGet<{ items: RazorpayPayment[] }>(
+      `/payments?from=${fromUnix}&to=${toUnix}&count=100&skip=${page * 100}`,
+    );
+    all.push(...(data.items ?? []));
+    if ((data.items ?? []).length < 100) break;
+  }
+  return all;
 }

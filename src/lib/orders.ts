@@ -1,5 +1,5 @@
 import "server-only";
-import { getSupabaseAdmin } from "./supabase/server";
+import { DatabaseUnavailableError, getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
 import { createOrderAccessToken } from "./razorpay";
 
@@ -26,7 +26,7 @@ export function normalizePhone(raw: unknown): string {
 
 /** Customer-facing order page URL (refreshable, token-protected). */
 export function orderPagePath(orderId: string): string {
-  return `/order/${orderId}?t=${createOrderAccessToken(orderId)}`;
+  return `/order/${encodeURIComponent(orderId)}?t=${createOrderAccessToken(orderId)}`;
 }
 
 export function orderPageUrl(orderId: string): string {
@@ -36,25 +36,28 @@ export function orderPageUrl(orderId: string): string {
 /**
  * The PDFs a purchase of `productId` unlocks. A single ebook delivers its own
  * PDF; a combo delivers each member book's PDF (plus its own, if one was
- * uploaded). Items without a PDF are skipped.
+ * uploaded). Items without a PDF are skipped. Throws
+ * DatabaseUnavailableError when Supabase fails (never "no items").
  */
 export async function getDeliverableItems(
   productId: number,
 ): Promise<DeliverableItem[]> {
   const admin = getSupabaseAdmin();
-  const { data: product } = await admin
+  const { data: product, error } = await admin
     .from("products")
     .select("id, slug, title, pdf_path, is_combo")
     .eq("id", productId)
     .maybeSingle<ItemRow>();
+  if (error) throw new DatabaseUnavailableError("load product", error);
   if (!product) return [];
 
   const rows: ItemRow[] = [product];
   if (product.is_combo) {
-    const { data: members } = await admin
+    const { data: members, error: membersError } = await admin
       .from("combo_items")
       .select("products:product_id(id, slug, title, pdf_path)")
       .eq("combo_id", productId);
+    if (membersError) throw new DatabaseUnavailableError("load combo items", membersError);
     for (const m of (members ?? []) as unknown as { products: ItemRow | null }[]) {
       if (m.products) rows.push(m.products);
     }
@@ -69,6 +72,8 @@ export async function getDeliverableItems(
  * Atomically moves an order to `paid`. Safe to call from both the client
  * confirm route and the webhook, any number of times: only the first call
  * changes state (`newlyPaid: true`). Returns null if no such order exists.
+ * Throws DatabaseUnavailableError if Supabase fails — callers must answer
+ * "retry" (webhook: non-2xx so Razorpay redelivers), never "not found".
  */
 export async function markOrderPaid(opts: {
   razorpayOrderId: string;
@@ -88,7 +93,7 @@ export async function markOrderPaid(opts: {
     .neq("status", "paid");
   if (opts.orderId) update = update.eq("id", opts.orderId);
   const { data: updated, error } = await update.select("id").maybeSingle();
-  if (error) console.error("[orders] markOrderPaid update failed", error);
+  if (error) throw new DatabaseUnavailableError("mark order paid", error);
   if (updated) return { orderId: updated.id, newlyPaid: true };
 
   // Already paid (duplicate webhook / confirm after webhook) or unknown.
@@ -97,7 +102,8 @@ export async function markOrderPaid(opts: {
     .select("id, status")
     .eq("razorpay_order_id", opts.razorpayOrderId);
   if (opts.orderId) lookup = lookup.eq("id", opts.orderId);
-  const { data: existing } = await lookup.maybeSingle();
+  const { data: existing, error: lookupError } = await lookup.maybeSingle();
+  if (lookupError) throw new DatabaseUnavailableError("look up order", lookupError);
   if (existing?.status === "paid") {
     return { orderId: existing.id, newlyPaid: false };
   }
