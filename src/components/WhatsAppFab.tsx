@@ -9,7 +9,7 @@ export default function WhatsAppFab() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="WhatsApp support"
-      className="group fixed bottom-20 right-4 z-40 flex items-center gap-2 md:bottom-8 md:right-8"
+      className="group fixed bottom-20 right-4 z-40 transition-[bottom] in-data-[buybar=on]:bottom-36 flex items-center gap-2 md:bottom-8 md:right-8"
     >
       <span className="font-deva hidden max-w-0 items-center overflow-hidden whitespace-nowrap rounded-full bg-brand-teal px-0 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-all duration-300 group-hover:max-w-xs group-hover:px-4 group-hover:opacity-100 sm:flex">
         काही अडचण असल्यास येथे संपर्क साधा

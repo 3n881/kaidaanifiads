@@ -18,7 +18,7 @@ export default function BackToTop() {
       type="button"
       aria-label="वर जा (Back to top)"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      className={`fixed bottom-20 left-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-brand-100 bg-white text-brand-teal shadow-lg transition-all duration-300 hover:bg-brand-50 md:bottom-8 md:left-8 ${
+      className={`fixed bottom-20 left-4 z-40 in-data-[buybar=on]:bottom-36 flex h-11 w-11 items-center justify-center rounded-full border border-brand-100 bg-white text-brand-teal shadow-lg transition-all duration-300 hover:bg-brand-50 md:bottom-8 md:left-8 ${
         visible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-4 opacity-0"

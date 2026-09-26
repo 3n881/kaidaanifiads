@@ -16,6 +16,7 @@ import { SITE } from "@/data/catalog";
 import CoverImage from "./CoverImage";
 import { coverSrc, coverSrcSet } from "@/lib/covers";
 import BuyButton from "./BuyButton";
+import StickyBuyBar from "./StickyBuyBar";
 import ExpandableText from "./ExpandableText";
 import DisclaimerBanner from "./DisclaimerBanner";
 import Carousel from "./Carousel";
@@ -76,13 +77,14 @@ export default async function ProductDetail({
   };
 
   return (
-    <div className="container-x py-8">
+    <div className="container-x py-6 lg:py-8">
+      <StickyBuyBar product={product} targetId="buy-now" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       {/* Breadcrumb */}
-      <nav className="mb-6 flex items-center gap-1 text-xs text-brand-400">
+      <nav className="mb-4 flex items-center gap-1 text-xs text-brand-400 lg:mb-6">
         <Link href="/" className="hover:text-brand-700">
           मुख्यपृष्ठ
         </Link>
@@ -94,9 +96,9 @@ export default async function ProductDetail({
         <span className="font-deva truncate text-brand-600">{product.title}</span>
       </nav>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[380px_1fr]">
-        {/* Cover */}
-        <div className="lg:sticky lg:top-24 lg:self-start">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[380px_1fr] lg:gap-8">
+        {/* Cover — compact on phones so title, price and Buy fit the first screen */}
+        <div className="mx-auto w-[46%] max-w-[240px] lg:sticky lg:top-24 lg:w-full lg:max-w-none lg:self-start">
           <div className="relative overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
             <CoverImage
               product={product}
@@ -105,7 +107,9 @@ export default async function ProductDetail({
               sizes="(max-width: 768px) 90vw, 400px"
             />
             {pct > 0 && (
-              <span className="badge-sale absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold text-white shadow">
+              // Phones already show the discount next to the price; on the small
+              // mobile cover the badge would cover the placeholder label.
+              <span className="badge-sale absolute right-4 top-4 hidden rounded-full px-3 py-1 text-xs font-bold text-white shadow lg:inline-block">
                 {pct}% सवलत
               </span>
             )}
@@ -160,8 +164,11 @@ export default async function ProductDetail({
               ऑफर मर्यादित वेळेसाठी फक्त
             </p>
 
-            <div className="mt-4">
+            <div id="buy-now" className="mt-4">
               <BuyButton product={product} />
+              <p className="font-deva mt-2 text-center text-xs font-semibold text-brand-600">
+                Login / Account ची गरज नाही · पेमेंटनंतर PDF लगेच डाउनलोड
+              </p>
             </div>
 
             {/* chips */}
