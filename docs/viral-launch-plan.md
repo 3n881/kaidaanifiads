@@ -4,6 +4,8 @@
 > Legend: `[x]` done · `[ ]` not done · `[~]` partially done · **(owner)** = needs the business owner / dashboard access, not code.
 > Audit date: 2026-09-26 · Next.js 16.3 (App Router) · React 19.2 · Supabase · Razorpay · Cloudflare (planned)
 
+Traffic pattern: the client is a **creator who posts Reels 2–3 times a week, each with millions of views** — recurring, organic spikes (≈ 150 a year), not a one-off paid campaign. Every spike must feel smooth.
+
 Business flow we are protecting:
 
 ```
@@ -32,7 +34,7 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 1. ~~Run migrations 001 + 002~~ ✅ done (verified 2026-09-26: columns, functions, view exist; anon cannot call the functions or read the funnel).
 2. Add env vars: `ORDER_ACCESS_SECRET`, `ADMIN_EMAILS`, Razorpay **test** keys + webhook secret (see `.env.local.example`).
 3. Dashboard → upload a PDF for every ebook; tick member books on every combo.
-4. Hosting = **AWS Lightsail** (budget ₹7,000/month incl. Supabase — see Phase 5b) → Dockerfile next; then Phase 5 Cloudflare rules apply as written.
+4. Hosting = **two always-on AWS Lightsail servers + Cloudflare Load Balancing** (≈ ₹4,900 of ₹7,000/month incl. Supabase). Docker/deploy code is done → follow `docs/deploy-lightsail.md`.
 5. One Razorpay **test-mode** purchase on a phone, opened from an Instagram link → tick 1.14.
 6. Run `supabase/checks/verify.sql` → tick Phase 4.
 7. Stand up staging + Cloudflare rules → run `loadtest/` → tick Phase 7.
@@ -80,7 +82,7 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 | Product covers (`cover_image`) | **0** — all books show gradient placeholders |
 | Orders in DB | 0 |
 | Migrations 001 / 002 applied | **yes** (verified) |
-| Hosting target | **AWS Lightsail** single instance + Cloudflare Free + Supabase Pro (≈ ₹3,300/month of ₹7,000 budget) |
+| Hosting target | **2 × AWS Lightsail (Mumbai, zones a + b) + Cloudflare Free + Load Balancing + Supabase Pro** (≈ ₹4,900/month of ₹7,000) |
 
 ---
 
@@ -310,39 +312,38 @@ Cloudflare stays in front as the CDN (Phase 5 rules apply unchanged); AWS only r
 | Option | What | Pros | Cons | Fit |
 |---|---|---|---|---|
 | **A. ECS Fargate + ALB** (recommended) | Docker image (`output: "standalone"`), 2+ tasks behind an Application Load Balancer, auto-scale on CPU | No servers to patch; 2 tasks = no single point of failure for payments; scales in minutes; Cloudflare → ALB is a standard setup | ~US$40–70/month (ALB + 2 small tasks); ISR cache is per task (after an admin edit, other tasks refresh within the 5-min revalidate) | Best balance for a payment site |
-| B. EC2 / Lightsail VM + Docker | One VM running the same image (or `next start` under PM2) | Cheapest (~US$10–20/month), simplest | Single point of failure; you patch the OS; manual scaling | OK for a soft launch — Cloudflare absorbs browsing, but a VM outage stops checkout |
+| **B. Lightsail VMs + Docker (chosen, ×2)** | Same image on two VMs behind Cloudflare Load Balancing | Fits budget (~US$29/month for both + LB); simple | You patch the OS (unattended upgrades on); single VM would be a SPOF — hence two | **Chosen** |
 | C. AWS Amplify Hosting | Managed Next.js hosting on AWS CloudFront | Git-push deploys, no Docker | Has its own CDN — putting the Cloudflare proxy in front double-caches (same issue as Vercel); **check Amplify supported Next.js versions before choosing (we are on 16.3)** | Only if Cloudflare is DNS-only |
 | D. OpenNext / SST on Lambda + CloudFront | Serverless Next.js | Scales to zero and to spikes | Most moving parts (S3 + DynamoDB + SQS for ISR); Next 16 support depends on the OpenNext release | Not needed — Cloudflare already absorbs spikes |
 
-#### Budget decision: ₹7,000 / month total (Supabase + AWS)
+#### Decision: two always-on Lightsail servers (≈ ₹4,900 / month of ₹7,000)
 
-Option A (Fargate ≈ ₹5,000–6,000 incl. ALB + public IPv4 charges) plus Supabase Pro (≈ ₹2,100) exceeds the budget. **Chosen: Option B on Lightsail, with a documented upgrade path.** Prices are approximate (≈ ₹85/US$) — confirm Mumbai pricing in the AWS console.
+Fargate (Option A) plus Supabase Pro exceeds the budget. **Chosen: Option B ×2** — two Lightsail servers in different Mumbai zones behind **Cloudflare Load Balancing**, running permanently. Full steps, costs and failover drill: `docs/deploy-lightsail.md`.
 
 | Item | Plan | ≈ US$/mo | ≈ ₹/mo |
 |---|---|---|---|
-| Cloudflare | Free plan (CDN, SSL, WAF custom rules, 1 rate-limit rule) | 0 | 0 |
-| AWS Lightsail (Mumbai) | 2 GB RAM / 2 vCPU instance, static IP + ~3 TB transfer included | ~12 | ~1,000 |
-| Lightsail snapshots | daily automatic snapshots (~40 GB) | ~2 | ~170 |
-| Supabase | Pro (8 GB DB, 100 GB storage, 250 GB egress, daily backups, never pauses) | 25 | ~2,100 |
-| **Total** | | **~39** | **~3,300** |
-| Headroom | Supabase egress overage, second instance later | | ~3,700 |
+| Lightsail server A (`ap-south-1a`) | 2 GB RAM / 2 vCPU, static IP, ~3 TB transfer | 12 | 1,000 |
+| Lightsail server B (`ap-south-1b`) | same | 12 | 1,000 |
+| Snapshots (both) | daily automatic | 4 | 340 |
+| Cloudflare | Free plan + Load Balancing add-on (2 origins, health checks) | 5 | 425 |
+| Supabase | Pro (never pauses, 250 GB egress, daily backups) | 25 | 2,100 |
+| **Total** | | **~58** | **~4,900** |
+| Headroom | Supabase egress overage, bigger plans | | ~2,100 |
 
-Why one small instance is enough: Cloudflare serves ~99 % of anonymous traffic; the origin only handles checkout / confirm / webhook / download redirects and ISR refreshes every 5 min — light JSON calls that a 2 GB box serves at hundreds of requests/second.
+Why two servers when one has enough capacity:
+- One 1M-view Reel is estimated to send ~5 requests/second to the servers at peak (checkout, confirm, order page, download). Cloudflare serves everything else. One 2 GB server handles ~100× that.
+- The second server is for **availability**. Spikes happen 2–3× a week, so a server fault, reboot or AWS zone problem will eventually land on a spike. With two servers Cloudflare moves traffic to the healthy one within ~1 minute. The ~₹1,600/month it adds is less than one lost spike.
+- Each server also runs two app containers → deploys and single-process crashes never cause a gap.
 
-Single-instance risk and mitigations:
-- Cached pages stay up if the box is down (Cloudflare serve-stale).
-- Razorpay retries webhooks for up to 24 h, so payments during a short outage still complete.
-- Docker `restart: always` + Lightsail CPU/status alarms + a free uptime monitor on `/about`.
-- Daily snapshots → restore to a new instance in minutes.
+Remaining single points (managed, cannot be doubled on this budget): **Supabase** and **Razorpay**. Cached pages survive both; checkout needs both.
+
 - Do **not** use Supabase Free for production: it pauses on inactivity and has 5 GB egress.
 
 Watch these costs:
-- **Supabase egress** — PDFs download from Supabase via signed URLs (not through Cloudflare). 250 GB is included (e.g. 5 MB PDF ≈ 50,000 downloads); overage ≈ US$0.09/GB. Keep PDFs compressed (< 5 MB).
+- **Supabase egress** — PDFs download from Supabase via signed URLs (not through Cloudflare). 250 GB included; e.g. 5,000 sales/week × 5 MB × 1–2 downloads ≈ 200 GB/month; overage ≈ US$0.09/GB. Keep PDFs < 5 MB.
 - Covers are also served by Supabase (~30 KB each after Phase 3); 1 M views ≈ 30 GB. If needed later, proxy `/covers/*` through Cloudflare to cache them.
 
-Upgrade path: second Lightsail instance in another zone + **Cloudflare Load Balancing** (~US$5) ≈ ₹4,900 total — code is ready; impact and steps in `docs/deploy-lightsail.md` → "Adding a second server". Recommended ~1 week before a big campaign (hourly billing).
-
-Setup checklist (Option B, Lightsail):
+Setup checklist (two Lightsail servers):
 - [x] `next.config.ts` → `output: "standalone"` + `deploymentId`; multi-stage `Dockerfile` (node 22-alpine, non-root, healthcheck); `.dockerignore` excludes every `.env*`.
 - [x] `deploy/docker-compose.yml`: Caddy + **two app containers** (`restart: always`, 700 MB limit, log rotation, healthchecks).
 - [x] `deploy/Caddyfile`: Cloudflare Origin cert, zstd/gzip, 60 MB uploads, load-balance app1/app2 with health checks + retry.
@@ -350,14 +351,16 @@ Setup checklist (Option B, Lightsail):
 - [x] `deploy/setup-server.sh` (Docker, swap, unattended upgrades), `deploy/lightsail-firewall.sh` (80/443 Cloudflare-only, SSH your IP), `deploy/app.env.example`.
 - [x] `.github/workflows/deploy.yml`: build once → GHCR (tag = SHA) → SSH rolling deploy to each host in `LIGHTSAIL_HOSTS`. Off until `DEPLOY_ENABLED=true`.
 - [x] `/api/health` (no DB) for Caddy/Docker/Cloudflare LB.
-- [x] Runbook: `docs/deploy-lightsail.md` (incl. second server).
-- [ ] **(owner)** Lightsail instance in `ap-south-1` (same region as Supabase if possible), Ubuntu 24.04, 2 GB, static IP, automatic snapshots.
-- [ ] **(owner)** Cloudflare Origin CA certificate → `/opt/kaf/certs/`.
-- [ ] **(owner)** Run `deploy/lightsail-firewall.sh`.
-- [ ] **(owner)** `/opt/kaf/app.env` (chmod 600) from `deploy/app.env.example`.
+- [x] Runbook: `docs/deploy-lightsail.md` (two servers, Cloudflare LB, failover drill, per-Reel routine).
+- [ ] **(owner)** Two Lightsail instances `kaf-a` (`ap-south-1a`) and `kaf-b` (`ap-south-1b`), Ubuntu 24.04, 2 GB, static IPs, automatic snapshots.
+- [ ] **(owner)** Same Cloudflare Origin CA certificate → `/opt/kaf/certs/` on both.
+- [ ] **(owner)** Run `deploy/lightsail-firewall.sh` for both instances.
+- [ ] **(owner)** `/opt/kaf/app.env` (chmod 600) — **identical on both servers**.
 - [ ] **(owner)** GitHub secrets/variables per `docs/deploy-lightsail.md` §1 (public Supabase values are build args; `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` is a build secret).
-- [ ] **(owner)** Set `DEPLOY_ENABLED=true` → first deploy.
-- [ ] **(owner)** Lightsail alarms (CPU, status check), uptime monitor on `/api/health`.
+- [ ] **(owner)** `LIGHTSAIL_HOSTS="<ip-A> <ip-B>"`; set `DEPLOY_ENABLED=true` → first deploy.
+- [ ] **(owner)** Cloudflare Load Balancing: monitor `GET /api/health` → 200, pool with both IPs, load balancer on the apex (+ www), e-mail alerts.
+- [ ] **(owner)** Failover drill: stop server A → site and a test checkout keep working via B → start A.
+- [ ] **(owner)** Lightsail alarms on both (CPU, status check), uptime monitor on `/api/health`.
 - [ ] Supabase: upgrade to Pro; set spend cap on; region noted.
 
 ### Phase 6 — Observability & funnel — P1
@@ -369,7 +372,7 @@ Setup checklist (Option B, Lightsail):
 - [ ] 6.5 Alerts: `/api/*` 5xx > 1 % (5 min), `[webhook] invalid signature` / `amount mismatch`, paid-not-downloaded after 15 min (query in 002), Supabase CPU > 70 %.
 - [x] 6.6 Funnel: VISITORS (Cloudflare) → CHECKOUT (`orders` created) → PAYMENT SUCCESS (`paid`) → DOWNLOAD SUCCESS (`download_count > 0`); failures from `failed` + Razorpay dashboard.
 
-### Phase 7 — Load & failure testing (staging, Razorpay test mode) — P0 before campaign
+### Phase 7 — Load & failure testing (staging, Razorpay test mode) — P0 before the first Reel link goes live
 
 Scripts written in `loadtest/` (see `loadtest/README.md`); runs pending staging:
 
@@ -382,13 +385,20 @@ Scripts written in `loadtest/` (see `loadtest/README.md`); runs pending staging:
 
 Record per run: RPS, p50/p95/p99, error rate, Next CPU/memory, Supabase CPU/API, Storage egress, Cloudflare HIT ratio, origin requests. **Key metric: origin offload.**
 
-### Phase 8 — Launch runbook
+### Phase 8 — Go-live and per-Reel runbook
 
-- [ ] T-7d: Phases 0–7 checked; live Razorpay keys; one real ₹1 purchase on Android Instagram in-app browser + iOS.
-- [ ] T-1d: warm cache (request every book URL once, confirm HIT).
-- [ ] T-0: watch Cloudflare HIT ratio, `/api/*` 5xx, Razorpay dashboard, `funnel_daily`.
-- [ ] Rollback: previous deployment kept; "Under Attack" mode only as last resort (challenges real buyers).
-- [ ] T+1d: review failures, paid-not-downloaded, support messages.
+Go-live (once):
+- [ ] Phases 0–7 checked; live Razorpay keys; one real ₹1 purchase on Android Instagram in-app browser + iOS.
+- [ ] Failover drill passed (stop one server during a test purchase).
+- [ ] Warm cache: request every book URL once, confirm `cf-cache-status: HIT`.
+- [ ] Put the book link in the creator's bio / story sticker.
+
+Every Reel (2–3× a week):
+- [ ] No deploys in the hour before the creator posts (deploys are zero-downtime, but keep peaks boring).
+- [ ] During the first hours: Cloudflare cache HIT ratio > 95 %, both pool origins healthy, `/api/*` 5xx ≈ 0, `funnel_daily` checkouts → paid → downloaded moving together.
+- [ ] After the peak: `paid and download_count = 0` older than 15 min → follow up on WhatsApp; review Razorpay failures.
+- [ ] Weekly: Supabase egress vs the 250 GB allowance; Lightsail CPU peaks.
+- [ ] Last resort only: Cloudflare "Under Attack" mode (it challenges real buyers).
 
 ### Later (P2)
 
@@ -411,7 +421,8 @@ Record per run: RPS, p50/p95/p99, error rate, Next CPU/memory, Supabase CPU/API,
 | 2026-09-26 | 1.17 | Mobile above-the-fold landing + sticky Buy bar | `a33c5d5` |
 | 2026-09-26 | — | Migrations 001/002 applied by owner and verified | — |
 | 2026-09-26 | 5b | Budget plan: Lightsail + Cloudflare Free + Supabase Pro | `021dce0` |
-| 2026-09-26 | 5b | Docker/Caddy/rolling deploy/CI for Lightsail (1–2 servers), `/api/health`, runbook | this push |
+| 2026-09-26 | 5b | Docker/Caddy/rolling deploy/CI for Lightsail (1–2 servers), `/api/health`, runbook | `1c352ca`, `29d1c4c` |
+| 2026-09-26 | 5b/8 | Decision: two always-on servers (recurring creator Reels, not a campaign); per-Reel runbook | this push |
 
 ## 5. Files added / changed
 
