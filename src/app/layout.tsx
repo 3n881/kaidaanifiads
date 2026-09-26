@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import BackToTop from "@/components/BackToTop";
 import AdminChromeGate from "@/components/AdminChromeGate";
 import { getAllProducts } from "@/lib/products";
+import type { SearchItem } from "@/data/catalog";
 
 const lato = Lato({
   variable: "--font-lato",
@@ -47,11 +48,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  let products = [] as Awaited<ReturnType<typeof getAllProducts>>;
+  // Only what the search box needs — full descriptions would add ~100 KB to
+  // every page's HTML.
+  let searchItems: SearchItem[] = [];
   try {
-    products = await getAllProducts();
+    searchItems = (await getAllProducts()).map(
+      ({ id, slug, title, price, pages, language, isCombo }) => ({
+        id, slug, title, price, pages, language, isCombo,
+      }),
+    );
   } catch {
-    products = [];
+    searchItems = [];
   }
   return (
     <html
@@ -63,7 +70,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           मुख्य मजकुरावर जा
         </a>
         <AdminChromeGate>
-          <Navbar products={products} />
+          <Navbar products={searchItems} />
         </AdminChromeGate>
         <main id="main" className="flex-1">
           {children}

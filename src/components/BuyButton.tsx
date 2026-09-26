@@ -83,6 +83,10 @@ export default function BuyButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        // Start fetching checkout.js on first touch/hover (before the click
+        // completes) without making every visitor download it.
+        onPointerEnter={() => void loadRazorpay()}
+        onPointerDown={() => void loadRazorpay()}
         className={
           className ||
           "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.98]"

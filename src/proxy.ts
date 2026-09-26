@@ -15,7 +15,7 @@ function isAdminEmail(email: string | null | undefined): boolean {
   return allow.includes(email.toLowerCase());
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLogin = pathname.startsWith("/dashboard/login");
 

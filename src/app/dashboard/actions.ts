@@ -6,13 +6,16 @@ import { requireAdmin } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
+import { purgePublicPages } from "@/lib/cdn";
 
-function revalidatePublic(slug?: string, isCombo?: boolean) {
+async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/");
   revalidatePath("/ebooks");
   revalidatePath("/combos");
   if (slug) revalidatePath(`/${isCombo ? "combos" : "ebooks"}/${slug}`);
   revalidatePath("/dashboard");
+  // /ebooks and /combos prefixes cover every detail page and RSC variant.
+  await purgePublicPages(["/", "/ebooks", "/combos"]);
 }
 
 function slugify(input: string): string {
@@ -122,7 +125,7 @@ export async function saveProduct(formData: FormData) {
     }
   }
 
-  revalidatePublic(slug, isCombo);
+  await revalidatePublic(slug, isCombo);
   redirect("/dashboard/products");
 }
 
@@ -131,14 +134,14 @@ export async function deleteProduct(id: number) {
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("products").delete().eq("id", id);
   if (error) throw new Error(error.message);
-  revalidatePublic();
+  await revalidatePublic();
 }
 
 export async function toggleActive(id: number, active: boolean) {
   await requireAdmin();
   const admin = getSupabaseAdmin();
   await admin.from("products").update({ active }).eq("id", id);
-  revalidatePublic();
+  await revalidatePublic();
 }
 
 const SETTINGS_SCOPES = ["business", "content", "integrations", "launch"] as const;

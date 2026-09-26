@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Search, Menu, X } from "lucide-react";
-import type { Product } from "@/data/catalog";
+import type { SearchItem } from "@/data/catalog";
 import CommandPalette from "./CommandPalette";
 
 const LINKS = [
@@ -16,9 +16,11 @@ const LINKS = [
   { href: "/my-books", label: "माझी पुस्तके", en: "" },
 ];
 
-export default function Navbar({ products }: { products: Product[] }) {
+export default function Navbar({ products }: { products: SearchItem[] }) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The menu belongs to the page it was opened on, so it closes on navigation.
+  const [menuPath, setMenuPath] = useState<string | null>(null);
+  const menuOpen = menuPath === pathname;
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -31,8 +33,6 @@ export default function Navbar({ products }: { products: Product[] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  useEffect(() => setMenuOpen(false), [pathname]);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -109,7 +109,7 @@ export default function Navbar({ products }: { products: Product[] }) {
             <Search className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => setMenuPath(menuOpen ? null : pathname)}
             aria-label="मेनू"
             className="rounded-lg p-2 text-brand-teal"
           >

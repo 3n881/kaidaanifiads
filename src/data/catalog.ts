@@ -42,8 +42,13 @@ export interface Product {
   category?: Category;
   /** Uploaded cover image URL (from the `covers` bucket). Falls back to gradient. */
   coverImage?: string;
-  /** Object path of the PDF in the private `pdfs` bucket. */
 }
+
+/** Slim product shape for the site-wide search box (shipped on every page). */
+export type SearchItem = Pick<
+  Product,
+  "id" | "slug" | "title" | "price" | "pages" | "language" | "isCombo"
+>;
 
 /** Deterministic gradient placeholder cover for a given product id. */
 export function gradientForId(id: number): { from: string; to: string } {

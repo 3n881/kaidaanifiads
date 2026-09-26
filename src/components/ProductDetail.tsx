@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { preconnect } from "react-dom";
 import {
   FileText,
   Zap,
-  ShieldCheck,
   Star,
   ChevronRight,
   BookOpen,
@@ -31,6 +31,9 @@ export default async function ProductDetail({
 }: {
   product: Product;
 }) {
+  // Warm the TLS connection so the Razorpay popup opens faster on Buy.
+  preconnect("https://checkout.razorpay.com");
+  preconnect("https://api.razorpay.com");
   const pct = discountPercent(product);
   const backHref = product.isCombo ? "/combos" : "/ebooks";
   const backLabel = product.isCombo ? "कॉम्बो पॅक्स" : "ई-बुक्स";

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Search, FileText, Package } from "lucide-react";
-import type { Product } from "@/data/catalog";
+import type { SearchItem } from "@/data/catalog";
 
 export default function CommandPalette({
   open,
@@ -13,11 +13,16 @@ export default function CommandPalette({
 }: {
   open: boolean;
   onClose: () => void;
-  products: Product[];
+  products: SearchItem[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [mounted, setMounted] = useState(false);
+  // true only on the client (portals need document.body)
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   const results = useMemo(() => {
@@ -27,8 +32,6 @@ export default function CommandPalette({
       .filter((p) => p.title.toLowerCase().includes(q))
       .slice(0, 12);
   }, [query, products]);
-
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (open) {
