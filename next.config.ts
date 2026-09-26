@@ -23,6 +23,12 @@ const securityHeaders = [
 const noStore = [{ key: "Cache-Control", value: "private, no-store, max-age=0" }];
 
 const nextConfig: NextConfig = {
+  // Self-contained server (`node server.js`) for the Docker image — see Dockerfile.
+  output: "standalone",
+  // Same value on every server/container of one release (the image's git SHA):
+  // lets Next.js detect version skew during rolling deploys and hard-reload
+  // clients instead of breaking navigation.
+  deploymentId: process.env.DEPLOYMENT_ID || undefined,
   poweredByHeader: false,
   async headers() {
     return [

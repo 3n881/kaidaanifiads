@@ -11,7 +11,7 @@ export const isCdnPurgeConfigured = Boolean(ZONE_ID && API_TOKEN);
  * Purges public pages from Cloudflare after `revalidatePath` refreshed them in
  * Next.js, so edits show up immediately instead of after the edge TTL.
  * Prefix purges also clear the `?_rsc=` variants Next uses for navigation.
- * Never throws — a failed purge only means the edge TTL (1h) applies.
+ * Never throws — a failed purge only means the edge TTL (s-maxage, 5 min) applies.
  */
 export async function purgePublicPages(paths: string[]): Promise<void> {
   if (!isCdnPurgeConfigured || paths.length === 0) return;

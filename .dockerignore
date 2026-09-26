@@ -1,0 +1,17 @@
+# Never send secrets or local state into the image build context.
+.env*
+!.env.local.example
+.git
+.github
+.next
+node_modules
+.claude
+client-onboarding
+docs
+loadtest
+deploy
+supabase
+*.md
+!README.md
+Dockerfile
+.dockerignore

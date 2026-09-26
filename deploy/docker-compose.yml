@@ -1,0 +1,50 @@
+# ---------------------------------------------------------------------------
+# One Lightsail server = Caddy (TLS) + two identical app containers.
+# Two containers let deploy.sh restart them one at a time (zero-downtime
+# deploys) and keep the site answering if one Node process crashes.
+# A second Lightsail server runs this exact file too (see docs).
+#
+# Lives at /opt/kaf/docker-compose.yml on the server; IMAGE is set by deploy.sh.
+# ---------------------------------------------------------------------------
+
+x-app: &app
+  image: ${IMAGE:-ghcr.io/3n881/kaidaanifiads:latest}
+  restart: always
+  env_file: ./app.env
+  environment:
+    NODE_OPTIONS: --max-old-space-size=512
+  mem_limit: 700m
+  stop_grace_period: 20s # finish in-flight checkout/confirm requests
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+    interval: 10s
+    timeout: 3s
+    start_period: 20s
+    retries: 3
+
+services:
+  app1:
+    <<: *app
+  app2:
+    <<: *app
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on: [app1, app2]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro # Cloudflare Origin CA cert + key
+      - caddy_data:/data
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  caddy_data:

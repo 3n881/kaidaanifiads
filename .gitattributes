@@ -1,0 +1,5 @@
+# Scripts and configs run on Linux servers — always LF.
+*.sh text eol=lf
+deploy/** text eol=lf
+Dockerfile text eol=lf
+.github/** text eol=lf
