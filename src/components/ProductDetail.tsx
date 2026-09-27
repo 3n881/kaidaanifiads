@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { preconnect, preload } from "react-dom";
 import {
@@ -10,8 +12,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
-import { LANGUAGE_LABELS, discountPercent, categoryOf } from "@/lib/catalog";
-import { getRelated, getComboBooks } from "@/lib/products";
+import {
+  LANGUAGE_LABELS,
+  discountPercent,
+  categoryOf,
+  localizeProduct,
+  productHasLanguage,
+} from "@/lib/catalog";
 import { SITE } from "@/data/catalog";
 import { coverSrc, coverSrcSet } from "@/lib/covers";
 import BuyButton from "./BuyButton";
@@ -20,6 +27,8 @@ import ExpandableText from "./ExpandableText";
 import DisclaimerBanner from "./DisclaimerBanner";
 import Carousel from "./Carousel";
 import ProductGallery from "./ProductGallery";
+import { useLanguage } from "./LanguageProvider";
+import { LOCALE_TO_PRODUCT_LANGUAGE } from "@/lib/i18n";
 
 const MINI_STEPS = [
   { n: "1", label: "बटन दाबा", en: "Click" },
@@ -28,11 +37,23 @@ const MINI_STEPS = [
   { n: "✓", label: "WhatsApp ऐच्छिक", en: "Optional" },
 ];
 
-export default async function ProductDetail({
-  product,
+export default function ProductDetail({
+  product: sourceProduct,
+  relatedProducts = [],
+  comboBooks: sourceComboBooks = [],
 }: {
   product: Product;
+  relatedProducts?: Product[];
+  comboBooks?: Product[];
 }) {
+  const { locale } = useLanguage();
+  const product = localizeProduct(sourceProduct, locale);
+  const related = relatedProducts
+    .filter((item) =>
+      productHasLanguage(item, LOCALE_TO_PRODUCT_LANGUAGE[locale]),
+    )
+    .map((item) => localizeProduct(item, locale));
+  const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
@@ -48,9 +69,6 @@ export default async function ProductDetail({
   const pct = discountPercent(product);
   const backHref = product.isCombo ? "/combos" : "/ebooks";
   const backLabel = product.isCombo ? "कॉम्बो पॅक्स" : "ई-बुक्स";
-  const related = await getRelated(product);
-  const comboBooks = product.isCombo ? await getComboBooks(product.id) : [];
-
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -100,7 +118,7 @@ export default async function ProductDetail({
         {/* Cover — compact on phones so title, price and Buy fit the first screen */}
         <div className="mx-auto w-[46%] max-w-[240px] lg:sticky lg:top-24 lg:w-full lg:max-w-none lg:self-start">
           <div className="relative overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
-            <ProductGallery product={product} />
+            <ProductGallery key={`${product.id}-${locale}`} product={product} />
             {pct > 0 && (
               // Phones already show the discount next to the price; on the small
               // mobile cover the badge would cover the placeholder label.

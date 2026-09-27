@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Search, FileText, Package } from "lucide-react";
 import type { SearchItem } from "@/data/catalog";
+import { localizeSearchItem, productHasLanguage } from "@/lib/catalog";
+import { LOCALE_TO_PRODUCT_LANGUAGE, UI_COPY } from "@/lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 
 export default function CommandPalette({
   open,
@@ -16,6 +19,8 @@ export default function CommandPalette({
   products: SearchItem[];
 }) {
   const router = useRouter();
+  const { locale } = useLanguage();
+  const copy = UI_COPY[locale];
   const [query, setQuery] = useState("");
   // true only on the client (portals need document.body)
   const mounted = useSyncExternalStore(
@@ -26,12 +31,17 @@ export default function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const results = useMemo(() => {
+    const localized = products
+      .filter((product) =>
+        productHasLanguage(product, LOCALE_TO_PRODUCT_LANGUAGE[locale]),
+      )
+      .map((product) => localizeSearchItem(product, locale));
     const q = query.trim().toLowerCase();
-    if (!q) return products.slice(0, 8);
-    return products
+    if (!q) return localized.slice(0, 8);
+    return localized
       .filter((p) => p.title.toLowerCase().includes(q))
       .slice(0, 12);
-  }, [query, products]);
+  }, [query, products, locale]);
 
   useEffect(() => {
     if (open) {
@@ -72,7 +82,7 @@ export default function CommandPalette({
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="पुस्तके शोधा (Search books)…"
+            placeholder={copy.search}
             className="font-deva w-full bg-transparent py-3.5 text-sm outline-none placeholder:text-brand-300"
           />
           <kbd className="hidden rounded border border-brand-200 px-1.5 py-0.5 text-[10px] text-brand-400 sm:block">

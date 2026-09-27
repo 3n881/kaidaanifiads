@@ -9,11 +9,23 @@ create table if not exists public.products (
   id            bigint primary key,
   slug          text unique not null,
   title         text not null,
+  title_mr      text,
+  title_hi      text,
+  title_en      text,
   short_description text,
+  short_description_mr text,
+  short_description_hi text,
+  short_description_en text,
   description   text,
+  description_mr text,
+  description_hi text,
+  description_en text,
   mrp           integer not null,
   price         integer not null,
   pages         integer,
+  pages_mr      integer,
+  pages_hi      integer,
+  pages_en      integer,
   language      text not null default 'Marathi'
                 check (language in ('Marathi','Hindi','English')),
   is_combo      boolean not null default false,
@@ -22,11 +34,17 @@ create table if not exists public.products (
   category      text default 'Other'
                 check (category in ('Property Law','Civil Law','Other')),
   cover_image   text,          -- public URL in the `covers` bucket (null → gradient placeholder)
+  cover_image_mr text,
+  cover_image_hi text,
+  cover_image_en text,
   pdf_path      text,          -- object path in the private `pdfs` bucket
   pdf_path_mr   text,          -- Marathi PDF (pdf_path remains a legacy Marathi fallback)
   pdf_path_hi   text,          -- Hindi PDF
   pdf_path_en   text,          -- English PDF
   gallery_images text[] not null default '{}', -- up to 4 previews; cover + previews = 5
+  gallery_images_mr text[] not null default '{}',
+  gallery_images_hi text[] not null default '{}',
+  gallery_images_en text[] not null default '{}',
   available_locales text[] not null default '{}',
   featured      boolean default false,
   active        boolean default true,

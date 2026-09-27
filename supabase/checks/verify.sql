@@ -36,8 +36,19 @@ select routine_name, grantee from information_schema.routine_privileges
 select indexname, indexdef from pg_indexes
   where schemaname = 'public' and tablename = 'orders';
 
--- 8. Multilingual catalog readiness: every active single ebook and every
---    combo must be deliverable in Marathi, Hindi and English (expect zero).
+-- 8. Multilingual catalog readiness: every active product needs complete
+--    independent listing content/media in all three languages; single ebooks
+--    also need all three PDFs (expect zero rows from both checks).
+select slug from public.products
+ where active and (
+   coalesce(title_mr, title) is null or title_hi is null or title_en is null
+   or coalesce(short_description_mr, short_description) is null
+   or short_description_hi is null or short_description_en is null
+   or coalesce(description_mr, description) is null
+   or description_hi is null or description_en is null
+   or coalesce(cover_image_mr, cover_image) is null
+   or cover_image_hi is null or cover_image_en is null
+ );
 select slug from public.products
  where active and not is_combo
    and (coalesce(pdf_path_mr, pdf_path) is null

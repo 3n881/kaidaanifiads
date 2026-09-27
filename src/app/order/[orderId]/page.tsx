@@ -10,7 +10,7 @@ import { reconcileOrder } from "@/lib/reconcile";
 import { SITE } from "@/data/catalog";
 import { OrderMemory, PendingRefresh, WhatsAppOptIn } from "@/components/order/OrderClient";
 import InAppBrowserHint from "@/components/order/InAppBrowserHint";
-import { normalizeLocale, ORDER_COPY } from "@/lib/i18n";
+import { localizedTitle, normalizeLocale, ORDER_COPY } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export default async function OrderPage({
   const loadOrder = () =>
     admin
       .from("orders")
-      .select("id, status, amount, created_at, product_id, locale, whatsapp_number, razorpay_order_id, products(title, slug, is_combo)")
+      .select("id, status, amount, created_at, product_id, locale, whatsapp_number, razorpay_order_id, products(title, title_mr, title_hi, title_en, slug, is_combo)")
       .eq("id", orderId)
       .maybeSingle();
   let { data: order, error: orderError } = await loadOrder();
@@ -63,10 +63,10 @@ export default async function OrderPage({
   }
 
   const product = (Array.isArray(order.products) ? order.products[0] : order.products) as
-    | { title: string; slug: string; is_combo: boolean }
+    | { title: string; title_mr?: string | null; title_hi?: string | null; title_en?: string | null; slug: string; is_combo: boolean }
     | null;
-  const title = product?.title ?? "पुस्तक";
   const locale = normalizeLocale(order.locale);
+  const title = localizedTitle(product, locale) || "पुस्तक";
   const copy = ORDER_COPY[locale];
   const supportHref = `https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
     `Order ${orderId.slice(0, 8)} — download help`,

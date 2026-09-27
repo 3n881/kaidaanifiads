@@ -24,6 +24,21 @@ export function normalizeLocale(value: unknown): Locale {
   return isLocale(value) ? value : DEFAULT_LOCALE;
 }
 
+export type LocalizedTitleRow = {
+  title?: string | null;
+  title_mr?: string | null;
+  title_hi?: string | null;
+  title_en?: string | null;
+};
+
+export function localizedTitle(
+  row: LocalizedTitleRow | null | undefined,
+  locale: Locale,
+): string {
+  if (!row) return "";
+  return row[`title_${locale}`] || row.title_mr || row.title || "";
+}
+
 export const UI_COPY = {
   mr: {
     skip: "मुख्य मजकुरावर जा",

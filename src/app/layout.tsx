@@ -54,8 +54,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   let searchItems: SearchItem[] = [];
   try {
     searchItems = (await getAllProducts()).map(
-      ({ id, slug, title, price, pages, language, isCombo }) => ({
-        id, slug, title, price, pages, language, isCombo,
+      ({ id, slug, title, price, pages, language, isCombo, localized, availableLocales }) => ({
+        id, slug, title, price, pages, language, isCombo, localized, availableLocales,
       }),
     );
   } catch {

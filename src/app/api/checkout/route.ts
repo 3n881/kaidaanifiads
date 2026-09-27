@@ -9,7 +9,7 @@ import {
   createRazorpayOrder,
 } from "@/lib/razorpay";
 import { getDeliverableItems, orderPagePath } from "@/lib/orders";
-import { normalizeLocale } from "@/lib/i18n";
+import { localizedTitle, normalizeLocale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -51,17 +51,26 @@ async function handle(req: NextRequest) {
 
   const admin = getSupabaseAdmin();
   // Price is always read from the database — never from the browser.
-  const { data: product, error: productError } = await admin
+  let { data: product, error: productError } = await admin
     .from("products")
-    .select("id, title, price, slug")
+    .select("id, title, title_mr, title_hi, title_en, price, slug")
     .eq("slug", slug)
     .eq("active", true)
     .maybeSingle();
+  if (productError?.code === "42703") {
+    ({ data: product, error: productError } = await admin
+      .from("products")
+      .select("id, title, price, slug")
+      .eq("slug", slug)
+      .eq("active", true)
+      .maybeSingle());
+  }
   if (productError) throw new DatabaseUnavailableError("checkout product", productError);
 
   if (!product) {
     return NextResponse.json({ error: "product not found" }, { status: 404 });
   }
+  const productTitle = localizedTitle(product, locale);
 
   // Don't take money for something we can't deliver (single PDF, or the
   // member books' PDFs for a combo).
@@ -108,7 +117,7 @@ async function handle(req: NextRequest) {
       orderId,
       accessToken: createOrderAccessToken(orderId),
       orderUrl: orderPagePath(orderId),
-      productTitle: product.title,
+      productTitle,
     });
   }
 
@@ -139,6 +148,6 @@ async function handle(req: NextRequest) {
     orderId,
     accessToken: createOrderAccessToken(orderId),
     orderUrl: orderPagePath(orderId),
-    productTitle: product.title,
+    productTitle,
   });
 }

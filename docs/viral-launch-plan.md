@@ -20,7 +20,7 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 | Phase | What | Status |
 |---|---|---|
 | 0 | Business setup (keys, PDFs, hosting, secrets) | **not started — owner** |
-| 1 | Payment / order / download correctness | **code done** · migrations 001+002 applied · migration 003 pending · paid end-to-end test pending (needs PDFs + Razorpay test keys) |
+| 1 | Payment / order / download correctness | **code done** · migrations 001+002 applied · migrations 003+004 pending · paid end-to-end test pending (needs PDFs + Razorpay test keys) |
 | 2 | Page weight & caching in code | **done** |
 | 3 | Images | **done** (no existing covers → no backfill needed) · real-device LCP pending |
 | 4 | Supabase hardening | checks written (`supabase/checks/verify.sql`) · **run pending — owner** |
@@ -32,9 +32,9 @@ Core scaling rule: **anonymous browsing must be served by Cloudflare/Next cache,
 
 ### Your next actions (in order)
 
-1. Run `supabase/migrations/003_multilingual_delivery.sql` (001 + 002 are already applied).
+1. Run `supabase/migrations/003_multilingual_delivery.sql`, then `004_localized_product_content.sql` (001 + 002 are already applied).
 2. Add env vars: `ORDER_ACCESS_SECRET`, `ADMIN_EMAILS`, Razorpay **test** keys + webhook secret (see `.env.local.example`).
-3. Dashboard → upload Marathi, Hindi and English PDFs plus cover/page previews for every ebook; tick member books on every combo.
+3. Dashboard → complete and save each Marathi, Hindi and English edition (title, descriptions, pages, cover, previews and PDF); tick member books on every combo.
 4. Hosting = **two always-on AWS Lightsail servers + Cloudflare Load Balancing** (≈ ₹4,900 of ₹7,000/month incl. Supabase). Docker/deploy code is done → follow `docs/deploy-lightsail.md`.
 5. One Razorpay **test-mode** purchase on a phone, opened from an Instagram link → tick 1.14.
 6. Run `supabase/checks/verify.sql` → tick Phase 4.

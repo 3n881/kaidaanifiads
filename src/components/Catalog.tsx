@@ -16,6 +16,7 @@ import {
   sortProducts,
   searchProducts,
   productHasLanguage,
+  localizeProduct,
 } from "@/lib/catalog";
 import ProductCard from "./ProductCard";
 import { LOCALE_TO_PRODUCT_LANGUAGE, UI_COPY } from "@/lib/i18n";
@@ -37,6 +38,10 @@ export default function Catalog({ products }: { products: Product[] }) {
   const [query, setQuery] = useState("");
 
   const preferred = LOCALE_TO_PRODUCT_LANGUAGE[locale];
+  const localizedProducts = useMemo(
+    () => products.map((product) => localizeProduct(product, locale)),
+    [products, locale],
+  );
   const lang = langSelection.locale === locale
     ? langSelection.value
     : products.some((product) => productHasLanguage(product, preferred))
@@ -52,11 +57,11 @@ export default function Catalog({ products }: { products: Product[] }) {
   );
 
   const filtered = useMemo(() => {
-    let out = filterByLanguage(products, lang);
+    let out = filterByLanguage(localizedProducts, lang);
     out = filterByCategory(out, cat);
     out = searchProducts(out, query);
     return sortProducts(out, sort);
-  }, [products, lang, cat, query, sort]);
+  }, [localizedProducts, lang, cat, query, sort]);
 
   return (
     <div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
-import { getEbooks, getEbookBySlug } from "@/lib/products";
+import { getEbooks, getEbookBySlug, getRelated } from "@/lib/products";
 
 export const revalidate = 300;
 
@@ -32,5 +32,6 @@ export default async function EbookDetailPage({
   const { slug } = await params;
   const product = await getEbookBySlug(slug);
   if (!product) notFound();
-  return <ProductDetail product={product} />;
+  const relatedProducts = await getRelated(product);
+  return <ProductDetail product={product} relatedProducts={relatedProducts} />;
 }

@@ -7,6 +7,7 @@ import {
   getEbookOptions,
   getComboItemIds,
 } from "@/lib/admin";
+import { normalizeLocale } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Edit product",
@@ -17,8 +18,10 @@ export const dynamic = "force-dynamic";
 
 export default async function EditProductPage({
   params,
+  searchParams,
 }: PageProps<"/dashboard/products/[id]">) {
   const { id } = await params;
+  const query = await searchParams;
   const product = await getAdminProductById(Number(id));
   if (!product) notFound();
 
@@ -28,11 +31,12 @@ export default async function EditProductPage({
   ]);
 
   return (
-    <AdminShell active="products" title="Edit product" description="Update localized PDFs, the cover and page previews. Changes appear on the public store automatically.">
+    <AdminShell active="products" title="Edit product" description="Each language has independent customer details, cover, previews and PDF. Save one edition at a time.">
       <ProductForm
         product={product}
         ebookOptions={ebookOptions}
         selectedBookIds={selectedBookIds}
+        initialLocale={normalizeLocale(query.lang)}
       />
     </AdminShell>
   );

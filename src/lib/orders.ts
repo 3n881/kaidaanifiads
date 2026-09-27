@@ -2,12 +2,15 @@ import "server-only";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
 import { createOrderAccessToken } from "./razorpay";
-import { normalizeLocale, type Locale } from "./i18n";
+import { localizedTitle, normalizeLocale, type Locale } from "./i18n";
 
 export interface DeliverableItem {
   id: number;
   slug: string;
   title: string;
+  title_mr?: string | null;
+  title_hi?: string | null;
+  title_en?: string | null;
   pdfPath: string;
 }
 
@@ -51,7 +54,7 @@ export async function getDeliverableItems(
   const admin = getSupabaseAdmin();
   const { data: product, error } = await admin
     .from("products")
-    .select("id, slug, title, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en, is_combo")
+    .select("id, slug, title, title_mr, title_hi, title_en, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en, is_combo")
     .eq("id", productId)
     .maybeSingle<ItemRow>();
   if (error) throw new DatabaseUnavailableError("load product", error);
@@ -61,7 +64,7 @@ export async function getDeliverableItems(
   if (product.is_combo) {
     const { data: members, error: membersError } = await admin
       .from("combo_items")
-      .select("products:product_id(id, slug, title, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en)")
+      .select("products:product_id(id, slug, title, title_mr, title_hi, title_en, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en)")
       .eq("combo_id", productId);
     if (membersError) throw new DatabaseUnavailableError("load combo items", membersError);
     for (const m of (members ?? []) as unknown as { products: ItemRow | null }[]) {
@@ -78,7 +81,7 @@ export async function getDeliverableItems(
   return rows.flatMap((row) => {
     const pdfPath = pathForLocale(row);
     return pdfPath
-      ? [{ id: row.id, slug: row.slug, title: row.title, pdfPath }]
+      ? [{ id: row.id, slug: row.slug, title: localizedTitle(row, locale), pdfPath }]
       : [];
   });
 }

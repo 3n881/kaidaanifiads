@@ -10,7 +10,7 @@ export default async function NewProductPage({ searchParams }: PageProps<"/dashb
   const query = await searchParams;
   const ebookOptions = await getEbookOptions();
   const isCombo = query.type === "combo";
-  return <AdminShell active="products" title={isCombo ? "Build a combo pack" : "Add an ebook"} description="Add customer details, a cover, page previews and Marathi, Hindi and English PDFs.">
+  return <AdminShell active="products" title={isCombo ? "Build a combo pack" : "Add an ebook"} description="Create Marathi first, then add independent Hindi and English details, media and PDFs.">
     <ProductForm ebookOptions={ebookOptions} defaultIsCombo={isCombo} />
   </AdminShell>;
 }

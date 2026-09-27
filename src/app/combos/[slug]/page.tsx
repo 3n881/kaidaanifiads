@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
-import { getCombos, getComboBySlug } from "@/lib/products";
+import {
+  getCombos,
+  getComboBySlug,
+  getRelated,
+  getComboBooks,
+} from "@/lib/products";
 
 export const revalidate = 300;
 
@@ -32,5 +37,15 @@ export default async function ComboDetailPage({
   const { slug } = await params;
   const product = await getComboBySlug(slug);
   if (!product) notFound();
-  return <ProductDetail product={product} />;
+  const [relatedProducts, comboBooks] = await Promise.all([
+    getRelated(product),
+    getComboBooks(product.id),
+  ]);
+  return (
+    <ProductDetail
+      product={product}
+      relatedProducts={relatedProducts}
+      comboBooks={comboBooks}
+    />
+  );
 }

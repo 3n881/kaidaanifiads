@@ -12,6 +12,16 @@
 
 export type Language = "Marathi" | "Hindi" | "English";
 export type Category = "Property Law" | "Civil Law" | "Other";
+export type ProductLocale = "mr" | "hi" | "en";
+
+export interface ProductEdition {
+  title: string;
+  shortDescription: string;
+  description: string;
+  pages: number;
+  coverImage?: string;
+  galleryImages: string[];
+}
 
 export interface Product {
   /** Stable id (kept from the reference site). */
@@ -45,13 +55,15 @@ export interface Product {
   /** Optional inside-page previews. The cover plus these is capped at five images. */
   galleryImages?: string[];
   /** PDF editions currently available for checkout. */
-  availableLocales?: Array<"mr" | "hi" | "en">;
+  availableLocales?: ProductLocale[];
+  /** Customer-facing content and media for each language edition. */
+  localized?: Partial<Record<ProductLocale, ProductEdition>>;
 }
 
 /** Slim product shape for the site-wide search box (shipped on every page). */
 export type SearchItem = Pick<
   Product,
-  "id" | "slug" | "title" | "price" | "pages" | "language" | "isCombo"
+  "id" | "slug" | "title" | "price" | "pages" | "language" | "isCombo" | "localized" | "availableLocales"
 >;
 
 /** Deterministic gradient placeholder cover for a given product id. */

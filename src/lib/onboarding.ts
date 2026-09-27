@@ -21,13 +21,28 @@ function missingFields(
 }
 
 export function productIsReady(product: AdminProduct) {
+  const localizedDetailsReady = (["mr", "hi", "en"] as const).every((locale) => {
+    const title = locale === "mr" ? product.title_mr || product.title : product[`title_${locale}`];
+    const shortDescription = locale === "mr"
+      ? product.short_description_mr || product.short_description
+      : product[`short_description_${locale}`];
+    const description = locale === "mr"
+      ? product.description_mr || product.description
+      : product[`description_${locale}`];
+    const cover = locale === "mr"
+      ? product.cover_image_mr || product.cover_image
+      : product[`cover_image_${locale}`];
+    const pages = locale === "mr"
+      ? product.pages_mr || product.pages
+      : product[`pages_${locale}`];
+    return Boolean(
+      title && shortDescription && description && cover && (product.is_combo || pages),
+    );
+  });
   return Boolean(
-    product.title &&
-      product.short_description &&
-      product.description &&
+    localizedDetailsReady &&
       product.price > 0 &&
       product.mrp >= product.price &&
-      product.cover_image &&
       (product.is_combo
         ? Boolean(
             product.set_size &&
@@ -37,8 +52,7 @@ export function productIsReady(product: AdminProduct) {
         : Boolean(
             (product.pdf_path_mr || product.pdf_path) &&
               product.pdf_path_hi &&
-              product.pdf_path_en &&
-              product.pages,
+              product.pdf_path_en,
           )),
   );
 }

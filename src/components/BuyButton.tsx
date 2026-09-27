@@ -8,6 +8,7 @@ import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
 import PriceTag from "./PriceTag";
 import { UI_COPY, type Locale } from "@/lib/i18n";
+import { localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 
 type Step = "processing" | "error";
@@ -80,6 +81,7 @@ export default function BuyButton({
   label?: string;
 }) {
   const { locale } = useLanguage();
+  product = localizeProduct(product, locale);
   const copy = UI_COPY[locale];
   const [open, setOpen] = useState(false);
   // Bumping the key remounts the modal = a fresh checkout attempt.

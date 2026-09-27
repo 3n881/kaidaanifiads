@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Product } from "@/data/catalog";
-import { discountPercent } from "@/lib/catalog";
+import { discountPercent, localizeProduct } from "@/lib/catalog";
 import CoverImage from "./CoverImage";
 import PriceTag from "./PriceTag";
 import BuyButton from "./BuyButton";
@@ -11,6 +11,7 @@ import { useLanguage } from "./LanguageProvider";
 
 export default function ProductCard({ product }: { product: Product }) {
   const { locale } = useLanguage();
+  product = localizeProduct(product, locale);
   const copy = UI_COPY[locale];
   const href = product.isCombo
     ? `/combos/${product.slug}`

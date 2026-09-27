@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
 import { purgePublicPages } from "@/lib/cdn";
 import { COVER_WIDTHS, coverVariantPath } from "@/lib/covers";
+import { isLocale, type Locale } from "@/lib/i18n";
 
 async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/");
@@ -100,23 +101,45 @@ export async function saveProduct(formData: FormData) {
   const isEdit = idRaw !== null && String(idRaw).length > 0;
   const id = isEdit ? Number(idRaw) : await nextProductId();
 
-  const title = String(formData.get("title") || "").trim();
-  if (!title) throw new Error("Title is required");
+  const localeValue = formData.get("edition_locale");
+  if (!isLocale(localeValue)) throw new Error("Choose a valid edition language");
+  const locale: Locale = localeValue;
+  if (!isEdit && locale !== "mr") {
+    throw new Error("Create the Marathi edition first, then add Hindi and English");
+  }
+
+  const title = String(formData.get(`title_${locale}`) || "").trim();
+  if (!title) throw new Error("The selected edition needs a title");
+  const legacyTitle = locale === "mr"
+    ? title
+    : String(formData.get("legacy_title") || "").trim();
+  if (!legacyTitle) throw new Error("Save the Marathi edition first");
 
   const slug =
-    String(formData.get("slug") || "").trim() || slugify(title) || `book-${id}`;
+    String(formData.get("slug") || "").trim() || slugify(legacyTitle) || `book-${id}`;
   const isCombo = formData.get("is_combo") === "on";
+  const shortDescription = String(
+    formData.get(`short_description_${locale}`) || "",
+  ).trim();
+  const description = String(formData.get(`description_${locale}`) || "").trim();
+  const pages = Number(formData.get(`pages_${locale}`) || 0);
 
   const row: Record<string, unknown> = {
     id,
     slug,
-    title,
-    short_description: String(formData.get("short_description") || "").trim(),
-    description: String(formData.get("description") || "").trim(),
+    title: legacyTitle,
+    short_description: locale === "mr"
+      ? shortDescription
+      : String(formData.get("legacy_short_description") || "").trim(),
+    description: locale === "mr"
+      ? description
+      : String(formData.get("legacy_description") || "").trim(),
     mrp: Number(formData.get("mrp") || 0),
     price: Number(formData.get("price") || 0),
-    pages: Number(formData.get("pages") || 0),
-    language: String(formData.get("language") || "Marathi"),
+    pages: locale === "mr"
+      ? pages
+      : Number(formData.get("legacy_pages") || 0),
+    language: "Marathi",
     is_combo: isCombo,
     set_size: isCombo ? Number(formData.get("set_size") || 0) || null : null,
     rating: Number(formData.get("rating") || 4.8),
@@ -124,12 +147,19 @@ export async function saveProduct(formData: FormData) {
     featured: formData.get("featured") === "on",
     active: formData.get("active") === "on",
     sort_order: Number(formData.get("sort_order") || 0),
+    [`title_${locale}`]: title,
+    [`short_description_${locale}`]: shortDescription,
+    [`description_${locale}`]: description,
+    [`pages_${locale}`]: pages || null,
   };
 
-  // Optional file uploads
-  const cover = formData.get("cover_file");
+  // Only the active language fieldset is enabled in the browser, keeping each
+  // request under the 95 MB Server Action limit.
+  const cover = formData.get(`cover_file_${locale}`);
   if (cover instanceof File && cover.size > 0) {
-    row.cover_image = await uploadCover(cover, slug);
+    const coverUrl = await uploadCover(cover, `${slug}-${locale}`);
+    row[`cover_image_${locale}`] = coverUrl;
+    if (locale === "mr") row.cover_image = coverUrl;
   }
   const pdfFields = [
     ["pdf_file_mr", "pdf_path_mr", "mr"],
@@ -144,15 +174,19 @@ export async function saveProduct(formData: FormData) {
   }
 
   const previewFiles = formData
-    .getAll("preview_files")
+    .getAll(`preview_files_${locale}`)
     .filter((value): value is File => value instanceof File && value.size > 0);
   if (previewFiles.length > 4) {
     throw new Error("Upload at most 4 preview pages (the cover makes 5 images total)");
   }
   if (previewFiles.length) {
-    row.gallery_images = await Promise.all(
-      previewFiles.map((file, index) => uploadCover(file, `${slug}-preview-${index + 1}`)),
+    const gallery = await Promise.all(
+      previewFiles.map((file, index) =>
+        uploadCover(file, `${slug}-${locale}-preview-${index + 1}`),
+      ),
     );
+    row[`gallery_images_${locale}`] = gallery;
+    if (locale === "mr") row.gallery_images = gallery;
   }
 
   const { error } = await admin
@@ -162,15 +196,25 @@ export async function saveProduct(formData: FormData) {
 
   const { data: saved, error: savedError } = await admin
     .from("products")
-    .select("pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en")
+    .select("title, title_mr, title_hi, title_en, short_description, short_description_mr, short_description_hi, short_description_en, description, description_mr, description_hi, description_en, pages, pages_mr, pages_hi, pages_en, cover_image, cover_image_mr, cover_image_hi, cover_image_en, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en")
     .eq("id", id)
     .single();
   if (savedError) throw new Error(savedError.message);
-  const availableLocales = [
-    (saved.pdf_path_mr || saved.pdf_path) && "mr",
-    saved.pdf_path_hi && "hi",
-    saved.pdf_path_en && "en",
-  ].filter(Boolean);
+  const savedRow = saved as Record<string, unknown>;
+  const valueFor = (field: string, edition: Locale) =>
+    savedRow[`${field}_${edition}`] || (edition === "mr" ? savedRow[field] : null);
+  const editionReady = (edition: Locale) => Boolean(
+    valueFor("title", edition) &&
+      valueFor("short_description", edition) &&
+      valueFor("description", edition) &&
+      valueFor("cover_image", edition) &&
+      (isCombo || valueFor("pages", edition)),
+  );
+  const pdfFor = (edition: Locale) =>
+    savedRow[`pdf_path_${edition}`] || (edition === "mr" ? savedRow.pdf_path : null);
+  const availableLocales = (["mr", "hi", "en"] as const).filter(
+    (edition) => editionReady(edition) && (isCombo || pdfFor(edition)),
+  );
   const { error: localeError } = await admin
     .from("products")
     .update({ available_locales: availableLocales })
@@ -193,9 +237,13 @@ export async function saveProduct(formData: FormData) {
         .select("available_locales")
         .in("id", memberIds);
       if (membersError) throw new Error(membersError.message);
-      const comboLocales = (["mr", "hi", "en"] as const).filter((locale) =>
-        (members ?? []).length === memberIds.length &&
-        (members ?? []).every((member) => member.available_locales?.includes(locale)),
+      const comboLocales = (["mr", "hi", "en"] as const).filter(
+        (memberLocale) =>
+          editionReady(memberLocale) &&
+          (members ?? []).length === memberIds.length &&
+          (members ?? []).every((member) =>
+            member.available_locales?.includes(memberLocale),
+          ),
       );
       await admin
         .from("products")
@@ -210,7 +258,7 @@ export async function saveProduct(formData: FormData) {
   }
 
   await revalidatePublic(slug, isCombo);
-  redirect("/dashboard/products");
+  redirect(`/dashboard/products/${id}?lang=${locale}&saved=1`);
 }
 
 export async function deleteProduct(id: number) {

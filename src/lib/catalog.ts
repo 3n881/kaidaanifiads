@@ -3,7 +3,13 @@
 // Data fetching lives in `src/lib/products.ts` (server-only, Supabase).
 // ---------------------------------------------------------------------------
 
-import type { Product, Language, Category } from "@/data/catalog";
+import type {
+  Product,
+  SearchItem,
+  Language,
+  Category,
+  ProductLocale,
+} from "@/data/catalog";
 
 export type { Category } from "@/data/catalog";
 
@@ -55,7 +61,10 @@ export function filterByLanguage(
   return items.filter((p) => productHasLanguage(p, language));
 }
 
-export function productHasLanguage(product: Product, language: Language): boolean {
+export function productHasLanguage(
+  product: Pick<Product, "availableLocales" | "language">,
+  language: Language,
+): boolean {
   const code = language === "Marathi" ? "mr" : language === "Hindi" ? "hi" : "en";
   return product.availableLocales?.length
     ? product.availableLocales.includes(code)
@@ -75,6 +84,47 @@ export const LANGUAGE_LABELS: Record<Language | "All", string> = {
   Hindi: "हिंदी",
   English: "English",
 };
+
+const LANGUAGE_BY_LOCALE: Record<ProductLocale, Language> = {
+  mr: "Marathi",
+  hi: "Hindi",
+  en: "English",
+};
+
+/** Applies the buyer's selected edition without losing the full locale map. */
+export function localizeProduct<T extends Product>(
+  product: T,
+  locale: ProductLocale,
+): T {
+  const edition = product.localized?.[locale] ?? product.localized?.mr;
+  if (!edition) return product;
+  return {
+    ...product,
+    title: edition.title || product.title,
+    shortDescription: edition.shortDescription || product.shortDescription,
+    description: edition.description || product.description,
+    pages: edition.pages || product.pages,
+    language: LANGUAGE_BY_LOCALE[locale],
+    coverImage: edition.coverImage || product.coverImage,
+    galleryImages: edition.galleryImages.length
+      ? edition.galleryImages
+      : product.galleryImages,
+  };
+}
+
+export function localizeSearchItem<T extends SearchItem>(
+  product: T,
+  locale: ProductLocale,
+): T {
+  const edition = product.localized?.[locale] ?? product.localized?.mr;
+  if (!edition) return product;
+  return {
+    ...product,
+    title: edition.title || product.title,
+    pages: edition.pages || product.pages,
+    language: LANGUAGE_BY_LOCALE[locale],
+  };
+}
 
 // --------------------------------- Search ----------------------------------
 
