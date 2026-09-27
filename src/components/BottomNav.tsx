@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, BookOpen, Sparkles, Download } from "lucide-react";
+import { UI_COPY } from "@/lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 
 const TABS = [
-  { href: "/", label: "मुख्यपृष्ठ", icon: Home },
-  { href: "/ebooks", label: "ई-बुक्स", icon: BookOpen },
-  { href: "/combos", label: "कॉम्बो", icon: Sparkles, accent: true },
-  { href: "/my-books", label: "माझी पुस्तके", icon: Download },
+  { href: "/", index: 0, icon: Home },
+  { href: "/ebooks", index: 1, icon: BookOpen },
+  { href: "/combos", index: 2, icon: Sparkles, accent: true },
+  { href: "/my-books", index: 4, icon: Download },
 ];
 
 export default function BottomNav() {
+  const { locale } = useLanguage();
+  const copy = UI_COPY[locale];
   const pathname = usePathname();
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -41,7 +45,7 @@ export default function BottomNav() {
                 }`}
               />
             </span>
-            <span className="font-deva text-[9px] font-medium">{t.label}</span>
+            <span className="font-deva text-[9px] font-medium">{copy.nav[t.index]}</span>
           </Link>
         );
       })}

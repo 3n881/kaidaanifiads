@@ -9,6 +9,7 @@ import {
   createRazorpayOrder,
 } from "@/lib/razorpay";
 import { getDeliverableItems, orderPagePath } from "@/lib/orders";
+import { normalizeLocale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  let body: { slug?: string };
+  let body: { slug?: string; locale?: string };
   try {
     body = await req.json();
   } catch {
@@ -36,6 +37,7 @@ async function handle(req: NextRequest) {
   }
 
   const slug = String(body.slug ?? "").trim().slice(0, 120);
+  const locale = normalizeLocale(body.locale);
   if (!slug) {
     return NextResponse.json({ error: "product is required" }, { status: 400 });
   }
@@ -63,10 +65,10 @@ async function handle(req: NextRequest) {
 
   // Don't take money for something we can't deliver (single PDF, or the
   // member books' PDFs for a combo).
-  const items = await getDeliverableItems(product.id);
+  const items = await getDeliverableItems(product.id, locale);
   if (items.length === 0) {
     return NextResponse.json(
-      { error: "This ebook is temporarily unavailable for download." },
+      { error: "This ebook is not available in the selected language yet." },
       { status: 409 },
     );
   }
@@ -78,6 +80,7 @@ async function handle(req: NextRequest) {
     whatsapp_number: "",
     product_id: product.id,
     amount: product.price,
+    locale,
   };
 
   // ------- TEST MODE: Razorpay not configured → simulate a paid order -------

@@ -7,6 +7,7 @@ import WhatsAppFab from "@/components/WhatsAppFab";
 import BottomNav from "@/components/BottomNav";
 import BackToTop from "@/components/BackToTop";
 import AdminChromeGate from "@/components/AdminChromeGate";
+import LanguageProvider from "@/components/LanguageProvider";
 import { getAllProducts } from "@/lib/products";
 import type { SearchItem } from "@/data/catalog";
 
@@ -66,21 +67,23 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${lato.variable} ${devanagari.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white text-brand-900 pb-14 md:pb-0">
-        <a href="#main" className="skip-link font-deva">
-          मुख्य मजकुरावर जा
-        </a>
-        <AdminChromeGate>
-          <Navbar products={searchItems} />
-        </AdminChromeGate>
-        <main id="main" className="flex-1">
-          {children}
-        </main>
-        <AdminChromeGate>
-          <Footer />
-          <WhatsAppFab />
-          <BackToTop />
-          <BottomNav />
-        </AdminChromeGate>
+        <LanguageProvider>
+          <a href="#main" className="skip-link font-deva">
+            मुख्य मजकुरावर जा / Skip to content
+          </a>
+          <AdminChromeGate>
+            <Navbar products={searchItems} />
+          </AdminChromeGate>
+          <main id="main" className="flex-1">
+            {children}
+          </main>
+          <AdminChromeGate>
+            <Footer />
+            <WhatsAppFab />
+            <BackToTop />
+            <BottomNav />
+          </AdminChromeGate>
+        </LanguageProvider>
       </body>
     </html>
   );

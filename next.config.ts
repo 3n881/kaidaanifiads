@@ -39,9 +39,9 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    // Admin-only forms upload ebook PDFs. Individual files are validated again
-    // in the server action (5 MB images, 50 MB PDFs).
-    serverActions: { bodySizeLimit: "60mb" },
+    // Admin-only forms can upload one or more localized PDFs plus previews.
+    // Keep this below Cloudflare's common 100 MB request ceiling.
+    serverActions: { bodySizeLimit: "95mb" },
   },
   images: {
     // Optimised brand images are cached by Cloudflare too; a month here keeps

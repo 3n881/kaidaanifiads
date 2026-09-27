@@ -2,6 +2,7 @@ import "server-only";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
 import { createOrderAccessToken } from "./razorpay";
+import { normalizeLocale, type Locale } from "./i18n";
 
 export interface DeliverableItem {
   id: number;
@@ -15,6 +16,9 @@ interface ItemRow {
   slug: string;
   title: string;
   pdf_path: string | null;
+  pdf_path_mr: string | null;
+  pdf_path_hi: string | null;
+  pdf_path_en: string | null;
   is_combo?: boolean;
 }
 
@@ -41,11 +45,13 @@ export function orderPageUrl(orderId: string): string {
  */
 export async function getDeliverableItems(
   productId: number,
+  requestedLocale: Locale = "mr",
 ): Promise<DeliverableItem[]> {
+  const locale = normalizeLocale(requestedLocale);
   const admin = getSupabaseAdmin();
   const { data: product, error } = await admin
     .from("products")
-    .select("id, slug, title, pdf_path, is_combo")
+    .select("id, slug, title, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en, is_combo")
     .eq("id", productId)
     .maybeSingle<ItemRow>();
   if (error) throw new DatabaseUnavailableError("load product", error);
@@ -55,7 +61,7 @@ export async function getDeliverableItems(
   if (product.is_combo) {
     const { data: members, error: membersError } = await admin
       .from("combo_items")
-      .select("products:product_id(id, slug, title, pdf_path)")
+      .select("products:product_id(id, slug, title, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en)")
       .eq("combo_id", productId);
     if (membersError) throw new DatabaseUnavailableError("load combo items", membersError);
     for (const m of (members ?? []) as unknown as { products: ItemRow | null }[]) {
@@ -63,9 +69,18 @@ export async function getDeliverableItems(
     }
   }
 
-  return rows
-    .filter((r): r is ItemRow & { pdf_path: string } => Boolean(r.pdf_path))
-    .map((r) => ({ id: r.id, slug: r.slug, title: r.title, pdfPath: r.pdf_path }));
+  const pathForLocale = (row: ItemRow) => {
+    if (locale === "hi") return row.pdf_path_hi;
+    if (locale === "en") return row.pdf_path_en;
+    return row.pdf_path_mr || row.pdf_path;
+  };
+
+  return rows.flatMap((row) => {
+    const pdfPath = pathForLocale(row);
+    return pdfPath
+      ? [{ id: row.id, slug: row.slug, title: row.title, pdfPath }]
+      : [];
+  });
 }
 
 /**

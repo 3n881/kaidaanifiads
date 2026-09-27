@@ -15,23 +15,38 @@ import {
   filterByCategory,
   sortProducts,
   searchProducts,
+  productHasLanguage,
 } from "@/lib/catalog";
 import ProductCard from "./ProductCard";
+import { LOCALE_TO_PRODUCT_LANGUAGE, UI_COPY } from "@/lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 
 export default function Catalog({ products }: { products: Product[] }) {
+  const { locale } = useLanguage();
+  const copy = UI_COPY[locale];
   const searchParams = useSearchParams();
   const initialLang = (searchParams.get("lang") as Language | "All") ?? "All";
   const validInitial = LANGUAGES.includes(initialLang) ? initialLang : "All";
 
-  const [lang, setLang] = useState<Language | "All">(validInitial);
+  const [langSelection, setLangSelection] = useState<{
+    locale: typeof locale;
+    value: Language | "All";
+  }>({ locale, value: validInitial });
   const [cat, setCat] = useState<Category | "All">("All");
   const [sort, setSort] = useState<SortKey>("featured");
   const [query, setQuery] = useState("");
 
+  const preferred = LOCALE_TO_PRODUCT_LANGUAGE[locale];
+  const lang = langSelection.locale === locale
+    ? langSelection.value
+    : products.some((product) => productHasLanguage(product, preferred))
+      ? preferred
+      : "All";
+
   const availableLangs = useMemo(
     () =>
       LANGUAGES.filter(
-        (l) => l === "All" || products.some((p) => p.language === l),
+        (l) => l === "All" || products.some((p) => productHasLanguage(p, l)),
       ),
     [products],
   );
@@ -53,7 +68,7 @@ export default function Catalog({ products }: { products: Product[] }) {
             {availableLangs.map((l) => (
               <button
                 key={l}
-                onClick={() => setLang(l)}
+                onClick={() => setLangSelection({ locale, value: l })}
                 aria-pressed={lang === l}
                 className={`font-deva rounded-full px-4 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40 ${
                   lang === l
@@ -61,7 +76,7 @@ export default function Catalog({ products }: { products: Product[] }) {
                     : "border border-brand-200 text-brand-700 hover:bg-brand-50"
                 }`}
               >
-                {LANGUAGE_LABELS[l]}
+                {l === "All" ? copy.all : LANGUAGE_LABELS[l]}
               </button>
             ))}
           </div>
@@ -71,8 +86,8 @@ export default function Catalog({ products }: { products: Product[] }) {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="पुस्तके शोधा…"
-              aria-label="पुस्तके शोधा"
+              placeholder={copy.search}
+              aria-label={copy.search}
               className="font-deva w-full bg-transparent py-2.5 text-sm outline-none"
             />
           </div>
@@ -99,7 +114,7 @@ export default function Catalog({ products }: { products: Product[] }) {
 
           <label className="flex items-center gap-2 self-start rounded-xl border border-brand-200 px-3 py-2 text-sm text-brand-600 sm:self-auto">
             <ArrowUpDown className="h-4 w-4 text-brand-400" />
-            <span className="sr-only">क्रमवारी</span>
+            <span className="sr-only">{copy.sort}</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
@@ -117,13 +132,13 @@ export default function Catalog({ products }: { products: Product[] }) {
 
       {/* Count */}
       <p className="mt-5 text-sm text-brand-400">
-        Showing <b className="text-brand-700">{filtered.length}</b> books
+        <b className="text-brand-700">{filtered.length}</b> {copy.showing}
       </p>
 
       {/* Grid */}
       {filtered.length === 0 ? (
         <p className="font-deva mt-16 text-center text-brand-400">
-          या निवडीसाठी काही पुस्तके सापडली नाहीत.
+          {copy.noBooks}
         </p>
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">

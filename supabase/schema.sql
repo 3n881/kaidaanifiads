@@ -23,6 +23,11 @@ create table if not exists public.products (
                 check (category in ('Property Law','Civil Law','Other')),
   cover_image   text,          -- public URL in the `covers` bucket (null → gradient placeholder)
   pdf_path      text,          -- object path in the private `pdfs` bucket
+  pdf_path_mr   text,          -- Marathi PDF (pdf_path remains a legacy Marathi fallback)
+  pdf_path_hi   text,          -- Hindi PDF
+  pdf_path_en   text,          -- English PDF
+  gallery_images text[] not null default '{}', -- up to 4 previews; cover + previews = 5
+  available_locales text[] not null default '{}',
   featured      boolean default false,
   active        boolean default true,
   sort_order    integer default 0,
@@ -43,6 +48,8 @@ create table if not exists public.orders (
   whatsapp_number    text not null,
   product_id         bigint references public.products(id),
   amount             integer not null,
+  locale             text not null default 'mr'
+                     check (locale in ('mr','hi','en')),
   razorpay_order_id  text,
   razorpay_payment_id text,
   status             text not null default 'created'

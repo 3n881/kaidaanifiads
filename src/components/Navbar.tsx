@@ -4,19 +4,23 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Search, Menu, X } from "lucide-react";
+import { Languages, Search, Menu, X } from "lucide-react";
 import type { SearchItem } from "@/data/catalog";
+import { LOCALES, LOCALE_LABELS, UI_COPY } from "@/lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 import CommandPalette from "./CommandPalette";
 
 const LINKS = [
-  { href: "/", label: "मुख्यपृष्ठ", en: "Home" },
-  { href: "/ebooks", label: "ई-बुक्स", en: "E-Books" },
-  { href: "/combos", label: "कॉम्बो पॅक्स", en: "Combos", sale: true },
-  { href: "/about", label: "आमच्याबद्दल", en: "About" },
-  { href: "/my-books", label: "माझी पुस्तके", en: "" },
+  { href: "/" },
+  { href: "/ebooks" },
+  { href: "/combos", sale: true },
+  { href: "/about" },
+  { href: "/my-books" },
 ];
 
 export default function Navbar({ products }: { products: SearchItem[] }) {
+  const { locale, setLocale } = useLanguage();
+  const copy = UI_COPY[locale];
   const pathname = usePathname();
   // The menu belongs to the page it was opened on, so it closes on navigation.
   const [menuPath, setMenuPath] = useState<string | null>(null);
@@ -58,7 +62,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
           className="hidden min-w-0 flex-1 items-center gap-2 rounded-xl border border-brand-200 bg-brand-50/50 px-4 py-2.5 text-left text-sm text-brand-400 transition hover:border-brand-300 md:flex lg:max-w-sm"
         >
           <Search className="h-4 w-4 flex-shrink-0" />
-          <span className="font-deva truncate">पुस्तके शोधा (Search books)…</span>
+          <span className="font-deva truncate">{copy.search}</span>
           <kbd className="ml-auto hidden flex-shrink-0 rounded border border-brand-200 px-1.5 text-[10px] lg:block">
             ⌘K
           </kbd>
@@ -66,7 +70,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
 
         {/* Desktop links */}
         <div className="ml-auto hidden items-center gap-0.5 lg:flex">
-          {LINKS.map((l) => (
+          {LINKS.map((l, index) => (
             <Link
               key={l.href}
               href={l.href}
@@ -76,12 +80,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
                   : "text-brand-600 hover:bg-brand-50 hover:text-brand-teal"
               }`}
             >
-              <span className="block">{l.label}</span>
-              {l.en && (
-                <span className="block text-[10px] font-normal text-brand-400">
-                  ({l.en})
-                </span>
-              )}
+              <span className="block">{copy.nav[index]}</span>
               {l.sale && (
                 <span className="badge-sale absolute -right-1 top-0 rounded-full px-1.5 text-[9px] font-bold text-white">
                   SALE
@@ -91,12 +90,14 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
           ))}
         </div>
 
+        <LanguageSelect className="hidden xl:flex" />
+
         {/* Buy button (gold) */}
         <Link
           href="/ebooks"
           className="font-deva ml-auto hidden flex-shrink-0 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-bold text-brand-teal shadow-sm transition hover:bg-brand-gold/90 lg:ml-2 lg:inline-block"
         >
-          खरेदी करा (Buy Now)
+          {copy.buyNow}
         </Link>
 
         {/* Mobile actions */}
@@ -122,7 +123,8 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
       {menuOpen && (
         <div className="border-t border-brand-100 bg-white lg:hidden">
           <div className="container-x flex flex-col gap-1 py-3">
-            {LINKS.map((l) => (
+            <LanguageSelect className="mb-2 flex" />
+            {LINKS.map((l, index) => (
               <Link
                 key={l.href}
                 href={l.href}
@@ -133,13 +135,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
                 }`}
               >
                 <span>
-                  {l.label}
-                  {l.en && (
-                    <span className="text-xs font-normal text-brand-400">
-                      {" "}
-                      ({l.en})
-                    </span>
-                  )}
+                  {copy.nav[index]}
                 </span>
                 {l.sale && (
                   <span className="badge-sale rounded-full px-1.5 text-[9px] font-bold text-white">
@@ -152,7 +148,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
               href="/ebooks"
               className="font-deva mt-1 rounded-xl bg-brand-gold px-3 py-2.5 text-center text-sm font-bold text-brand-teal"
             >
-              खरेदी करा (Buy Now)
+              {copy.buyNow}
             </Link>
           </div>
         </div>
@@ -165,4 +161,23 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
       />
     </header>
   );
+
+  function LanguageSelect({ className }: { className: string }) {
+    return (
+      <label className={`${className} items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-brand-600`}>
+        <Languages className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="sr-only">{copy.language}</span>
+        <select
+          value={locale}
+          onChange={(event) => setLocale(event.target.value as typeof locale)}
+          aria-label={copy.language}
+          className="font-deva min-w-0 bg-transparent text-xs font-semibold outline-none"
+        >
+          {LOCALES.map((value) => (
+            <option key={value} value={value}>{LOCALE_LABELS[value]}</option>
+          ))}
+        </select>
+      </label>
+    );
+  }
 }

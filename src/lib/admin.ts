@@ -18,6 +18,11 @@ export interface AdminProduct {
   category: string | null;
   cover_image: string | null;
   pdf_path: string | null;
+  pdf_path_mr: string | null;
+  pdf_path_hi: string | null;
+  pdf_path_en: string | null;
+  gallery_images: string[] | null;
+  available_locales: Array<"mr" | "hi" | "en"> | null;
   featured: boolean | null;
   active: boolean | null;
   sort_order: number | null;
@@ -29,6 +34,7 @@ export interface AdminOrder {
   whatsapp_number: string;
   product_id: number | null;
   amount: number;
+  locale: "mr" | "hi" | "en";
   razorpay_payment_id: string | null;
   status: string;
   delivered: boolean | null;

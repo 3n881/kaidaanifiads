@@ -52,7 +52,14 @@ export function filterByLanguage(
   language: Language | "All",
 ): Product[] {
   if (language === "All") return items;
-  return items.filter((p) => p.language === language);
+  return items.filter((p) => productHasLanguage(p, language));
+}
+
+export function productHasLanguage(product: Product, language: Language): boolean {
+  const code = language === "Marathi" ? "mr" : language === "Hindi" ? "hi" : "en";
+  return product.availableLocales?.length
+    ? product.availableLocales.includes(code)
+    : product.language === language;
 }
 
 export const LANGUAGES: Array<Language | "All"> = [

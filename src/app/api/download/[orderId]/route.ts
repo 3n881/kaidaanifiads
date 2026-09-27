@@ -3,6 +3,7 @@ import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/serve
 import { verifyOrderAccessToken } from "@/lib/razorpay";
 import { getDeliverableItems, orderPagePath } from "@/lib/orders";
 import { createSignedPdfUrl } from "@/lib/delivery";
+import { normalizeLocale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,7 @@ async function handle(req: NextRequest, orderId: string) {
   const admin = getSupabaseAdmin();
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, status, product_id")
+    .select("id, status, product_id, locale")
     .eq("id", orderId)
     .maybeSingle();
   if (orderError) throw new DatabaseUnavailableError("download order", orderError);
@@ -71,7 +72,8 @@ async function handle(req: NextRequest, orderId: string) {
     return fail("पेमेंटची पुष्टी अजून झाली नाही. / Payment not confirmed yet.", 409, back);
   }
 
-  const items = await getDeliverableItems(order.product_id);
+  const locale = normalizeLocale(order.locale);
+  const items = await getDeliverableItems(order.product_id, locale);
   const item = itemParam ? items.find((i) => i.id === itemParam) : items[0];
   if (!item) return fail("या ऑर्डरसाठी फाइल सापडली नाही. / File not found for this order.", 404, back);
 
@@ -86,7 +88,7 @@ async function handle(req: NextRequest, orderId: string) {
     return fail("या ऑर्डरची डाउनलोड मर्यादा संपली — WhatsApp सपोर्टशी संपर्क करा. / Download limit reached — please contact support on WhatsApp.", 429, back);
   }
 
-  const url = await createSignedPdfUrl(item.pdfPath, `${item.slug}.pdf`);
+  const url = await createSignedPdfUrl(item.pdfPath, `${item.slug}-${locale}.pdf`);
   if (!url) {
     console.error("[download] could not sign", { orderId, item: item.id });
     return fail(BUSY, 503, back);

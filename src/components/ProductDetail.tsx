@@ -13,13 +13,13 @@ import type { Product } from "@/data/catalog";
 import { LANGUAGE_LABELS, discountPercent, categoryOf } from "@/lib/catalog";
 import { getRelated, getComboBooks } from "@/lib/products";
 import { SITE } from "@/data/catalog";
-import CoverImage from "./CoverImage";
 import { coverSrc, coverSrcSet } from "@/lib/covers";
 import BuyButton from "./BuyButton";
 import StickyBuyBar from "./StickyBuyBar";
 import ExpandableText from "./ExpandableText";
 import DisclaimerBanner from "./DisclaimerBanner";
 import Carousel from "./Carousel";
+import ProductGallery from "./ProductGallery";
 
 const MINI_STEPS = [
   { n: "1", label: "बटन दाबा", en: "Click" },
@@ -100,12 +100,7 @@ export default async function ProductDetail({
         {/* Cover — compact on phones so title, price and Buy fit the first screen */}
         <div className="mx-auto w-[46%] max-w-[240px] lg:sticky lg:top-24 lg:w-full lg:max-w-none lg:self-start">
           <div className="relative overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
-            <CoverImage
-              product={product}
-              className="aspect-[3/4] w-full"
-              priority
-              sizes="(max-width: 768px) 90vw, 400px"
-            />
+            <ProductGallery product={product} />
             {pct > 0 && (
               // Phones already show the discount next to the price; on the small
               // mobile cover the badge would cover the placeholder label.

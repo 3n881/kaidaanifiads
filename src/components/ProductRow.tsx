@@ -1,7 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import Carousel from "./Carousel";
+import type { Locale } from "@/lib/i18n";
+import { useLanguage } from "./LanguageProvider";
+
+type LocalizedText = string | Record<Locale, string>;
 
 export default function ProductRow({
   eyebrow,
@@ -12,12 +18,14 @@ export default function ProductRow({
   viewAllLabel,
 }: {
   eyebrow?: string;
-  title: string;
-  subtitle?: string;
+  title: LocalizedText;
+  subtitle?: LocalizedText;
   products: Product[];
   viewAllHref: string;
-  viewAllLabel: string;
+  viewAllLabel: LocalizedText;
 }) {
+  const { locale } = useLanguage();
+  const text = (value: LocalizedText) => typeof value === "string" ? value : value[locale];
   return (
     <section className="py-14">
       <div className="container-x">
@@ -29,17 +37,17 @@ export default function ProductRow({
               </span>
             )}
             <h2 className="font-deva mt-3 text-2xl font-extrabold text-brand-900 sm:text-3xl">
-              {title}
+              {text(title)}
             </h2>
             {subtitle && (
-              <p className="font-deva mt-2 text-brand-500">{subtitle}</p>
+              <p className="font-deva mt-2 text-brand-500">{text(subtitle)}</p>
             )}
           </div>
           <Link
             href={viewAllHref}
             className="font-deva inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-brand-200 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
           >
-            {viewAllLabel} <ArrowRight className="h-4 w-4" />
+            {text(viewAllLabel)} <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 

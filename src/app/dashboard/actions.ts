@@ -131,15 +131,51 @@ export async function saveProduct(formData: FormData) {
   if (cover instanceof File && cover.size > 0) {
     row.cover_image = await uploadCover(cover, slug);
   }
-  const pdf = formData.get("pdf_file");
-  if (pdf instanceof File && pdf.size > 0) {
-    row.pdf_path = await uploadFile("pdfs", pdf, slug);
+  const pdfFields = [
+    ["pdf_file_mr", "pdf_path_mr", "mr"],
+    ["pdf_file_hi", "pdf_path_hi", "hi"],
+    ["pdf_file_en", "pdf_path_en", "en"],
+  ] as const;
+  for (const [field, column, locale] of pdfFields) {
+    const pdf = formData.get(field);
+    if (pdf instanceof File && pdf.size > 0) {
+      row[column] = await uploadFile("pdfs", pdf, `${slug}-${locale}`);
+    }
+  }
+
+  const previewFiles = formData
+    .getAll("preview_files")
+    .filter((value): value is File => value instanceof File && value.size > 0);
+  if (previewFiles.length > 4) {
+    throw new Error("Upload at most 4 preview pages (the cover makes 5 images total)");
+  }
+  if (previewFiles.length) {
+    row.gallery_images = await Promise.all(
+      previewFiles.map((file, index) => uploadCover(file, `${slug}-preview-${index + 1}`)),
+    );
   }
 
   const { error } = await admin
     .from("products")
     .upsert(row, { onConflict: "id" });
   if (error) throw new Error(error.message);
+
+  const { data: saved, error: savedError } = await admin
+    .from("products")
+    .select("pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en")
+    .eq("id", id)
+    .single();
+  if (savedError) throw new Error(savedError.message);
+  const availableLocales = [
+    (saved.pdf_path_mr || saved.pdf_path) && "mr",
+    saved.pdf_path_hi && "hi",
+    saved.pdf_path_en && "en",
+  ].filter(Boolean);
+  const { error: localeError } = await admin
+    .from("products")
+    .update({ available_locales: availableLocales })
+    .eq("id", id);
+  if (localeError) throw new Error(localeError.message);
 
   // Combo membership: replace combo_items with the checked books.
   if (isCombo) {
@@ -152,9 +188,23 @@ export async function saveProduct(formData: FormData) {
       await admin
         .from("combo_items")
         .insert(memberIds.map((product_id) => ({ combo_id: id, product_id })));
+      const { data: members, error: membersError } = await admin
+        .from("products")
+        .select("available_locales")
+        .in("id", memberIds);
+      if (membersError) throw new Error(membersError.message);
+      const comboLocales = (["mr", "hi", "en"] as const).filter((locale) =>
+        (members ?? []).length === memberIds.length &&
+        (members ?? []).every((member) => member.available_locales?.includes(locale)),
+      );
       await admin
         .from("products")
-        .update({ set_size: memberIds.length })
+        .update({ set_size: memberIds.length, available_locales: comboLocales })
+        .eq("id", id);
+    } else {
+      await admin
+        .from("products")
+        .update({ set_size: null, available_locales: [] })
         .eq("id", id);
     }
   }

@@ -42,6 +42,10 @@ export interface Product {
   category?: Category;
   /** Uploaded cover image URL (from the `covers` bucket). Falls back to gradient. */
   coverImage?: string;
+  /** Optional inside-page previews. The cover plus these is capped at five images. */
+  galleryImages?: string[];
+  /** PDF editions currently available for checkout. */
+  availableLocales?: Array<"mr" | "hi" | "en">;
 }
 
 /** Slim product shape for the site-wide search box (shipped on every page). */

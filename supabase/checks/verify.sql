@@ -36,11 +36,13 @@ select routine_name, grantee from information_schema.routine_privileges
 select indexname, indexdef from pg_indexes
   where schemaname = 'public' and tablename = 'orders';
 
--- 8. Catalog readiness: every active single ebook has a PDF; every combo has
---    members that all have PDFs (expect zero rows from both).
-select slug from public.products where active and not is_combo and pdf_path is null;
-select c.slug from public.products c
-  where c.active and c.is_combo and c.pdf_path is null
-    and not exists (
-      select 1 from public.combo_items ci join public.products m on m.id = ci.product_id
-       where ci.combo_id = c.id and m.pdf_path is not null);
+-- 8. Multilingual catalog readiness: every active single ebook and every
+--    combo must be deliverable in Marathi, Hindi and English (expect zero).
+select slug from public.products
+ where active and not is_combo
+   and (coalesce(pdf_path_mr, pdf_path) is null
+     or pdf_path_hi is null
+     or pdf_path_en is null);
+select slug from public.products
+ where active and is_combo
+   and not (available_locales @> array['mr','hi','en']::text[]);

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -10,8 +12,17 @@ import {
   Sparkles,
 } from "lucide-react";
 import { SITE } from "@/data/catalog";
+import { useLanguage } from "./LanguageProvider";
+
+const COPY = {
+  mr: { badge: "100% अधिकृत कायदेशीर माहिती", title: "सोप्या भाषेत कायदे —", accent: "तुमच्या हक्कांसाठी", body: "शेतकरी, सामान्य नागरिक आणि महिलांसाठी जमीन आणि वारसा हक्कांची विश्वासार्ह माहिती एका क्लिकवर.", search: "पुस्तके शोधा…", popular: "लोकप्रिय:", books: "प्रकाशन पहा", combos: "कॉम्बो पॅक्स", readers: "वाचक", rating: "रेटिंग", trusted: "अधिकृत", authentic: "100% अधिकृत", info: "कायदेशीर माहिती" },
+  hi: { badge: "100% प्रामाणिक कानूनी जानकारी", title: "आसान भाषा में कानून —", accent: "आपके अधिकारों के लिए", body: "किसानों, नागरिकों और महिलाओं के लिए जमीन और विरासत के अधिकारों की भरोसेमंद जानकारी।", search: "किताबें खोजें…", popular: "लोकप्रिय:", books: "किताबें देखें", combos: "कॉम्बो पैक्स", readers: "पाठक", rating: "रेटिंग", trusted: "प्रामाणिक", authentic: "100% प्रामाणिक", info: "कानूनी जानकारी" },
+  en: { badge: "100% authentic legal information", title: "Law in plain language —", accent: "for your rights", body: "Reliable information about land, inheritance, and everyday rights for farmers, citizens, and women.", search: "Search books…", popular: "Popular:", books: "View books", combos: "Combo packs", readers: "Readers", rating: "Rating", trusted: "Authentic", authentic: "100% authentic", info: "Legal information" },
+} as const;
 
 export default function Hero() {
+  const { locale } = useLanguage();
+  const copy = COPY[locale];
   return (
     <section className="relative flex min-h-fit items-center overflow-hidden bg-brand-teal text-white md:min-h-[600px] lg:min-h-screen">
       {/* ambient glows */}
@@ -37,16 +48,16 @@ export default function Hero() {
               className="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-xs font-semibold text-brand-gold"
               style={{ animationDelay: "0.05s" }}
             >
-              <ShieldCheck className="h-3.5 w-3.5" /> 100% अधिकृत कायदेशीर माहिती
+              <ShieldCheck className="h-3.5 w-3.5" /> {copy.badge}
             </span>
 
             <h1
               className="font-deva animate-fade-in-up mt-5 text-3xl font-black leading-[1.15] tracking-tight text-white sm:text-5xl"
               style={{ animationDelay: "0.15s" }}
             >
-              सोप्या भाषेत कायदे -{" "}
+              {copy.title}{" "}
               <span className="bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold bg-clip-text text-transparent drop-shadow-[0_2px_8px_rgba(255,211,1,0.3)]">
-                तुमच्या हक्कांसाठी
+                {copy.accent}
               </span>
             </h1>
 
@@ -54,8 +65,7 @@ export default function Hero() {
               className="font-deva animate-fade-in-up mx-auto mt-4 max-w-md text-base text-slate-300 lg:mx-0"
               style={{ animationDelay: "0.25s" }}
             >
-              शेतकरी, सामान्य नागरिक आणि महिलांसाठी जमीन आणि वारसा हक्कांची
-              विश्वासार्ह माहिती एका क्लिकवर.
+              {copy.body}
             </p>
             <p
               className="animate-fade-in-up mt-3 text-xs font-medium text-slate-400"
@@ -72,7 +82,7 @@ export default function Hero() {
               style={{ animationDelay: "0.4s" }}
             >
               <Search className="h-4 w-4" />
-              <span className="font-deva">पुस्तके शोधा (Search books)…</span>
+              <span className="font-deva">{copy.search}</span>
             </Link>
 
             {/* tags */}
@@ -80,7 +90,7 @@ export default function Hero() {
               className="animate-fade-in-up mt-5 flex flex-wrap items-center justify-center gap-2 lg:justify-start"
               style={{ animationDelay: "0.48s" }}
             >
-              <span className="font-deva text-sm text-slate-400">लोकप्रिय:</span>
+              <span className="font-deva text-sm text-slate-400">{copy.popular}</span>
               {SITE.popularTags.map((tag) => (
                 <Link
                   key={tag}
@@ -101,13 +111,13 @@ export default function Hero() {
                 href="/ebooks"
                 className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-sm font-bold text-brand-teal shadow-[var(--shadow-gold)] transition hover:bg-brand-gold/90 sm:w-auto"
               >
-                प्रकाशन पहा (View Books) <ArrowRight className="h-4 w-4" />
+                {copy.books} <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/combos"
                 className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/5 sm:w-auto"
               >
-                कॉम्बो पॅक्स
+                {copy.combos}
               </Link>
             </div>
 
@@ -116,9 +126,9 @@ export default function Hero() {
               className="animate-fade-in-up mx-auto mt-9 grid max-w-md grid-cols-3 gap-3 lg:mx-0"
               style={{ animationDelay: "0.64s" }}
             >
-              <Stat icon={Users} value={SITE.stats.readers} label="वाचक" />
-              <Stat icon={Star} value={SITE.stats.rating} label="रेटिंग" />
-              <Stat icon={ShieldCheck} value="100%" label="अधिकृत" />
+              <Stat icon={Users} value={SITE.stats.readers} label={copy.readers} />
+              <Stat icon={Star} value={SITE.stats.rating} label={copy.rating} />
+              <Stat icon={ShieldCheck} value="100%" label={copy.trusted} />
             </div>
           </div>
 
@@ -159,10 +169,10 @@ export default function Hero() {
                 </span>
                 <span className="text-left">
                   <span className="font-deva block text-sm font-black leading-none text-brand-teal">
-                    100% अधिकृत
+                    {copy.authentic}
                   </span>
                   <span className="font-deva block text-[10px] font-medium text-brand-400">
-                    कायदेशीर माहिती
+                    {copy.info}
                   </span>
                 </span>
               </div>

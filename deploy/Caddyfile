@@ -18,9 +18,9 @@ kaydyachaanifaydyach.com, www.kaydyachaanifaydyach.com {
 
 	encode zstd gzip
 
-	# Admin PDF uploads (Next.js server action limit is 60 MB).
+	# Admin localized PDF + preview uploads (kept below Cloudflare's 100 MB ceiling).
 	request_body {
-		max_size 60MB
+		max_size 95MB
 	}
 
 	reverse_proxy app1:3000 app2:3000 {

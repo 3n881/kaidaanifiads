@@ -2,6 +2,7 @@ import "server-only";
 import { getSupabaseAdmin } from "./supabase/server";
 import { sendWhatsAppDelivery } from "./interakt";
 import { normalizePhone, orderPageUrl } from "./orders";
+import { normalizeLocale } from "./i18n";
 
 // Signed URLs are minted per click by /api/download and only need to survive
 // the redirect, so they expire quickly — a forwarded link is useless.
@@ -46,7 +47,7 @@ export async function sendOrderOnWhatsApp(
   const admin = getSupabaseAdmin();
   const { data: order } = await admin
     .from("orders")
-    .select("id, name, status, whatsapp_number, buyer_contact, products(title)")
+    .select("id, name, status, locale, whatsapp_number, buyer_contact, products(title)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order || order.status !== "paid") return false;
@@ -65,11 +66,16 @@ export async function sendOrderOnWhatsApp(
   }
 
   const product = Array.isArray(order.products) ? order.products[0] : order.products;
+  const locale = normalizeLocale(order.locale);
+  const customerName = order.name && order.name !== "Guest"
+    ? order.name
+    : locale === "mr" ? "ग्राहक" : locale === "hi" ? "ग्राहक" : "Customer";
   const sent = await sendWhatsAppDelivery({
     phone,
-    name: order.name && order.name !== "Guest" ? order.name : "Customer",
+    name: customerName,
     productTitle: (product as { title?: string } | null)?.title ?? "",
     downloadLink: orderPageUrl(orderId),
+    locale,
   });
   if (sent) {
     await admin.from("orders").update({ delivered: true }).eq("id", orderId);

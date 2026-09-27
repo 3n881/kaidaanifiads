@@ -3,6 +3,7 @@ import { sendOrderOnWhatsApp } from "@/lib/delivery";
 import { verifyOrderAccessToken } from "@/lib/razorpay";
 import { normalizePhone } from "@/lib/orders";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { normalizeLocale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
     accessToken?: string;
     name?: string;
     whatsapp?: string;
+    locale?: string;
   };
   try {
     body = await req.json();
@@ -27,6 +29,7 @@ export async function POST(req: NextRequest) {
   const token = String(body.accessToken ?? "").trim();
   const phone = normalizePhone(body.whatsapp);
   const name = String(body.name ?? "").trim().slice(0, 100);
+  const locale = normalizeLocale(body.locale);
 
   if (!verifyOrderAccessToken(orderId, token)) {
     return NextResponse.json({ error: "invalid order access" }, { status: 403 });
@@ -44,6 +47,7 @@ export async function POST(req: NextRequest) {
     .update({
       name: name.length >= 2 ? name : "Customer",
       whatsapp_number: phone,
+      locale,
     })
     .eq("id", orderId)
     .eq("status", "paid")

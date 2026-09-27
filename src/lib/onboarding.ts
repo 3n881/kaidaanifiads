@@ -29,8 +29,17 @@ export function productIsReady(product: AdminProduct) {
       product.mrp >= product.price &&
       product.cover_image &&
       (product.is_combo
-        ? Boolean(product.set_size && product.set_size >= 2)
-        : Boolean(product.pdf_path && product.pages)),
+        ? Boolean(
+            product.set_size &&
+              product.set_size >= 2 &&
+              ["mr", "hi", "en"].every((locale) => product.available_locales?.includes(locale as "mr" | "hi" | "en")),
+          )
+        : Boolean(
+            (product.pdf_path_mr || product.pdf_path) &&
+              product.pdf_path_hi &&
+              product.pdf_path_en &&
+              product.pages,
+          )),
   );
 }
 

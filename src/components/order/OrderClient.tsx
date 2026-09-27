@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, MessageCircle } from "lucide-react";
+import { Loader2, MessageCircle, X } from "lucide-react";
 import { saveOrder } from "@/lib/purchases";
+import { ORDER_COPY, type Locale } from "@/lib/i18n";
 
 /** Remembers the order on this device and (once) starts the first download. */
 export function OrderMemory({
@@ -11,14 +12,16 @@ export function OrderMemory({
   token,
   title,
   autoDownloadHref,
+  locale = "mr",
 }: {
   orderId: string;
   token: string;
   title: string;
   autoDownloadHref?: string;
+  locale?: Locale;
 }) {
   useEffect(() => {
-    saveOrder({ orderId, token, title });
+    saveOrder({ orderId, token, title, locale });
     if (!autoDownloadHref) return;
     const flag = `kaf-dl-${orderId}`;
     try {
@@ -30,7 +33,7 @@ export function OrderMemory({
     // Same-tab navigation to an attachment response keeps this page open and
     // is not blocked by in-app browsers the way window.open() popups are.
     window.location.href = autoDownloadHref;
-  }, [orderId, token, title, autoDownloadHref]);
+  }, [orderId, token, title, autoDownloadHref, locale]);
   return null;
 }
 
@@ -72,20 +75,29 @@ type ContactState = "idle" | "sending" | "sent" | "error";
 export function WhatsAppOptIn({
   orderId,
   token,
+  locale,
 }: {
   orderId: string;
   token: string;
+  locale: Locale;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<ContactState>("idle");
   const [message, setMessage] = useState("");
+  const copy = ORDER_COPY[locale];
+
+  useEffect(() => {
+    const id = window.setTimeout(() => dialogRef.current?.showModal(), 700);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!/^[6-9]\d{9}$/.test(phone)) {
       setState("error");
-      setMessage("कृपया वैध १० अंकी WhatsApp नंबर भरा.");
+      setMessage(copy.invalidPhone);
       return;
     }
     setState("sending");
@@ -94,7 +106,7 @@ export function WhatsAppOptIn({
       const response = await fetch("/api/orders/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, accessToken: token, name, whatsapp: phone }),
+        body: JSON.stringify({ orderId, accessToken: token, name, whatsapp: phone, locale }),
       });
       const result = (await response.json()) as { error?: string; delivered?: boolean };
       if (!response.ok) {
@@ -105,73 +117,80 @@ export function WhatsAppOptIn({
       setState("sent");
       setMessage(
         result.delivered
-          ? "पुस्तकाची लिंक WhatsApp वर पाठवली आहे."
-          : "नंबर सेव्ह झाला. हे पुस्तक आता My Books मध्येही मिळेल.",
+          ? copy.sent
+          : copy.saved,
       );
     } catch {
       setState("error");
-      setMessage("Number could not be saved. Please try again.");
+      setMessage(locale === "en" ? "Number could not be saved. Please try again." : copy.invalidPhone);
     }
   };
 
-  if (state === "sent") {
-    return (
-      <p className="font-deva rounded-xl bg-green-50 px-3 py-3 text-xs font-semibold text-green-700">
-        {message}
-      </p>
-    );
-  }
-
   return (
-    <form
-      onSubmit={submit}
-      className="w-full rounded-xl border border-brand-100 bg-brand-50/50 p-3 text-left"
-    >
-      <div className="mb-2 flex items-start gap-2">
-        <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#25D366]" aria-hidden="true" />
-        <div>
-          <p className="font-deva text-xs font-bold text-brand-800">
-            WhatsApp वर लिंक हवी आहे? (Optional)
-          </p>
-          <p className="font-deva text-[11px] text-brand-500">
-            नंबर दिल्यास लिंक WhatsApp वर येईल आणि My Books मधूनही पुन्हा मिळेल.
-          </p>
-        </div>
-      </div>
-      <input
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        autoComplete="name"
-        placeholder="नाव (optional)"
-        className="mb-2 w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-teal"
-      />
-      <div className="flex rounded-lg border border-brand-200 bg-white focus-within:border-brand-teal focus-within:ring-2 focus-within:ring-brand-teal/20">
-        <span className="px-3 py-2 text-sm text-brand-500">+91</span>
-        <input
-          value={phone}
-          onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
-          type="tel"
-          inputMode="numeric"
-          autoComplete="tel-national"
-          enterKeyHint="send"
-          aria-label="WhatsApp number"
-          placeholder="10 अंकी WhatsApp नंबर"
-          className="w-full rounded-r-lg bg-transparent py-2 pr-3 text-sm outline-none"
-        />
-      </div>
-      {message && (
-        <p className={`mt-2 text-[11px] ${state === "error" ? "text-danger-600" : "text-brand-600"}`}>
-          {message}
-        </p>
-      )}
+    <>
       <button
-        type="submit"
-        disabled={state === "sending"}
-        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs font-bold text-brand-800 hover:bg-brand-50 disabled:opacity-60"
+        type="button"
+        onClick={() => dialogRef.current?.showModal()}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#25D366]/30 bg-[#25D366]/10 px-4 py-3 text-sm font-bold text-brand-800 hover:bg-[#25D366]/15"
       >
-        {state === "sending" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-        WhatsApp वर पाठवा
+        <MessageCircle className="h-4 w-4 text-[#128C7E]" aria-hidden="true" />
+        {copy.whatsappTitle}
       </button>
-    </form>
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="whatsapp-dialog-title"
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border-0 bg-white p-0 text-brand-900 shadow-2xl backdrop:bg-black/55 backdrop:backdrop-blur-sm"
+      >
+        <div className="p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366]/15 text-[#128C7E]">
+                <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 id="whatsapp-dialog-title" className="font-deva text-lg font-extrabold">
+                  {copy.whatsappTitle}
+                </h2>
+                <p id="whatsapp-dialog-description" className="font-deva mt-1 text-sm text-brand-500">
+                  {copy.whatsappBody}
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={() => dialogRef.current?.close()} aria-label={copy.later} className="rounded-full p-1.5 text-brand-400 hover:bg-brand-50">
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+
+          {state === "sent" ? (
+            <div className="mt-5">
+              <p className="font-deva rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{message}</p>
+              <button type="button" onClick={() => dialogRef.current?.close()} className="mt-3 w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white">{UI_CLOSE[locale]}</button>
+            </div>
+          ) : (
+            <form onSubmit={submit} aria-describedby="whatsapp-dialog-description" className="mt-5 space-y-3">
+              <div>
+                <label htmlFor="whatsapp-name" className="font-deva mb-1 block text-xs font-semibold text-brand-700">{copy.name}</label>
+                <input id="whatsapp-name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" className="w-full rounded-xl border border-brand-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-teal" />
+              </div>
+              <div>
+                <label htmlFor="whatsapp-phone" className="font-deva mb-1 block text-xs font-semibold text-brand-700">{copy.phone}</label>
+                <div className="flex rounded-xl border border-brand-200 bg-white focus-within:border-brand-teal focus-within:ring-2 focus-within:ring-brand-teal/20">
+                  <span className="px-3 py-2.5 text-sm text-brand-500">+91</span>
+                  <input id="whatsapp-phone" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} type="tel" inputMode="numeric" autoComplete="tel-national" enterKeyHint="send" pattern="[6-9][0-9]{9}" required aria-errormessage="whatsapp-error" className="w-full rounded-r-xl bg-transparent py-2.5 pr-3 text-sm outline-none" />
+                </div>
+              </div>
+              {message && <p id="whatsapp-error" role="alert" className="text-xs font-medium text-danger-600">{message}</p>}
+              <button type="submit" disabled={state === "sending"} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#128C7E] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-60">
+                {state === "sending" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {state === "sending" ? copy.sending : copy.send}
+              </button>
+              <button type="button" onClick={() => dialogRef.current?.close()} className="w-full px-4 py-2 text-sm font-semibold text-brand-500">{copy.later}</button>
+            </form>
+          )}
+        </div>
+      </dialog>
+    </>
   );
 }
+
+const UI_CLOSE: Record<Locale, string> = { mr: "पूर्ण", hi: "हो गया", en: "Done" };

@@ -11,6 +11,7 @@ export interface SavedOrder {
   orderId: string;
   token: string;
   title: string;
+  locale?: "mr" | "hi" | "en";
   savedAt: number;
 }
 

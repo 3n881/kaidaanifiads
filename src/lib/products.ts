@@ -15,6 +15,8 @@ import {
 // Public catalog columns only — never pdf_path (private storage paths stay
 // server-side; the pages are cached and shipped to every visitor).
 const PUBLIC_COLUMNS =
+  "id, slug, title, short_description, description, mrp, price, pages, language, is_combo, set_size, rating, category, cover_image, gallery_images, available_locales, featured, active";
+const LEGACY_PUBLIC_COLUMNS =
   "id, slug, title, short_description, description, mrp, price, pages, language, is_combo, set_size, rating, category, cover_image, featured, active";
 
 interface ProductRow {
@@ -32,6 +34,8 @@ interface ProductRow {
   rating: number | string | null;
   category: Category | null;
   cover_image: string | null;
+  gallery_images: string[] | null;
+  available_locales: Array<"mr" | "hi" | "en"> | null;
   featured: boolean | null;
   active: boolean | null;
 }
@@ -53,6 +57,8 @@ function rowToProduct(r: ProductRow): Product {
     category: r.category ?? "Other",
     cover: gradientForId(r.id),
     coverImage: r.cover_image ?? undefined,
+    galleryImages: r.gallery_images ?? [],
+    availableLocales: r.available_locales ?? [],
     featured: Boolean(r.featured),
     active: r.active ?? true,
   };
@@ -69,14 +75,27 @@ function rowToProduct(r: ProductRow): Product {
 // your Supabase credits) low.
 const loadFromSupabase = cache(async (): Promise<Product[]> => {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  const current = await supabase
     .from("products")
     .select(PUBLIC_COLUMNS)
     .eq("active", true)
     .order("sort_order", { ascending: true })
     .order("id", { ascending: false });
-  if (error) throw error;
-  return (data as ProductRow[]).map(rowToProduct);
+  // Allows the public catalogue to stay online during the short deployment
+  // window before migration 003 is applied. Checkout still fails closed until
+  // the migration exists, so no wrong-language PDF can be sold.
+  if (current.error?.code === "42703") {
+    const legacy = await supabase
+      .from("products")
+      .select(LEGACY_PUBLIC_COLUMNS)
+      .eq("active", true)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: false });
+    if (legacy.error) throw legacy.error;
+    return (legacy.data as unknown as ProductRow[]).map(rowToProduct);
+  }
+  if (current.error) throw current.error;
+  return (current.data as unknown as ProductRow[]).map(rowToProduct);
 });
 
 /**

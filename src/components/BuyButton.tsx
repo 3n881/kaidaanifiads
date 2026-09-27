@@ -7,6 +7,8 @@ import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
 import PriceTag from "./PriceTag";
+import { UI_COPY, type Locale } from "@/lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 
 type Step = "processing" | "error";
 
@@ -71,12 +73,14 @@ function loadRazorpay(): Promise<boolean> {
 export default function BuyButton({
   product,
   className = "",
-  label = "Download / PDF डाऊनलोड करा",
+  label,
 }: {
   product: Product;
   className?: string;
   label?: string;
 }) {
+  const { locale } = useLanguage();
+  const copy = UI_COPY[locale];
   const [open, setOpen] = useState(false);
   // Bumping the key remounts the modal = a fresh checkout attempt.
   const [attempt, setAttempt] = useState(0);
@@ -95,12 +99,13 @@ export default function BuyButton({
         }
       >
         <Download className="h-4 w-4" aria-hidden="true" />
-        {label}
+        {label ?? copy.downloadPdf}
       </button>
       {open && (
         <BuyModal
           key={attempt}
           product={product}
+          locale={locale}
           onClose={() => setOpen(false)}
           onRetry={() => setAttempt((n) => n + 1)}
         />
@@ -111,10 +116,12 @@ export default function BuyButton({
 
 function BuyModal({
   product,
+  locale,
   onClose,
   onRetry,
 }: {
   product: Product;
+  locale: Locale;
   onClose: () => void;
   onRetry: () => void;
 }) {
@@ -143,7 +150,7 @@ function BuyModal({
         const checkoutRequest = fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug: product.slug }),
+          body: JSON.stringify({ slug: product.slug, locale }),
         });
 
         const [response, scriptReady] = await Promise.all([
@@ -161,6 +168,7 @@ function BuyModal({
           orderId: data.orderId,
           token: data.accessToken,
           title: data.productTitle ?? product.title,
+          locale,
         });
 
         if (data.testMode) {
@@ -199,18 +207,18 @@ function BuyModal({
               window.location.assign(data.orderUrl);
             }
           },
-          modal: {
-            ondismiss: () => fail("Payment was cancelled. You can try again."),
-          },
+          modal: { ondismiss: () => fail(UI_COPY[locale].paymentCancelled) },
         });
         razorpay.open();
       } catch {
-        fail("Checkout could not be started. Please check your connection.");
+        fail(UI_COPY[locale].checkoutFailed);
       }
     };
 
     void beginCheckout();
-  }, [fail, product.price, product.slug, product.title]);
+  }, [fail, locale, product.price, product.slug, product.title]);
+
+  const copy = UI_COPY[locale];
 
   return createPortal(
     <div
@@ -240,7 +248,7 @@ function BuyModal({
             <button
               type="button"
               onClick={onClose}
-              aria-label="बंद करा"
+              aria-label={copy.close}
               className="rounded-full p-1 text-brand-400 hover:bg-brand-50 hover:text-brand-700"
             >
               <X className="h-5 w-5" aria-hidden="true" />
@@ -255,10 +263,10 @@ function BuyModal({
               aria-hidden="true"
             />
             <p className="font-deva text-sm font-semibold text-brand-700">
-              सुरक्षित पेमेंट उघडत आहे…
+              {copy.openingPayment}
             </p>
             <p className="font-deva text-xs text-brand-500">
-              Account, नाव किंवा मोबाईल नंबरची गरज नाही.
+              {copy.noAccount}
             </p>
           </div>
         )}
@@ -277,14 +285,14 @@ function BuyModal({
               onClick={onRetry}
               className="font-deva mt-1 w-full rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-teal/90"
             >
-              पुन्हा प्रयत्न करा / Try again
+              {copy.retry}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="w-full rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
             >
-              बंद करा
+              {copy.close}
             </button>
           </div>
         )}

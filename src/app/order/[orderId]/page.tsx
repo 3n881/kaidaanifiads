@@ -10,6 +10,7 @@ import { reconcileOrder } from "@/lib/reconcile";
 import { SITE } from "@/data/catalog";
 import { OrderMemory, PendingRefresh, WhatsAppOptIn } from "@/components/order/OrderClient";
 import InAppBrowserHint from "@/components/order/InAppBrowserHint";
+import { normalizeLocale, ORDER_COPY } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function OrderPage({
   const loadOrder = () =>
     admin
       .from("orders")
-      .select("id, status, amount, created_at, product_id, whatsapp_number, razorpay_order_id, products(title, slug, is_combo)")
+      .select("id, status, amount, created_at, product_id, locale, whatsapp_number, razorpay_order_id, products(title, slug, is_combo)")
       .eq("id", orderId)
       .maybeSingle();
   let { data: order, error: orderError } = await loadOrder();
@@ -65,6 +66,8 @@ export default async function OrderPage({
     | { title: string; slug: string; is_combo: boolean }
     | null;
   const title = product?.title ?? "पुस्तक";
+  const locale = normalizeLocale(order.locale);
+  const copy = ORDER_COPY[locale];
   const supportHref = `https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
     `Order ${orderId.slice(0, 8)} — download help`,
   )}`;
@@ -75,14 +78,14 @@ export default async function OrderPage({
     const failed = order.status === "failed" || isAbandoned(order.created_at);
     return (
       <div className="container-x max-w-md py-12 text-center">
-        <OrderMemory orderId={orderId} token={token} title={title} />
+        <OrderMemory orderId={orderId} token={token} title={title} locale={locale} />
         {failed ? (
           <XCircle className="mx-auto h-12 w-12 text-danger-600" aria-hidden="true" />
         ) : (
           <Clock className="mx-auto h-12 w-12 text-brand-teal" aria-hidden="true" />
         )}
         <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">
-          {failed ? "पेमेंट पूर्ण झाले नाही" : "पेमेंटची पुष्टी होत आहे…"}
+          {failed ? copy.failed : copy.pending}
         </h1>
         <p className="font-deva mt-2 text-sm text-brand-600">{title}</p>
         {failed ? (
@@ -91,7 +94,7 @@ export default async function OrderPage({
               href={`/${product.is_combo ? "combos" : "ebooks"}/${product.slug}`}
               className="font-deva mt-6 inline-block rounded-xl bg-brand-teal px-6 py-3 text-sm font-bold text-white"
             >
-              पुन्हा प्रयत्न करा
+              {copy.retry}
             </Link>
           )
         ) : (
@@ -106,7 +109,7 @@ export default async function OrderPage({
 
   let items;
   try {
-    items = await getDeliverableItems(order.product_id);
+    items = await getDeliverableItems(order.product_id, locale);
   } catch (error) {
     if (error instanceof DatabaseUnavailableError) {
       return <SystemBusy orderId={orderId} token={token} title={title} />;
@@ -122,17 +125,18 @@ export default async function OrderPage({
         orderId={orderId}
         token={token}
         title={title}
+        locale={locale}
         autoDownloadHref={items.length === 1 ? downloadHref(items[0].id) : undefined}
       />
       <div className="text-center">
         <CheckCircle2 className="mx-auto h-12 w-12 text-brand-teal" aria-hidden="true" />
         <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">
-          पेमेंट यशस्वी झाले!
+          {copy.paid}
         </h1>
         <p className="font-deva mt-1 text-sm text-brand-600">
           {items.length === 1
-            ? "तुमचे डाउनलोड सुरू झाले आहे. न झाल्यास खालील बटन दाबा."
-            : "खालील प्रत्येक पुस्तक डाउनलोड करा."}
+            ? copy.singleDownload
+            : copy.multiDownload}
         </p>
       </div>
 
@@ -155,12 +159,11 @@ export default async function OrderPage({
           </a>
         ))}
         <p className="font-deva text-center text-[11px] text-brand-500">
-          हे पान bookmark करा — पुन्हा डाउनलोड करण्यासाठी कधीही उघडा. हे पान “माझी
-          पुस्तके” मध्येही सेव्ह झाले आहे.
+          {copy.bookmark}
         </p>
-        {!order.whatsapp_number && <WhatsAppOptIn orderId={orderId} token={token} />}
+        {!order.whatsapp_number && <WhatsAppOptIn orderId={orderId} token={token} locale={locale} />}
         <a href={supportHref} className="font-deva flex items-center justify-center gap-1.5 pt-2 text-xs font-semibold text-brand-teal hover:underline">
-          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> डाउनलोडमध्ये अडचण? WhatsApp करा
+          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {copy.help}
         </a>
       </div>
     </div>
