@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ExternalLink,
   FileText,
   Images,
   Loader2,
@@ -308,9 +310,19 @@ export default function ProductForm({
                   <h3 className="inline-flex items-center gap-2 text-sm font-bold text-brand-900">
                     <FileText className="h-4 w-4" /> {LOCALE_LABELS[locale]} PDF
                   </h3>
-                  {pdfUploaded(locale) && (
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-green-600">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> PDF uploaded
+                  {product && pdfUploaded(locale) && (
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold">
+                      <span className="inline-flex items-center gap-1 text-green-600">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> PDF uploaded
+                      </span>
+                      <a
+                        href={`/dashboard/products/${product.id}/pdf?lang=${locale}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-brand-teal underline underline-offset-2"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" /> View PDF
+                      </a>
                     </p>
                   )}
                 </div>
@@ -325,7 +337,7 @@ export default function ProductForm({
                 />
                 <p className="text-[11px] text-brand-400">
                   {isCombo
-                    ? "Upload the combo as one PDF with every book, or tick the included books below — buyers get both."
+                    ? "One PDF containing every book in this combo. Buyers receive this file."
                     : "The PDF remains private and is available only after verified payment."}
                 </p>
               </div>
@@ -337,20 +349,31 @@ export default function ProductForm({
               <Field id="set_size" label="Books in this set" hint="Shown as “3 Book Set”. Ticked books below override it.">
                 <input id="set_size" name="set_size" type="number" min={2} required defaultValue={product?.set_size ?? (selectedBookIds.length || 2)} className={inputClass} />
               </Field>
-              <h2 className="mt-4 font-bold text-brand-900">Included books</h2>
-              <p className="mt-1 text-xs text-brand-500">
-                Optional — only if each book is also sold separately. Buyers get each ticked book’s PDF.
-              </p>
-              <div className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-brand-100 p-2">
-                {ebookOptions.length ? ebookOptions.map((book) => (
-                  <label key={book.id} className="flex min-h-12 cursor-pointer items-start gap-2 rounded-lg p-2 hover:bg-brand-50">
-                    <input type="checkbox" name="combo_book" value={book.id} defaultChecked={selectedBookIds.includes(book.id)} className="mt-0.5 h-5 w-5 accent-brand-teal" />
-                    <span className="font-deva text-xs text-brand-700">{book.title}</span>
-                  </label>
-                )) : (
-                  <p className="p-2 text-xs text-brand-400">Add individual ebooks first.</p>
-                )}
-              </div>
+              {/* Collapsed unless already used: ticking a book sends buyers that
+                  book's PDF in addition to the combo PDF above. */}
+              <details open={selectedBookIds.length > 0} className="mt-4 rounded-xl border border-brand-100 p-3">
+                <summary className="cursor-pointer text-sm font-bold text-brand-900">
+                  Also send separate books ({selectedBookIds.length} ticked)
+                </summary>
+                <div className="mt-2 flex gap-2 rounded-lg bg-amber-50 p-2 text-[11px] leading-relaxed text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Usually leave this empty — the combo PDF above already has every book.
+                    Tick a book only if it is part of this combo and also sold on its own:
+                    buyers then get its PDF as an extra file.
+                  </span>
+                </div>
+                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-brand-100 p-2">
+                  {ebookOptions.length ? ebookOptions.map((book) => (
+                    <label key={book.id} className="flex min-h-12 cursor-pointer items-start gap-2 rounded-lg p-2 hover:bg-brand-50">
+                      <input type="checkbox" name="combo_book" value={book.id} defaultChecked={selectedBookIds.includes(book.id)} className="mt-0.5 h-5 w-5 accent-brand-teal" />
+                      <span className="font-deva text-xs text-brand-700">#{book.id} {book.title}</span>
+                    </label>
+                  )) : (
+                    <p className="p-2 text-xs text-brand-400">No single ebooks yet.</p>
+                  )}
+                </div>
+              </details>
             </section>
           )}
 
