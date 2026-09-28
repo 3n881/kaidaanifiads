@@ -2,18 +2,20 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Catalog from "@/components/Catalog";
 import DisclaimerBanner from "@/components/DisclaimerBanner";
-import { getEbooks } from "@/lib/products";
+import { getAllProducts } from "@/lib/products";
 
 export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "सर्व ई-बुक्स",
   description:
-    "मराठी व हिंदी कायदेशीर ई-बुक्स — वारसा हक्क, जमीन कायदा, RTI, ग्राहक हक्क आणि अधिक.",
+    "मराठी व हिंदी कायदेशीर ई-बुक्स आणि कॉम्बो पॅक्स — वारसा हक्क, जमीन कायदा, RTI, ग्राहक हक्क आणि अधिक.",
 };
 
 export default async function EbooksPage() {
-  const ebooks = await getEbooks();
+  // Every title, combos included (badged "Combo Pack"), as on the previous
+  // site; /combos stays a combos-only view.
+  const ebooks = await getAllProducts();
   return (
     <div className="container-x py-10">
       <header className="mb-6">
