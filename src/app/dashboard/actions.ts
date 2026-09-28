@@ -176,8 +176,8 @@ export async function saveProduct(formData: FormData) {
   const previewFiles = formData
     .getAll(`preview_files_${locale}`)
     .filter((value): value is File => value instanceof File && value.size > 0);
-  if (previewFiles.length > 4) {
-    throw new Error("Upload at most 4 preview pages (the cover makes 5 images total)");
+  if (previewFiles.length > 5) {
+    throw new Error("Upload at most 5 preview pages (the cover makes 6 images total)");
   }
   if (previewFiles.length) {
     const gallery = await Promise.all(
@@ -212,8 +212,10 @@ export async function saveProduct(formData: FormData) {
   );
   const pdfFor = (edition: Locale) =>
     savedRow[`pdf_path_${edition}`] || (edition === "mr" ? savedRow.pdf_path : null);
-  const availableLocales = (["mr", "hi", "en"] as const).filter(
-    (edition) => editionReady(edition) && (isCombo || pdfFor(edition)),
+  // An edition is on sale once its listing is complete and it has a PDF to
+  // deliver. Most combos are one merged PDF on the combo itself.
+  const availableLocales: Locale[] = (["mr", "hi", "en"] as const).filter(
+    (edition) => editionReady(edition) && Boolean(pdfFor(edition)),
   );
   const { error: localeError } = await admin
     .from("products")
@@ -221,7 +223,8 @@ export async function saveProduct(formData: FormData) {
     .eq("id", id);
   if (localeError) throw new Error(localeError.message);
 
-  // Combo membership: replace combo_items with the checked books.
+  // Combo membership: replace combo_items with the checked books. Without
+  // ticked books the combo keeps its own PDF and the set size from the form.
   if (isCombo) {
     await admin.from("combo_items").delete().eq("combo_id", id);
     const memberIds = formData
@@ -240,19 +243,15 @@ export async function saveProduct(formData: FormData) {
       const comboLocales = (["mr", "hi", "en"] as const).filter(
         (memberLocale) =>
           editionReady(memberLocale) &&
-          (members ?? []).length === memberIds.length &&
-          (members ?? []).every((member) =>
-            member.available_locales?.includes(memberLocale),
-          ),
+          (Boolean(pdfFor(memberLocale)) ||
+            ((members ?? []).length === memberIds.length &&
+              (members ?? []).every((member) =>
+                member.available_locales?.includes(memberLocale),
+              ))),
       );
       await admin
         .from("products")
         .update({ set_size: memberIds.length, available_locales: comboLocales })
-        .eq("id", id);
-    } else {
-      await admin
-        .from("products")
-        .update({ set_size: null, available_locales: [] })
         .eq("id", id);
     }
   }

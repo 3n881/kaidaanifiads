@@ -8,7 +8,7 @@ import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
 import PriceTag from "./PriceTag";
 import { UI_COPY, type Locale } from "@/lib/i18n";
-import { localizeProduct } from "@/lib/catalog";
+import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 
 type Step = "processing" | "error";
@@ -81,6 +81,8 @@ export default function BuyButton({
   label?: string;
 }) {
   const { locale } = useLanguage();
+  // The edition on sale can differ from the site language (Hindi-only book).
+  const editionLocale = editionLocaleFor(product, locale);
   product = localizeProduct(product, locale);
   const copy = UI_COPY[locale];
   const [open, setOpen] = useState(false);
@@ -108,6 +110,7 @@ export default function BuyButton({
           key={attempt}
           product={product}
           locale={locale}
+          editionLocale={editionLocale}
           onClose={() => setOpen(false)}
           onRetry={() => setAttempt((n) => n + 1)}
         />
@@ -119,11 +122,13 @@ export default function BuyButton({
 function BuyModal({
   product,
   locale,
+  editionLocale,
   onClose,
   onRetry,
 }: {
   product: Product;
   locale: Locale;
+  editionLocale: Locale;
   onClose: () => void;
   onRetry: () => void;
 }) {
@@ -152,7 +157,7 @@ function BuyModal({
         const checkoutRequest = fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug: product.slug, locale }),
+          body: JSON.stringify({ slug: product.slug, locale: editionLocale }),
         });
 
         const [response, scriptReady] = await Promise.all([
@@ -218,7 +223,7 @@ function BuyModal({
     };
 
     void beginCheckout();
-  }, [fail, locale, product.price, product.slug, product.title]);
+  }, [fail, locale, editionLocale, product.price, product.slug, product.title]);
 
   const copy = UI_COPY[locale];
 

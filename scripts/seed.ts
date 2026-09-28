@@ -11,14 +11,10 @@ import { ebooks, combos } from "../src/data/catalog";
 
 // Legal category per product id (kept in sync with src/lib/catalog.ts).
 const CATEGORY_BY_ID: Record<number, string> = {
-  31: "Property Law",
   30: "Other",
-  29: "Property Law",
-  28: "Other",
   27: "Property Law",
   26: "Property Law",
   25: "Other",
-  22: "Civil Law",
   19: "Civil Law",
   16: "Other",
   12: "Property Law",

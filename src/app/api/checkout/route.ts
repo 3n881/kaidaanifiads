@@ -10,6 +10,7 @@ import {
 } from "@/lib/razorpay";
 import { getDeliverableItems, orderPagePath } from "@/lib/orders";
 import { localizedTitle, normalizeLocale } from "@/lib/i18n";
+import { editionLocaleFor } from "@/lib/catalog";
 
 export const runtime = "nodejs";
 
@@ -53,14 +54,14 @@ async function handle(req: NextRequest) {
   // Price is always read from the database — never from the browser.
   let { data: product, error: productError } = await admin
     .from("products")
-    .select("id, title, title_mr, title_hi, title_en, price, slug")
+    .select("id, title, title_mr, title_hi, title_en, price, slug, language, available_locales")
     .eq("slug", slug)
     .eq("active", true)
     .maybeSingle();
   if (productError?.code === "42703") {
     ({ data: product, error: productError } = await admin
       .from("products")
-      .select("id, title, price, slug")
+      .select("id, title, price, slug, language")
       .eq("slug", slug)
       .eq("active", true)
       .maybeSingle());
@@ -70,11 +71,22 @@ async function handle(req: NextRequest) {
   if (!product) {
     return NextResponse.json({ error: "product not found" }, { status: 404 });
   }
-  const productTitle = localizedTitle(product, locale);
-
   // Don't take money for something we can't deliver (single PDF, or the
   // member books' PDFs for a combo).
-  const items = await getDeliverableItems(product.id, locale);
+  let orderLocale = locale;
+  let items = await getDeliverableItems(product.id, orderLocale);
+  if (items.length === 0) {
+    // A single-language book bought from a page in another site language
+    // (e.g. a page cached before editions were picked client-side).
+    const fallback = editionLocaleFor(
+      { availableLocales: product.available_locales ?? [], language: product.language ?? "Marathi" },
+      locale,
+    );
+    if (fallback !== locale) {
+      orderLocale = fallback;
+      items = await getDeliverableItems(product.id, orderLocale);
+    }
+  }
   if (items.length === 0) {
     return NextResponse.json(
       { error: "This ebook is not available in the selected language yet." },
@@ -89,8 +101,9 @@ async function handle(req: NextRequest) {
     whatsapp_number: "",
     product_id: product.id,
     amount: product.price,
-    locale,
+    locale: orderLocale,
   };
+  const productTitle = localizedTitle(product, orderLocale);
 
   // ------- TEST MODE: Razorpay not configured → simulate a paid order -------
   if (!isRazorpayConfigured) {

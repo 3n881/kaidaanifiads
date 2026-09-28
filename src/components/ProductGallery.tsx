@@ -7,7 +7,7 @@ import CoverImage from "./CoverImage";
 
 export default function ProductGallery({ product }: { product: Product }) {
   const images = product.coverImage
-    ? [product.coverImage, ...(product.galleryImages ?? []).slice(0, 4)]
+    ? [product.coverImage, ...(product.galleryImages ?? []).slice(0, 5)]
     : [];
   const [selected, setSelected] = useState(0);
 

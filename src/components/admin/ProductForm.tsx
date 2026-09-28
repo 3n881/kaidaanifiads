@@ -269,7 +269,7 @@ export default function ProductForm({
                 {LOCALE_LABELS[locale]} files and images
               </legend>
               <p className="text-[11px] leading-relaxed text-brand-500">
-                One language-specific cover plus up to four page previews. Saving this
+                One language-specific cover plus up to five page previews. Saving this
                 edition does not replace another language’s files.
               </p>
               <div>
@@ -303,44 +303,43 @@ export default function ProductForm({
                 onFiles={(names) => setPreviewNames((current) => ({ ...current, [locale]: names }))}
               />
 
-              {!isCombo ? (
-                <div className="space-y-3 border-t border-brand-100 pt-4">
-                  <div>
-                    <h3 className="inline-flex items-center gap-2 text-sm font-bold text-brand-900">
-                      <FileText className="h-4 w-4" /> {LOCALE_LABELS[locale]} PDF
-                    </h3>
-                    {pdfUploaded(locale) && (
-                      <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-green-600">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> PDF uploaded
-                      </p>
-                    )}
-                  </div>
-                  <UploadField
-                    name={`pdf_file_${locale}`}
-                    accept="application/pdf"
-                    maxBytes={50 * 1024 * 1024}
-                    sizeLabel="50 MB"
-                    label={`${pdfUploaded(locale) ? "Replace" : "Upload"} ${LOCALE_LABELS[locale]} PDF`}
-                    selectedName={pdfNames[locale]}
-                    onFile={(file) => setPdfNames((current) => ({ ...current, [locale]: file.name }))}
-                  />
-                  <p className="text-[11px] text-brand-400">
-                    The PDF remains private and is available only after verified payment.
-                  </p>
+              <div className="space-y-3 border-t border-brand-100 pt-4">
+                <div>
+                  <h3 className="inline-flex items-center gap-2 text-sm font-bold text-brand-900">
+                    <FileText className="h-4 w-4" /> {LOCALE_LABELS[locale]} PDF
+                  </h3>
+                  {pdfUploaded(locale) && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-green-600">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> PDF uploaded
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-[11px] text-brand-500">
-                  A combo delivers this language’s PDF from every selected member book.
+                <UploadField
+                  name={`pdf_file_${locale}`}
+                  accept="application/pdf"
+                  maxBytes={50 * 1024 * 1024}
+                  sizeLabel="50 MB"
+                  label={`${pdfUploaded(locale) ? "Replace" : "Upload"} ${LOCALE_LABELS[locale]} PDF`}
+                  selectedName={pdfNames[locale]}
+                  onFile={(file) => setPdfNames((current) => ({ ...current, [locale]: file.name }))}
+                />
+                <p className="text-[11px] text-brand-400">
+                  {isCombo
+                    ? "Upload the combo as one PDF with every book, or tick the included books below — buyers get both."
+                    : "The PDF remains private and is available only after verified payment."}
                 </p>
-              )}
+              </div>
             </fieldset>
           ))}
 
           {isCombo && (
             <section className="rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]">
-              <h2 className="font-bold text-brand-900">Included books</h2>
+              <Field id="set_size" label="Books in this set" hint="Shown as “3 Book Set”. Ticked books below override it.">
+                <input id="set_size" name="set_size" type="number" min={2} required defaultValue={product?.set_size ?? (selectedBookIds.length || 2)} className={inputClass} />
+              </Field>
+              <h2 className="mt-4 font-bold text-brand-900">Included books</h2>
               <p className="mt-1 text-xs text-brand-500">
-                Select the ebooks customers receive in this combo.
+                Optional — only if each book is also sold separately. Buyers get each ticked book’s PDF.
               </p>
               <div className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-brand-100 p-2">
                 {ebookOptions.length ? ebookOptions.map((book) => (
@@ -352,7 +351,6 @@ export default function ProductForm({
                   <p className="p-2 text-xs text-brand-400">Add individual ebooks first.</p>
                 )}
               </div>
-              <input type="hidden" name="set_size" value={selectedBookIds.length || 2} />
             </section>
           )}
 
@@ -388,7 +386,7 @@ function UploadField({ name, accept, label, selectedName, maxBytes, sizeLabel, o
 
 function MultiImageUpload({ name, existingCount, selectedNames, onFiles }: { name: string; existingCount: number; selectedNames: string[]; onFiles: (names: string[]) => void }) {
   const [error, setError] = useState("");
-  return <label className="block min-h-12 cursor-pointer rounded-xl border border-dashed border-brand-300 px-3 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50"><span className="flex items-center gap-2"><Images className="h-4 w-4" />{existingCount ? `Replace ${existingCount} page preview${existingCount === 1 ? "" : "s"}` : "Upload page previews"}</span><span className="mt-1 block text-[10px] font-normal text-brand-400">Choose up to 4 JPG, PNG or WebP images · 5 MB each</span>{selectedNames.length > 0 && !error && <span className="mt-1 block text-[11px] font-semibold text-green-600">Selected: {selectedNames.join(", ")}</span>}{error && <span role="alert" className="mt-1 block text-[11px] font-semibold text-danger-600">{error}</span>}<input name={name} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length > 4) { setError("Choose at most 4 preview images."); event.target.value = ""; return; } if (files.some((file) => file.size > 5 * 1024 * 1024)) { setError("Every preview image must be under 5 MB."); event.target.value = ""; return; } setError(""); onFiles(files.map((file) => file.name)); }} /></label>;
+  return <label className="block min-h-12 cursor-pointer rounded-xl border border-dashed border-brand-300 px-3 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50"><span className="flex items-center gap-2"><Images className="h-4 w-4" />{existingCount ? `Replace ${existingCount} page preview${existingCount === 1 ? "" : "s"}` : "Upload page previews"}</span><span className="mt-1 block text-[10px] font-normal text-brand-400">Choose up to 5 JPG, PNG or WebP images · 5 MB each</span>{selectedNames.length > 0 && !error && <span className="mt-1 block text-[11px] font-semibold text-green-600">Selected: {selectedNames.join(", ")}</span>}{error && <span role="alert" className="mt-1 block text-[11px] font-semibold text-danger-600">{error}</span>}<input name={name} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length > 5) { setError("Choose at most 5 preview images."); event.target.value = ""; return; } if (files.some((file) => file.size > 5 * 1024 * 1024)) { setError("Every preview image must be under 5 MB."); event.target.value = ""; return; } setError(""); onFiles(files.map((file) => file.name)); }} /></label>;
 }
 
 function Toggle({ name, label, defaultChecked }: { name: string; label: string; defaultChecked: boolean }) {

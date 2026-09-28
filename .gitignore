@@ -43,3 +43,7 @@ next-env.d.ts
 # generated client-onboarding artifacts (local handoff files)
 /client-onboarding/
 /scripts/create_client_intake.mjs
+
+# ebook source files (paid content, large) — keep locally, never commit
+/content/ebooks/*.pdf
+/content/images/

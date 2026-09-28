@@ -20,8 +20,22 @@ function missingFields(
   return fields.filter(([key]) => !present(values[key])).map(([, label]) => label);
 }
 
+/** Editions this product is offered in: those with a PDF to deliver (for a
+ *  combo without its own PDF, the editions its member books cover). */
+export function offeredEditions(product: AdminProduct): Array<"mr" | "hi" | "en"> {
+  const withPdf = (["mr", "hi", "en"] as const).filter((locale) =>
+    locale === "mr" ? product.pdf_path_mr || product.pdf_path : product[`pdf_path_${locale}`],
+  );
+  if (withPdf.length || !product.is_combo) return withPdf;
+  return product.available_locales ?? [];
+}
+
+/** Ready = offered in at least one language, and every offered language has
+ *  its full listing (title, descriptions, cover, pages). A Marathi-only book
+ *  does not need Hindi or English editions. */
 export function productIsReady(product: AdminProduct) {
-  const localizedDetailsReady = (["mr", "hi", "en"] as const).every((locale) => {
+  const editions = offeredEditions(product);
+  const localizedDetailsReady = editions.length > 0 && editions.every((locale) => {
     const title = locale === "mr" ? product.title_mr || product.title : product[`title_${locale}`];
     const shortDescription = locale === "mr"
       ? product.short_description_mr || product.short_description
@@ -43,17 +57,7 @@ export function productIsReady(product: AdminProduct) {
     localizedDetailsReady &&
       product.price > 0 &&
       product.mrp >= product.price &&
-      (product.is_combo
-        ? Boolean(
-            product.set_size &&
-              product.set_size >= 2 &&
-              ["mr", "hi", "en"].every((locale) => product.available_locales?.includes(locale as "mr" | "hi" | "en")),
-          )
-        : Boolean(
-            (product.pdf_path_mr || product.pdf_path) &&
-              product.pdf_path_hi &&
-              product.pdf_path_en,
-          )),
+      (!product.is_combo || (product.set_size && product.set_size >= 2)),
   );
 }
 

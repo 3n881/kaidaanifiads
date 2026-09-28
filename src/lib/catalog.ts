@@ -17,14 +17,10 @@ export type { Category } from "@/data/catalog";
 // Fallback category map (used by the seed script and for any legacy rows
 // without a category). Live products carry their own `category` column.
 export const CATEGORY_BY_ID: Record<number, Category> = {
-  31: "Property Law",
   30: "Other",
-  29: "Property Law",
-  28: "Other",
   27: "Property Law",
   26: "Property Law",
   25: "Other",
-  22: "Civil Law",
   19: "Civil Law",
   16: "Other",
   12: "Property Law",
@@ -91,11 +87,31 @@ const LANGUAGE_BY_LOCALE: Record<ProductLocale, Language> = {
   en: "English",
 };
 
+const LOCALE_BY_LANGUAGE: Record<Language, ProductLocale> = {
+  Marathi: "mr",
+  Hindi: "hi",
+  English: "en",
+};
+
+/**
+ * The edition a visitor sees and buys: their site language when the book has
+ * it, otherwise the book's own edition (a Hindi-only book stays buyable while
+ * the site is in Marathi). Idempotent on already-localized products.
+ */
+export function editionLocaleFor(
+  product: Pick<Product, "availableLocales" | "language">,
+  preferred: ProductLocale,
+): ProductLocale {
+  if (productHasLanguage(product, LANGUAGE_BY_LOCALE[preferred])) return preferred;
+  return product.availableLocales?.[0] ?? LOCALE_BY_LANGUAGE[product.language] ?? preferred;
+}
+
 /** Applies the buyer's selected edition without losing the full locale map. */
 export function localizeProduct<T extends Product>(
   product: T,
-  locale: ProductLocale,
+  preferred: ProductLocale,
 ): T {
+  const locale = editionLocaleFor(product, preferred);
   const edition = product.localized?.[locale] ?? product.localized?.mr;
   if (!edition) return product;
   return {
@@ -114,8 +130,9 @@ export function localizeProduct<T extends Product>(
 
 export function localizeSearchItem<T extends SearchItem>(
   product: T,
-  locale: ProductLocale,
+  preferred: ProductLocale,
 ): T {
+  const locale = editionLocaleFor(product, preferred);
   const edition = product.localized?.[locale] ?? product.localized?.mr;
   if (!edition) return product;
   return {
