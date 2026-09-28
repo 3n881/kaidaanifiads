@@ -108,8 +108,12 @@ export async function saveProduct(formData: FormData) {
     throw new Error("Create the Marathi edition first, then add Hindi and English");
   }
 
+  // Only the Marathi title is required (it is the book's main name and URL);
+  // any other field may be cleared and saved empty.
   const title = String(formData.get(`title_${locale}`) || "").trim();
-  if (!title) throw new Error("The selected edition needs a title");
+  if (locale === "mr" && !title) {
+    throw new Error("The Marathi title is required — it is the book's main name and web address");
+  }
   const legacyTitle = locale === "mr"
     ? title
     : String(formData.get("legacy_title") || "").trim();
@@ -129,17 +133,18 @@ export async function saveProduct(formData: FormData) {
     slug,
     title: legacyTitle,
     short_description: locale === "mr"
-      ? shortDescription
-      : String(formData.get("legacy_short_description") || "").trim(),
+      ? shortDescription || null
+      : String(formData.get("legacy_short_description") || "").trim() || null,
     description: locale === "mr"
-      ? description
-      : String(formData.get("legacy_description") || "").trim(),
+      ? description || null
+      : String(formData.get("legacy_description") || "").trim() || null,
     mrp: Number(formData.get("mrp") || 0),
     price: Number(formData.get("price") || 0),
     pages: locale === "mr"
-      ? pages
-      : Number(formData.get("legacy_pages") || 0),
-    language: "Marathi",
+      ? pages || null
+      : Number(formData.get("legacy_pages") || 0) || null,
+    // Set once at creation; editing must not turn a Hindi book into Marathi.
+    ...(isEdit ? {} : { language: "Marathi" }),
     is_combo: isCombo,
     set_size: isCombo ? Number(formData.get("set_size") || 0) || null : null,
     rating: Number(formData.get("rating") || 4.8),
@@ -147,9 +152,9 @@ export async function saveProduct(formData: FormData) {
     featured: formData.get("featured") === "on",
     active: formData.get("active") === "on",
     sort_order: Number(formData.get("sort_order") || 0),
-    [`title_${locale}`]: title,
-    [`short_description_${locale}`]: shortDescription,
-    [`description_${locale}`]: description,
+    [`title_${locale}`]: title || null,
+    [`short_description_${locale}`]: shortDescription || null,
+    [`description_${locale}`]: description || null,
     [`pages_${locale}`]: pages || null,
   };
 
@@ -160,6 +165,9 @@ export async function saveProduct(formData: FormData) {
     const coverUrl = await uploadCover(cover, `${slug}-${locale}`);
     row[`cover_image_${locale}`] = coverUrl;
     if (locale === "mr") row.cover_image = coverUrl;
+  } else if (formData.get(`remove_cover_${locale}`) === "1") {
+    row[`cover_image_${locale}`] = null;
+    if (locale === "mr") row.cover_image = null;
   }
   const pdfFields = [
     ["pdf_file_mr", "pdf_path_mr", "mr"],
@@ -170,16 +178,48 @@ export async function saveProduct(formData: FormData) {
     const pdf = formData.get(field);
     if (pdf instanceof File && pdf.size > 0) {
       row[column] = await uploadFile("pdfs", pdf, `${slug}-${locale}`);
+    } else if (formData.get(`remove_${field.replace("_file", "")}`) === "1") {
+      // The file stays in storage; only this edition stops delivering it.
+      row[column] = null;
+      if (locale === "mr") row.pdf_path = null;
     }
   }
 
   const previewFiles = formData
     .getAll(`preview_files_${locale}`)
     .filter((value): value is File => value instanceof File && value.size > 0);
-  if (previewFiles.length > 5) {
+  if (formData.get(`preview_state_${locale}`)) {
+    // Kept previews (in order) + new uploads. Only URLs already on this
+    // edition can be kept.
+    let existingGallery: string[] = [];
+    if (isEdit) {
+      const { data: current } = await admin
+        .from("products")
+        .select("gallery_images, gallery_images_mr, gallery_images_hi, gallery_images_en")
+        .eq("id", id)
+        .maybeSingle<Record<string, string[] | null>>();
+      existingGallery = locale === "mr"
+        ? (current?.gallery_images_mr?.length ? current.gallery_images_mr : current?.gallery_images) ?? []
+        : current?.[`gallery_images_${locale}`] ?? [];
+    }
+    const kept = formData
+      .getAll(`keep_preview_${locale}`)
+      .map(String)
+      .filter((url) => existingGallery.includes(url));
+    if (kept.length + previewFiles.length > 5) {
+      throw new Error("At most 5 preview pages per edition (the cover makes 6 images total)");
+    }
+    const uploaded = await Promise.all(
+      previewFiles.map((file, index) =>
+        uploadCover(file, `${slug}-${locale}-preview-${kept.length + index + 1}`),
+      ),
+    );
+    const gallery = [...kept, ...uploaded];
+    row[`gallery_images_${locale}`] = gallery;
+    if (locale === "mr") row.gallery_images = gallery;
+  } else if (previewFiles.length > 5) {
     throw new Error("Upload at most 5 preview pages (the cover makes 6 images total)");
-  }
-  if (previewFiles.length) {
+  } else if (previewFiles.length) {
     const gallery = await Promise.all(
       previewFiles.map((file, index) =>
         uploadCover(file, `${slug}-${locale}-preview-${index + 1}`),

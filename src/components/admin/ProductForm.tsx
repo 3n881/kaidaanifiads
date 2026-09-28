@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import {
@@ -11,12 +11,16 @@ import {
   FileText,
   Images,
   Loader2,
+  RotateCcw,
   Save,
+  Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import type { AdminProduct } from "@/lib/admin";
 import { saveProduct } from "@/app/dashboard/actions";
 import { LOCALE_LABELS, type Locale } from "@/lib/i18n";
+import { coverSrc } from "@/lib/covers";
 
 const EDITIONS: Locale[] = ["mr", "hi", "en"];
 const inputClass =
@@ -41,17 +45,15 @@ export default function ProductForm({
   const [activeLocale, setActiveLocale] = useState<Locale>(
     product ? initialLocale : "mr",
   );
+  const coverFor = (locale: Locale) =>
+    (locale === "mr"
+      ? product?.cover_image_mr ?? product?.cover_image
+      : product?.[`cover_image_${locale}`]) ?? null;
+  // Tracks what each edition's cover will be after saving (for the tab ticks).
   const [coverPreviews, setCoverPreviews] = useState<Record<Locale, string | null>>({
-    mr: product?.cover_image_mr ?? product?.cover_image ?? null,
-    hi: product?.cover_image_hi ?? null,
-    en: product?.cover_image_en ?? null,
-  });
-  const [coverNames, setCoverNames] = useState<Partial<Record<Locale, string>>>({});
-  const [pdfNames, setPdfNames] = useState<Partial<Record<Locale, string>>>({});
-  const [previewNames, setPreviewNames] = useState<Record<Locale, string[]>>({
-    mr: [],
-    hi: [],
-    en: [],
+    mr: coverFor("mr"),
+    hi: coverFor("hi"),
+    en: coverFor("en"),
   });
 
   const titleFor = (locale: Locale) => {
@@ -173,11 +175,16 @@ export default function ProductForm({
               <legend className="px-1 text-lg font-bold text-brand-900">
                 {LOCALE_LABELS[locale]} customer-facing details
               </legend>
-              <Field id={`title_${locale}`} label="Title" required>
+              <Field
+                id={`title_${locale}`}
+                label="Title"
+                required={locale === "mr"}
+                hint={locale === "mr" ? "Required — the book’s main name and web address." : "Leave empty and save to clear this edition’s title."}
+              >
                 <input
                   id={`title_${locale}`}
                   name={`title_${locale}`}
-                  required
+                  required={locale === "mr"}
                   defaultValue={titleFor(locale)}
                   className={inputClass}
                 />
@@ -186,40 +193,34 @@ export default function ProductForm({
                 id={`short_description_${locale}`}
                 label="Short description"
                 hint="One or two lines shown on product cards"
-                required
               >
                 <textarea
                   id={`short_description_${locale}`}
                   name={`short_description_${locale}`}
                   rows={2}
-                  required
                   defaultValue={shortFor(locale)}
                   className={inputClass}
                 />
               </Field>
-              <Field id={`description_${locale}`} label="Full description" required>
+              <Field id={`description_${locale}`} label="Full description">
                 <textarea
                   id={`description_${locale}`}
                   name={`description_${locale}`}
                   rows={6}
-                  required
                   defaultValue={descriptionFor(locale)}
                   className={inputClass}
                 />
               </Field>
-              {!isCombo && (
-                <Field id={`pages_${locale}`} label="Pages in this edition" required>
-                  <input
-                    id={`pages_${locale}`}
-                    name={`pages_${locale}`}
-                    type="number"
-                    min={1}
-                    required
-                    defaultValue={pagesFor(locale)}
-                    className={inputClass}
-                  />
-                </Field>
-              )}
+              <Field id={`pages_${locale}`} label="Pages in this edition" hint={isCombo ? "Total pages of the combo PDF." : undefined}>
+                <input
+                  id={`pages_${locale}`}
+                  name={`pages_${locale}`}
+                  type="number"
+                  min={1}
+                  defaultValue={pagesFor(locale)}
+                  className={inputClass}
+                />
+              </Field>
             </fieldset>
           ))}
 
@@ -271,76 +272,30 @@ export default function ProductForm({
                 {LOCALE_LABELS[locale]} files and images
               </legend>
               <p className="text-[11px] leading-relaxed text-brand-500">
-                One language-specific cover plus up to five page previews. Saving this
-                edition does not replace another language’s files.
+                One cover plus up to five page previews. Removals and new files apply
+                when you save this edition; other languages are not touched.
               </p>
-              <div>
-                {coverPreviews[locale] && (
-                  // eslint-disable-next-line @next/next/no-img-element -- local blob or Supabase admin preview.
-                  <img
-                    src={coverPreviews[locale] ?? undefined}
-                    alt={`${LOCALE_LABELS[locale]} cover preview`}
-                    width={120}
-                    height={160}
-                    className="mb-3 h-36 w-auto rounded-lg border border-brand-100 object-cover"
-                  />
-                )}
-                <UploadField
-                  name={`cover_file_${locale}`}
-                  accept="image/jpeg,image/png,image/webp"
-                  maxBytes={5 * 1024 * 1024}
-                  sizeLabel="5 MB"
-                  label={coverPreviews[locale] ? "Replace cover" : "Upload cover image"}
-                  selectedName={coverNames[locale]}
-                  onFile={(file) => {
-                    setCoverPreviews((current) => ({ ...current, [locale]: URL.createObjectURL(file) }));
-                    setCoverNames((current) => ({ ...current, [locale]: file.name }));
-                  }}
-                />
-              </div>
-              <MultiImageUpload
-                name={`preview_files_${locale}`}
-                existingCount={galleryFor(locale).length}
-                selectedNames={previewNames[locale]}
-                onFiles={(names) => setPreviewNames((current) => ({ ...current, [locale]: names }))}
+              <CoverField
+                name={`cover_file_${locale}`}
+                removeName={`remove_cover_${locale}`}
+                label={`${LOCALE_LABELS[locale]} cover`}
+                existingUrl={coverFor(locale)}
+                onPreviewChange={(url) => setCoverPreviews((current) => ({ ...current, [locale]: url }))}
               />
-
-              <div className="space-y-3 border-t border-brand-100 pt-4">
-                <div>
-                  <h3 className="inline-flex items-center gap-2 text-sm font-bold text-brand-900">
-                    <FileText className="h-4 w-4" /> {LOCALE_LABELS[locale]} PDF
-                  </h3>
-                  {product && pdfUploaded(locale) && (
-                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold">
-                      <span className="inline-flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> PDF uploaded
-                      </span>
-                      <a
-                        href={`/dashboard/products/${product.id}/pdf?lang=${locale}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-brand-teal underline underline-offset-2"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" /> View PDF
-                      </a>
-                    </p>
-                  )}
-                </div>
-                <UploadField
-                  name={`pdf_file_${locale}`}
-                  accept="application/pdf"
-                  maxBytes={50 * 1024 * 1024}
-                  sizeLabel="50 MB"
-                  label={`${pdfUploaded(locale) ? "Replace" : "Upload"} ${LOCALE_LABELS[locale]} PDF`}
-                  selectedName={pdfNames[locale]}
-                  onFile={(file) => setPdfNames((current) => ({ ...current, [locale]: file.name }))}
-                />
-                <p className="text-[11px] text-brand-400">
-                  {isCombo
-                    ? "One PDF containing every book in this combo. Buyers receive this file."
-                    : "The PDF remains private and is available only after verified payment."}
-                </p>
-              </div>
+              <PreviewsField
+                locale={locale}
+                existing={galleryFor(locale)}
+              />
+              <PdfField
+                name={`pdf_file_${locale}`}
+                removeName={`remove_pdf_${locale}`}
+                label={`${LOCALE_LABELS[locale]} PDF`}
+                uploaded={pdfUploaded(locale)}
+                viewHref={product ? `/dashboard/products/${product.id}/pdf?lang=${locale}` : undefined}
+                hint={isCombo
+                  ? "One PDF containing every book in this combo. Buyers receive this file."
+                  : "The PDF remains private and is available only after verified payment."}
+              />
             </fieldset>
           ))}
 
@@ -402,14 +357,247 @@ function Field({ id, label, hint, required, children }: { id: string; label: str
   return <div><label htmlFor={id} className="mb-1 block text-xs font-semibold text-brand-700">{label}{required && <span className="text-danger-600"> *</span>}</label>{children}{hint && <span id={`${id}-hint`} className="mt-1 block text-[11px] text-brand-400">{hint}</span>}</div>;
 }
 
-function UploadField({ name, accept, label, selectedName, maxBytes, sizeLabel, onFile }: { name: string; accept: string; label: string; selectedName?: string; maxBytes: number; sizeLabel: string; onFile?: (file: File) => void }) {
+const IMAGE_TYPES = "image/jpeg,image/png,image/webp";
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_PREVIEWS = 5;
+const smallButton =
+  "inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition";
+
+/** Cover: shows the current image with Replace / Remove; a newly chosen file
+ *  can be cancelled before saving. Removal is sent as `removeName=1`. */
+function CoverField({ name, removeName, label, existingUrl, onPreviewChange }: { name: string; removeName: string; label: string; existingUrl: string | null; onPreviewChange: (url: string | null) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [removed, setRemoved] = useState(false);
+  const [selected, setSelected] = useState<{ name: string; url: string } | null>(null);
   const [error, setError] = useState("");
-  return <label className="block min-h-12 cursor-pointer rounded-xl border border-dashed border-brand-300 px-3 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50"><span className="flex items-center gap-2"><Upload className="h-4 w-4" />{label}</span><span className="mt-1 block text-[10px] font-normal text-brand-400">Maximum {sizeLabel}</span>{selectedName && !error && <span className="mt-1 block truncate text-[11px] font-semibold text-green-600">Selected: {selectedName}</span>}{error && <span role="alert" className="mt-1 block text-[11px] font-semibold text-danger-600">{error}</span>}<input name={name} type="file" accept={accept} className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > maxBytes) { setError(`File is too large. Maximum ${sizeLabel}.`); event.target.value = ""; return; } setError(""); onFile?.(file); }} /></label>;
+  const shown = selected?.url ?? (removed ? null : existingUrl);
+  const cancel = () => {
+    if (input.current) input.current.value = "";
+    setSelected(null);
+    onPreviewChange(removed ? null : existingUrl);
+  };
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold text-brand-700">{label}</p>
+      <input type="hidden" name={removeName} value={removed && !selected ? "1" : ""} />
+      <input
+        ref={input}
+        name={name}
+        type="file"
+        accept={IMAGE_TYPES}
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          if (!file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES) {
+            setError("Cover must be a JPG, PNG or WebP image under 5 MB.");
+            event.target.value = "";
+            return;
+          }
+          setError("");
+          const url = URL.createObjectURL(file);
+          setSelected({ name: file.name, url });
+          onPreviewChange(url);
+        }}
+      />
+      {shown ? (
+        // eslint-disable-next-line @next/next/no-img-element -- local blob or Supabase admin preview.
+        <img src={shown} alt={`${label} preview`} width={120} height={160} className="mb-2 h-36 w-auto rounded-lg border border-brand-100 object-cover" />
+      ) : (
+        <div className="mb-2 flex h-36 w-28 items-center justify-center rounded-lg border border-dashed border-brand-200 text-[11px] text-brand-400">No cover</div>
+      )}
+      {selected && <p className="mb-2 truncate text-[11px] font-semibold text-green-600">New: {selected.name}</p>}
+      {removed && !selected && <p className="mb-2 text-[11px] font-semibold text-amber-700">Cover will be removed when you save.</p>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => input.current?.click()} className={`${smallButton} border-brand-200 text-brand-700 hover:bg-brand-50`}>
+          <Upload className="h-3.5 w-3.5" /> {shown ? "Replace" : "Upload"}
+        </button>
+        {selected && (
+          <button type="button" onClick={cancel} className={`${smallButton} border-brand-200 text-brand-600 hover:bg-brand-50`}>
+            <X className="h-3.5 w-3.5" /> Cancel new
+          </button>
+        )}
+        {!selected && existingUrl && !removed && (
+          <button type="button" onClick={() => { setRemoved(true); onPreviewChange(null); }} className={`${smallButton} border-danger-200 text-danger-600 hover:bg-red-50`}>
+            <Trash2 className="h-3.5 w-3.5" /> Remove
+          </button>
+        )}
+        {!selected && removed && (
+          <button type="button" onClick={() => { setRemoved(false); onPreviewChange(existingUrl); }} className={`${smallButton} border-brand-200 text-brand-600 hover:bg-brand-50`}>
+            <RotateCcw className="h-3.5 w-3.5" /> Undo
+          </button>
+        )}
+      </div>
+      {error && <p role="alert" className="mt-1 text-[11px] font-semibold text-danger-600">{error}</p>}
+    </div>
+  );
 }
 
-function MultiImageUpload({ name, existingCount, selectedNames, onFiles }: { name: string; existingCount: number; selectedNames: string[]; onFiles: (names: string[]) => void }) {
+/** Page previews: keep/remove each saved image and add new ones (5 total).
+ *  Sends `preview_state_<l>` plus one `keep_preview_<l>` per kept URL. */
+function PreviewsField({ locale, existing }: { locale: Locale; existing: string[] }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [kept, setKept] = useState<string[]>(existing);
+  const [added, setAdded] = useState<{ file: File; url: string }[]>([]);
   const [error, setError] = useState("");
-  return <label className="block min-h-12 cursor-pointer rounded-xl border border-dashed border-brand-300 px-3 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50"><span className="flex items-center gap-2"><Images className="h-4 w-4" />{existingCount ? `Replace ${existingCount} page preview${existingCount === 1 ? "" : "s"}` : "Upload page previews"}</span><span className="mt-1 block text-[10px] font-normal text-brand-400">Choose up to 5 JPG, PNG or WebP images · 5 MB each</span>{selectedNames.length > 0 && !error && <span className="mt-1 block text-[11px] font-semibold text-green-600">Selected: {selectedNames.join(", ")}</span>}{error && <span role="alert" className="mt-1 block text-[11px] font-semibold text-danger-600">{error}</span>}<input name={name} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length > 5) { setError("Choose at most 5 preview images."); event.target.value = ""; return; } if (files.some((file) => file.size > 5 * 1024 * 1024)) { setError("Every preview image must be under 5 MB."); event.target.value = ""; return; } setError(""); onFiles(files.map((file) => file.name)); }} /></label>;
+  const room = MAX_PREVIEWS - kept.length - added.length;
+  // The file input's FileList is what submits, so it must mirror `added`.
+  const syncInput = (files: File[]) => {
+    if (!input.current) return;
+    const transfer = new DataTransfer();
+    files.forEach((file) => transfer.items.add(file));
+    input.current.files = transfer.files;
+  };
+  const removeAdded = (index: number) => {
+    const next = added.filter((_, i) => i !== index);
+    setAdded(next);
+    syncInput(next.map((item) => item.file));
+  };
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold text-brand-700">Page previews ({kept.length + added.length}/{MAX_PREVIEWS})</p>
+      <input type="hidden" name={`preview_state_${locale}`} value="1" />
+      {kept.map((url) => <input key={url} type="hidden" name={`keep_preview_${locale}`} value={url} />)}
+      <input
+        ref={input}
+        name={`preview_files_${locale}`}
+        type="file"
+        accept={IMAGE_TYPES}
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(event) => {
+          const picked = Array.from(event.target.files ?? []);
+          const current = added.map((item) => item.file);
+          if (picked.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
+            setError("Every preview must be a JPG, PNG or WebP image under 5 MB.");
+            syncInput(current);
+            return;
+          }
+          const accepted = picked.slice(0, Math.max(0, room));
+          setError(picked.length > accepted.length ? `Only ${MAX_PREVIEWS} previews in total — extra images were skipped.` : "");
+          const next = [...added, ...accepted.map((file) => ({ file, url: URL.createObjectURL(file) }))];
+          setAdded(next);
+          syncInput(next.map((item) => item.file));
+        }}
+      />
+      {kept.length + added.length > 0 && (
+        <div className="mb-2 grid grid-cols-5 gap-2">
+          {kept.map((url, index) => (
+            <Thumb key={url} src={coverSrc(url)} label={`Remove preview ${index + 1}`} onRemove={() => setKept((current) => current.filter((u) => u !== url))} />
+          ))}
+          {added.map((item, index) => (
+            <Thumb key={item.url} src={item.url} isNew label={`Cancel new preview ${item.file.name}`} onRemove={() => removeAdded(index)} />
+          ))}
+        </div>
+      )}
+      {kept.length < existing.length && (
+        <p className="mb-2 text-[11px] font-semibold text-amber-700">
+          {existing.length - kept.length} saved preview{existing.length - kept.length === 1 ? "" : "s"} will be removed when you save.{" "}
+          <button type="button" onClick={() => setKept(existing)} className="underline">Undo</button>
+        </p>
+      )}
+      <button type="button" disabled={room <= 0} onClick={() => input.current?.click()} className={`${smallButton} border-brand-200 text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40`}>
+        <Images className="h-3.5 w-3.5" /> Add previews
+      </button>
+      <span className="ml-2 text-[10px] text-brand-400">JPG, PNG or WebP · 5 MB each</span>
+      {error && <p role="alert" className="mt-1 text-[11px] font-semibold text-danger-600">{error}</p>}
+    </div>
+  );
+}
+
+function Thumb({ src, label, isNew = false, onRemove }: { src: string; label: string; isNew?: boolean; onRemove: () => void }) {
+  return (
+    <div className={`relative aspect-[3/4] overflow-hidden rounded-md border ${isNew ? "border-green-400" : "border-brand-100"}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- local blob or Supabase admin preview. */}
+      <img src={src} alt="" className="h-full w-full object-cover" />
+      <button type="button" onClick={onRemove} aria-label={label} title={label} className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-danger-600">
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/** Edition PDF: View / Replace / Remove the saved file; cancel a new pick. */
+function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name: string; removeName: string; label: string; uploaded: boolean; viewHref?: string; hint: string }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [removed, setRemoved] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const hasFile = uploaded && !removed;
+  return (
+    <div className="space-y-2 border-t border-brand-100 pt-4">
+      <h3 className="inline-flex items-center gap-2 text-sm font-bold text-brand-900">
+        <FileText className="h-4 w-4" /> {label}
+      </h3>
+      <input type="hidden" name={removeName} value={removed && !selected ? "1" : ""} />
+      <input
+        ref={input}
+        name={name}
+        type="file"
+        accept="application/pdf"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          if (file.type !== "application/pdf" || file.size > 50 * 1024 * 1024) {
+            setError("Choose a PDF under 50 MB.");
+            event.target.value = "";
+            return;
+          }
+          setError("");
+          setSelected(file.name);
+        }}
+      />
+      {hasFile && !selected && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold">
+          <span className="inline-flex items-center gap-1 text-green-600"><CheckCircle2 className="h-3.5 w-3.5" /> PDF uploaded</span>
+          {viewHref && (
+            <a href={viewHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand-teal underline underline-offset-2">
+              <ExternalLink className="h-3.5 w-3.5" /> View PDF
+            </a>
+          )}
+        </p>
+      )}
+      {selected && <p className="truncate text-[11px] font-semibold text-green-600">New: {selected}</p>}
+      {removed && !selected && (
+        <p className="text-[11px] font-semibold text-amber-700">
+          PDF will be removed when you save. This edition can’t be sold or downloaded until a new PDF is uploaded.
+        </p>
+      )}
+      {!uploaded && !selected && <p className="text-[11px] text-brand-400">No PDF yet.</p>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => input.current?.click()} className={`${smallButton} border-brand-200 text-brand-700 hover:bg-brand-50`}>
+          <Upload className="h-3.5 w-3.5" /> {hasFile || selected ? "Replace PDF" : "Upload PDF"}
+        </button>
+        {selected && (
+          <button type="button" onClick={() => { if (input.current) input.current.value = ""; setSelected(null); }} className={`${smallButton} border-brand-200 text-brand-600 hover:bg-brand-50`}>
+            <X className="h-3.5 w-3.5" /> Cancel new
+          </button>
+        )}
+        {!selected && hasFile && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm("Remove this PDF? Buyers of this edition, including past orders, can't download it until a new PDF is uploaded.")) setRemoved(true);
+            }}
+            className={`${smallButton} border-danger-200 text-danger-600 hover:bg-red-50`}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Remove
+          </button>
+        )}
+        {!selected && removed && (
+          <button type="button" onClick={() => setRemoved(false)} className={`${smallButton} border-brand-200 text-brand-600 hover:bg-brand-50`}>
+            <RotateCcw className="h-3.5 w-3.5" /> Undo
+          </button>
+        )}
+      </div>
+      <p className="text-[10px] text-brand-400">Maximum 50 MB. {hint}</p>
+      {error && <p role="alert" className="text-[11px] font-semibold text-danger-600">{error}</p>}
+    </div>
+  );
 }
 
 function Toggle({ name, label, defaultChecked }: { name: string; label: string; defaultChecked: boolean }) {
