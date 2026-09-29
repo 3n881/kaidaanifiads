@@ -9,6 +9,13 @@
       "autoPort": true
     },
     {
+      "name": "kaida-dev-webpack",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:webpack"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
       "name": "kaida-prod",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "start", "-p", "3100"],
