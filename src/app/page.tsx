@@ -3,7 +3,6 @@ import ProductRow from "@/components/ProductRow";
 import HowToBuy from "@/components/HowToBuy";
 import Benefits from "@/components/Benefits";
 import Testimonials from "@/components/Testimonials";
-import Faq from "@/components/Faq";
 import Reveal from "@/components/Reveal";
 import { getEbooks, getCombos } from "@/lib/products";
 
@@ -48,9 +47,6 @@ export default async function Home() {
       </Reveal>
       <Reveal>
         <Testimonials />
-      </Reveal>
-      <Reveal>
-        <Faq />
       </Reveal>
     </>
   );

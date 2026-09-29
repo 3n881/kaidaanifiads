@@ -52,7 +52,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
             width={230}
             height={40}
             loading="eager"
-            className="h-8 w-auto object-contain transition-transform group-hover:scale-105 sm:h-10"
+            className="h-8 w-auto object-contain transition-transform group-hover:scale-105 sm:h-10 lg:h-7 2xl:h-10"
           />
         </Link>
 
@@ -81,6 +81,9 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
               }`}
             >
               <span className="block">{copy.nav[index]}</span>
+              {copy.navEn[index] && (
+                <span className="block text-[11px] font-medium opacity-80">{copy.navEn[index]}</span>
+              )}
               {l.sale && (
                 <span className="badge-sale absolute -right-1 top-0 rounded-full px-1.5 text-[9px] font-bold text-white">
                   SALE

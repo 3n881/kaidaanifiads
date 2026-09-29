@@ -15,7 +15,7 @@ import { SITE } from "@/data/catalog";
 import { useLanguage } from "./LanguageProvider";
 
 const COPY = {
-  mr: { badge: "100% अधिकृत कायदेशीर माहिती", title: "सोप्या भाषेत कायदे —", accent: "तुमच्या हक्कांसाठी", body: "शेतकरी, सामान्य नागरिक आणि महिलांसाठी जमीन आणि वारसा हक्कांची विश्वासार्ह माहिती एका क्लिकवर.", search: "पुस्तके शोधा…", popular: "लोकप्रिय:", books: "प्रकाशन पहा", combos: "कॉम्बो पॅक्स", readers: "वाचक", rating: "रेटिंग", trusted: "अधिकृत", authentic: "100% अधिकृत", info: "कायदेशीर माहिती" },
+  mr: { badge: "100% अधिकृत कायदेशीर माहिती", title: "सोप्या भाषेत कायदे —", accent: "तुमच्या हक्कांसाठी", body: "शेतकरी, सामान्य नागरिक आणि महिलांसाठी जमीन आणि वारसा हक्कांची विश्वासार्ह माहिती एका क्लिकवर.", search: "पुस्तके शोधा…", popular: "लोकप्रिय:", books: "प्रकाशन पहा (View Books)", combos: "कॉम्बो पॅक्स", readers: "वाचक", rating: "रेटिंग", trusted: "अधिकृत", authentic: "100% अधिकृत", info: "कायदेशीर माहिती" },
   hi: { badge: "100% प्रामाणिक कानूनी जानकारी", title: "आसान भाषा में कानून —", accent: "आपके अधिकारों के लिए", body: "किसानों, नागरिकों और महिलाओं के लिए जमीन और विरासत के अधिकारों की भरोसेमंद जानकारी।", search: "किताबें खोजें…", popular: "लोकप्रिय:", books: "किताबें देखें", combos: "कॉम्बो पैक्स", readers: "पाठक", rating: "रेटिंग", trusted: "प्रामाणिक", authentic: "100% प्रामाणिक", info: "कानूनी जानकारी" },
   en: { badge: "100% authentic legal information", title: "Law in plain language —", accent: "for your rights", body: "Reliable information about land, inheritance, and everyday rights for farmers, citizens, and women.", search: "Search books…", popular: "Popular:", books: "View books", combos: "Combo packs", readers: "Readers", rating: "Rating", trusted: "Authentic", authentic: "100% authentic", info: "Legal information" },
 } as const;
@@ -112,12 +112,6 @@ export default function Hero() {
                 className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-sm font-bold text-brand-teal shadow-[var(--shadow-gold)] transition hover:bg-brand-gold/90 sm:w-auto"
               >
                 {copy.books} <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/combos"
-                className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/5 sm:w-auto"
-              >
-                {copy.combos}
               </Link>
             </div>
 
