@@ -1,34 +1,37 @@
 "use client";
 
-import { CreditCard, FileDown, MousePointerClick, Smartphone } from "lucide-react";
+import { BookOpen, CreditCard, FileDown, MousePointerClick } from "lucide-react";
 import { SITE } from "@/data/catalog";
 import { useLanguage } from "./LanguageProvider";
 
+// Our checkout: Buy opens the Razorpay window directly (it asks for the mobile
+// number), the order page starts the download, and the order is saved on the
+// device under "माझी पुस्तके" for later downloads.
 const STEPS = {
   mr: [
-    { icon: MousePointerClick, title: "१. पुस्तक निवडा", desc: "तुम्हाला हवे असलेले ई-बुक किंवा कॉम्बो पॅक निवडा आणि ‘आत्ताच डाऊनलोड करा’ बटणावर क्लिक करा." },
-    { icon: Smartphone, title: "२. माहिती भरा", desc: "पेमेंट विंडोमध्ये तुमचा मोबाईल नंबर भरा. वेगळे Account किंवा Login लागत नाही." },
-    { icon: CreditCard, title: "३. सुरक्षित पेमेंट", desc: "Google Pay, PhonePe, Paytm किंवा कार्डद्वारे सुरक्षितपणे पेमेंट पूर्ण करा." },
-    { icon: FileDown, title: "४. लगेच डाउनलोड", desc: "पेमेंट होताच ई-बुकची PDF लगेच डाउनलोड करा आणि वाचनाचा आनंद घ्या!" },
+    { icon: MousePointerClick, title: "१. पुस्तक निवडा", desc: "हवे असलेले ई-बुक किंवा कॉम्बो पॅक उघडा आणि ‘आत्ताच डाऊनलोड करा’ बटण दाबा." },
+    { icon: CreditCard, title: "२. सुरक्षित पेमेंट", desc: "Razorpay ची सुरक्षित पेमेंट विंडो लगेच उघडते. मोबाईल नंबर टाका आणि UPI, Google Pay, PhonePe, Paytm किंवा कार्डने पेमेंट करा." },
+    { icon: FileDown, title: "३. लगेच डाउनलोड", desc: "पेमेंट यशस्वी होताच PDF डाउनलोड आपोआप सुरू होते आणि स्क्रीनवर Download बटणही मिळते." },
+    { icon: BookOpen, title: "४. माझी पुस्तके", desc: "तुमची खरेदी याच मोबाईलवर ‘माझी पुस्तके’ मध्ये जतन राहते — गरज पडेल तेव्हा पुन्हा डाउनलोड करा." },
   ],
   hi: [
-    { icon: MousePointerClick, title: "1. किताब चुनें", desc: "अपनी पसंद की ई-बुक या कॉम्बो पैक चुनें और ‘अभी डाउनलोड करें’ बटन दबाएँ।" },
-    { icon: Smartphone, title: "2. जानकारी भरें", desc: "पेमेंट विंडो में अपना मोबाइल नंबर भरें। कोई अकाउंट या लॉगिन नहीं चाहिए।" },
-    { icon: CreditCard, title: "3. सुरक्षित पेमेंट", desc: "Google Pay, PhonePe, Paytm या कार्ड से सुरक्षित पेमेंट करें।" },
-    { icon: FileDown, title: "4. तुरंत डाउनलोड", desc: "पेमेंट होते ही ई-बुक की PDF तुरंत डाउनलोड करें।" },
+    { icon: MousePointerClick, title: "1. किताब चुनें", desc: "अपनी पसंद की ई-बुक या कॉम्बो पैक खोलें और ‘अभी डाउनलोड करें’ बटन दबाएँ।" },
+    { icon: CreditCard, title: "2. सुरक्षित पेमेंट", desc: "Razorpay की सुरक्षित पेमेंट विंडो तुरंत खुलती है। मोबाइल नंबर डालें और UPI, Google Pay, PhonePe, Paytm या कार्ड से पेमेंट करें।" },
+    { icon: FileDown, title: "3. तुरंत डाउनलोड", desc: "पेमेंट सफल होते ही PDF डाउनलोड अपने आप शुरू होता है और स्क्रीन पर Download बटन भी मिलता है।" },
+    { icon: BookOpen, title: "4. मेरी किताबें", desc: "आपकी खरीद इसी मोबाइल पर ‘मेरी किताबें’ में सेव रहती है — ज़रूरत हो तब फिर से डाउनलोड करें।" },
   ],
   en: [
-    { icon: MousePointerClick, title: "1. Choose a book", desc: "Pick an ebook or combo pack and press ‘Download now’." },
-    { icon: Smartphone, title: "2. Fill in details", desc: "Enter your mobile number in the payment window. No account or login needed." },
-    { icon: CreditCard, title: "3. Pay securely", desc: "Pay safely with Google Pay, PhonePe, Paytm or card." },
-    { icon: FileDown, title: "4. Download instantly", desc: "The PDF downloads as soon as the payment succeeds." },
+    { icon: MousePointerClick, title: "1. Choose a book", desc: "Open an ebook or combo pack and press ‘Download now’." },
+    { icon: CreditCard, title: "2. Pay securely", desc: "The secure Razorpay payment window opens right away. Enter your mobile number and pay by UPI, Google Pay, PhonePe, Paytm or card." },
+    { icon: FileDown, title: "3. Download instantly", desc: "As soon as the payment succeeds, the PDF starts downloading and a Download button stays on screen." },
+    { icon: BookOpen, title: "4. My Books", desc: "Your purchase is saved under ‘My Books’ on this phone — download it again whenever you need." },
   ],
 } as const;
 
 const COPY = {
-  mr: { badge: "सोपी प्रक्रिया", title: "ई-बुक कसे खरेदी करावे?", body: "कोणतेही account किंवा checkout form नाही — थेट पेमेंट आणि डाऊनलोड.", help: "डाउनलोडमध्ये मदत हवी आहे?", support: "आमची सपोर्ट टीम मदतीसाठी उपलब्ध आहे.", action: "WhatsApp करा" },
-  hi: { badge: "आसान प्रक्रिया", title: "ई-बुक कैसे खरीदें?", body: "कोई अकाउंट नहीं — सीधे पेमेंट करें और डाउनलोड पाएँ।", help: "डाउनलोड में मदद चाहिए?", support: "हमारी सपोर्ट टीम आपकी मदद के लिए उपलब्ध है।", action: "WhatsApp करें" },
-  en: { badge: "Simple process", title: "How to buy an ebook", body: "No account or long checkout form — pay and download directly.", help: "Need download help?", support: "Our support team is ready to help.", action: "Message on WhatsApp" },
+  mr: { badge: "सोपी प्रक्रिया", title: "ई-बुक कसे खरेदी करावे?", body: "Account, Login किंवा वेगळा फॉर्म नाही — थेट पेमेंट आणि लगेच डाउनलोड.", help: "डाउनलोडमध्ये मदत हवी आहे?", support: "आमची सपोर्ट टीम मदतीसाठी उपलब्ध आहे.", action: "WhatsApp करा" },
+  hi: { badge: "आसान प्रक्रिया", title: "ई-बुक कैसे खरीदें?", body: "कोई अकाउंट, लॉगिन या अलग फ़ॉर्म नहीं — सीधे पेमेंट और तुरंत डाउनलोड।", help: "डाउनलोड में मदद चाहिए?", support: "हमारी सपोर्ट टीम आपकी मदद के लिए उपलब्ध है।", action: "WhatsApp करें" },
+  en: { badge: "Simple process", title: "How to buy an ebook", body: "No account, login or extra form — pay and download straight away.", help: "Need download help?", support: "Our support team is ready to help.", action: "Message on WhatsApp" },
 } as const;
 
 export default function HowToBuy() {

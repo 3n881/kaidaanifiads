@@ -34,12 +34,13 @@ import ProductGallery from "./ProductGallery";
 import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
 
-// Same steps as the previous site; the payment window asks for the mobile number.
+// Our checkout: Buy opens the payment window directly, the PDF downloads right
+// after payment, and the order stays in "माझी पुस्तके" on the device.
 const MINI_STEPS = [
   { n: "1", label: "बटन दाबा", en: "Click" },
-  { n: "2", label: "माहिती भरा", en: "Fill Info" },
-  { n: "3", label: "पेमेंट करा", en: "Pay" },
-  { n: "✓", label: "PDF मिळवा", en: "Get PDF" },
+  { n: "2", label: "पेमेंट करा", en: "Pay" },
+  { n: "3", label: "PDF मिळवा", en: "Download" },
+  { n: "✓", label: "माझी पुस्तके", en: "My Books" },
 ];
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
