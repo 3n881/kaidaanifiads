@@ -223,14 +223,13 @@ export async function getComboBooks(comboId: number): Promise<Product[]> {
     .map(rowToProduct);
 }
 
-/** Related products for a detail page: same type, same category first. */
+/** Related products for a detail page: every other title (ebooks and
+ *  combos, as on the previous site), same category first. */
 export async function getRelated(
   product: Product,
   limit = 8,
 ): Promise<Product[]> {
-  const pool = (await loadCatalog()).filter(
-    (p) => p.isCombo === product.isCombo && p.id !== product.id,
-  );
+  const pool = (await loadCatalog()).filter((p) => p.id !== product.id);
   const cat = categoryOf(product);
   const sameCat = pool.filter((p) => categoryOf(p) === cat);
   const rest = pool.filter((p) => categoryOf(p) !== cat);

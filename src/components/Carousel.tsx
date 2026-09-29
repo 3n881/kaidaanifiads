@@ -11,13 +11,18 @@ import ProductCard from "./ProductCard";
  * the loop is invisible). Pauses on hover; arrows nudge it; respects
  * prefers-reduced-motion.
  */
+// A desktop row shows up to 4 cards; loop only when there are more than
+// that, otherwise the duplicated row shows the same book twice.
+const VISIBLE_CARDS = 4;
+
 export default function Carousel({ products }: { products: Product[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
+  const loop = products.length > VISIBLE_CARDS;
 
   useEffect(() => {
     const el = trackRef.current;
-    if (!el) return;
+    if (!el || !loop) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let raf = 0;
@@ -31,7 +36,7 @@ export default function Carousel({ products }: { products: Product[] }) {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [loop]);
 
   const nudge = (dir: 1 | -1) => {
     const el = trackRef.current;
@@ -57,7 +62,7 @@ export default function Carousel({ products }: { products: Product[] }) {
           onMouseLeave={() => (pausedRef.current = false)}
           className="no-scrollbar -ml-5 flex overflow-x-auto pb-1"
         >
-          {[...products, ...products].map((p, i) => (
+          {(loop ? [...products, ...products] : products).map((p, i) => (
             <div
               key={`${p.id}-${i}`}
               className="min-w-0 shrink-0 basis-1/3 pl-5 lg:basis-1/4"
@@ -68,6 +73,7 @@ export default function Carousel({ products }: { products: Product[] }) {
           ))}
         </div>
 
+        {loop && <>
         <button
           aria-label="मागे"
           onClick={() => nudge(-1)}
@@ -82,6 +88,7 @@ export default function Carousel({ products }: { products: Product[] }) {
         >
           <ChevronRight className="h-5 w-5" />
         </button>
+        </>}
       </div>
     </>
   );

@@ -5,8 +5,6 @@ import { ArrowRight } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import Carousel from "./Carousel";
 import type { Locale } from "@/lib/i18n";
-import { LOCALE_TO_PRODUCT_LANGUAGE } from "@/lib/i18n";
-import { productHasLanguage } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 
 type LocalizedText = string | Record<Locale, string>;
@@ -28,9 +26,8 @@ export default function ProductRow({
 }) {
   const { locale } = useLanguage();
   const text = (value: LocalizedText) => typeof value === "string" ? value : value[locale];
-  const localizedProducts = products.filter((product) =>
-    productHasLanguage(product, LOCALE_TO_PRODUCT_LANGUAGE[locale]),
-  );
+  // Every title, as on the previous site; cards show each book's own edition.
+  const localizedProducts = products;
   if (localizedProducts.length === 0) return null;
   return (
     <section className="py-14">

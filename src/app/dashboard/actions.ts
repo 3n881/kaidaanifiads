@@ -10,6 +10,7 @@ import { nextProductId } from "@/lib/admin";
 import { purgePublicPages } from "@/lib/cdn";
 import { COVER_WIDTHS, coverVariantPath } from "@/lib/covers";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { publishPreview, removePreview } from "@/lib/preview-pdf";
 
 async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/");
@@ -178,10 +179,23 @@ export async function saveProduct(formData: FormData) {
     const pdf = formData.get(field);
     if (pdf instanceof File && pdf.size > 0) {
       row[column] = await uploadFile("pdfs", pdf, `${slug}-${locale}`);
+      // Free "first 6 pages" preview shown on the product page. A failure
+      // must not lose the upload, so it is logged, not thrown.
+      try {
+        await publishPreview(
+          getSupabaseAdmin(ADMIN_UPLOAD_TIMEOUT_MS),
+          slug,
+          locale,
+          await pdf.arrayBuffer(),
+        );
+      } catch (error) {
+        console.error("[saveProduct] preview PDF failed", slug, locale, error);
+      }
     } else if (formData.get(`remove_${field.replace("_file", "")}`) === "1") {
       // The file stays in storage; only this edition stops delivering it.
       row[column] = null;
       if (locale === "mr") row.pdf_path = null;
+      await removePreview(admin, slug, locale);
     }
   }
 

@@ -419,7 +419,7 @@ function CoverField({ name, removeName, label, existingUrl, onPreviewChange }: {
           </button>
         )}
         {!selected && existingUrl && !removed && (
-          <button type="button" onClick={() => { setRemoved(true); onPreviewChange(null); }} className={`${smallButton} border-danger-200 text-danger-600 hover:bg-red-50`}>
+          <button type="button" onClick={() => { setRemoved(true); onPreviewChange(null); }} className={`${smallButton} border-red-200 text-danger-600 hover:bg-red-50`}>
             <Trash2 className="h-3.5 w-3.5" /> Remove
           </button>
         )}
@@ -583,7 +583,7 @@ function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name:
             onClick={() => {
               if (window.confirm("Remove this PDF? Buyers of this edition, including past orders, can't download it until a new PDF is uploaded.")) setRemoved(true);
             }}
-            className={`${smallButton} border-danger-200 text-danger-600 hover:bg-red-50`}
+            className={`${smallButton} border-red-200 text-danger-600 hover:bg-red-50`}
           >
             <Trash2 className="h-3.5 w-3.5" /> Remove
           </button>

@@ -1,43 +1,27 @@
 "use client";
 
-import { CreditCard, FileDown, MessageCircle, MousePointerClick } from "lucide-react";
+import { CreditCard, FileDown, MousePointerClick, Smartphone } from "lucide-react";
 import { SITE } from "@/data/catalog";
 import { useLanguage } from "./LanguageProvider";
 
 const STEPS = {
   mr: [
-  {
-    icon: MousePointerClick,
-    title: "१. पुस्तक निवडा",
-    desc: "तुमच्या आवडीचे ई-बुक निवडा आणि ‘Download’ बटन दाबा.",
-  },
-  {
-    icon: CreditCard,
-    title: "२. थेट पेमेंट करा",
-    desc: "Account, नाव किंवा मोबाईल नंबर न देता UPI, Google Pay, PhonePe किंवा Card ने पेमेंट करा.",
-  },
-  {
-    icon: FileDown,
-    title: "३. PDF डाऊनलोड करा",
-    desc: "पेमेंट यशस्वी होताच PDF डाऊनलोड सुरू होते आणि स्क्रीनवर लिंकही मिळते.",
-  },
-  {
-    icon: MessageCircle,
-    title: "४. WhatsApp ऐच्छिक",
-    desc: "हवे असल्यास पेमेंटनंतर नंबर द्या. लिंक WhatsApp वर येईल आणि My Books मध्ये जतन होईल.",
-  },
+    { icon: MousePointerClick, title: "१. पुस्तक निवडा", desc: "तुम्हाला हवे असलेले ई-बुक किंवा कॉम्बो पॅक निवडा आणि ‘आत्ताच डाऊनलोड करा’ बटणावर क्लिक करा." },
+    { icon: Smartphone, title: "२. माहिती भरा", desc: "पेमेंट विंडोमध्ये तुमचा मोबाईल नंबर भरा. वेगळे Account किंवा Login लागत नाही." },
+    { icon: CreditCard, title: "३. सुरक्षित पेमेंट", desc: "Google Pay, PhonePe, Paytm किंवा कार्डद्वारे सुरक्षितपणे पेमेंट पूर्ण करा." },
+    { icon: FileDown, title: "४. लगेच डाउनलोड", desc: "पेमेंट होताच ई-बुकची PDF लगेच डाउनलोड करा आणि वाचनाचा आनंद घ्या!" },
   ],
   hi: [
-    { icon: MousePointerClick, title: "1. किताब चुनें", desc: "अपनी पसंद की ई-बुक चुनें और Download बटन दबाएँ।" },
-    { icon: CreditCard, title: "2. सुरक्षित पेमेंट", desc: "UPI, Google Pay, PhonePe या कार्ड से सीधे पेमेंट करें।" },
-    { icon: FileDown, title: "3. PDF डाउनलोड करें", desc: "पेमेंट सफल होते ही PDF डाउनलोड और स्क्रीन पर लिंक मिलेगी।" },
-    { icon: MessageCircle, title: "4. WhatsApp पर पाएँ", desc: "नंबर दर्ज करें और अपनी भाषा में किताब की लिंक WhatsApp पर पाएँ।" },
+    { icon: MousePointerClick, title: "1. किताब चुनें", desc: "अपनी पसंद की ई-बुक या कॉम्बो पैक चुनें और ‘अभी डाउनलोड करें’ बटन दबाएँ।" },
+    { icon: Smartphone, title: "2. जानकारी भरें", desc: "पेमेंट विंडो में अपना मोबाइल नंबर भरें। कोई अकाउंट या लॉगिन नहीं चाहिए।" },
+    { icon: CreditCard, title: "3. सुरक्षित पेमेंट", desc: "Google Pay, PhonePe, Paytm या कार्ड से सुरक्षित पेमेंट करें।" },
+    { icon: FileDown, title: "4. तुरंत डाउनलोड", desc: "पेमेंट होते ही ई-बुक की PDF तुरंत डाउनलोड करें।" },
   ],
   en: [
-    { icon: MousePointerClick, title: "1. Choose a book", desc: "Select an ebook and press the Download button." },
-    { icon: CreditCard, title: "2. Pay securely", desc: "Pay directly with UPI, Google Pay, PhonePe, or card." },
-    { icon: FileDown, title: "3. Download the PDF", desc: "After payment, the PDF starts downloading and a link remains on screen." },
-    { icon: MessageCircle, title: "4. Get it on WhatsApp", desc: "Enter your number to receive the book link in your chosen language." },
+    { icon: MousePointerClick, title: "1. Choose a book", desc: "Pick an ebook or combo pack and press ‘Download now’." },
+    { icon: Smartphone, title: "2. Fill in details", desc: "Enter your mobile number in the payment window. No account or login needed." },
+    { icon: CreditCard, title: "3. Pay securely", desc: "Pay safely with Google Pay, PhonePe, Paytm or card." },
+    { icon: FileDown, title: "4. Download instantly", desc: "The PDF downloads as soon as the payment succeeds." },
   ],
 } as const;
 

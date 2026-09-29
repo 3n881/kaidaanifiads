@@ -8,20 +8,25 @@
  *   npm run db:upload-pdfs              # upload files whose edition has no PDF yet
  *   npm run db:upload-pdfs -- --dry-run # show what would happen
  *   npm run db:upload-pdfs -- --force   # also replace PDFs that are already set
+ *   npm run db:upload-pdfs -- --previews-only  # (re)build the free first-6-pages
+ *                                               # preview PDFs, no PDF upload
  *
- * Uses the same storage path scheme as the dashboard (`<slug>-<locale>-<ts>.pdf`).
+ * Uses the same storage path scheme as the dashboard (`<slug>-<locale>-<ts>.pdf`)
+ * and publishes each edition's preview PDF, as the dashboard does.
  * It does not change `available_locales` — that is recomputed when the edition
  * (title, descriptions, cover) is saved from the dashboard.
  */
 import { readdirSync, readFileSync } from "fs";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
+import { publishPreview } from "../src/lib/preview-pdf";
 
 const DIR = path.join(process.cwd(), "content", "ebooks");
 const FILE_RE = /^(\d+)-([a-z0-9-]+)-(mr|hi|en)\.pdf$/;
 
 const dryRun = process.argv.includes("--dry-run");
 const force = process.argv.includes("--force");
+const previewsOnly = process.argv.includes("--previews-only");
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -64,6 +69,19 @@ async function main() {
       failed++;
       continue;
     }
+    if (previewsOnly) {
+      if (!product[column]) {
+        console.log(`• ${file}: no ${column} yet — upload the PDF first`);
+        continue;
+      }
+      if (dryRun) {
+        console.log(`→ ${file} would publish its preview`);
+        continue;
+      }
+      await publishPreview(supabase, slug, locale, readFileSync(path.join(DIR, file)));
+      console.log(`✓ ${file}: preview published`);
+      continue;
+    }
     if (product[column] && !force) {
       console.log(`• ${file}: ${column} already set (${product[column]}) — skipped`);
       continue;
@@ -94,7 +112,8 @@ async function main() {
       failed++;
       continue;
     }
-    console.log(`✓ ${file} (${sizeMb} MB) → products[${id}].${column} = ${objectPath}`);
+    await publishPreview(supabase, slug, locale, body);
+    console.log(`✓ ${file} (${sizeMb} MB) → products[${id}].${column} = ${objectPath} (+ preview)`);
   }
 
   if (failed) {

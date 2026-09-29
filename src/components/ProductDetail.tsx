@@ -10,17 +10,21 @@ import {
   BookOpen,
   Info,
   AlertCircle,
+  ShieldCheck,
+  Share2,
+  ChevronDown,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import {
   LANGUAGE_LABELS,
   discountPercent,
   categoryOf,
+  editionLocaleFor,
   localizeProduct,
-  productHasLanguage,
 } from "@/lib/catalog";
 import { SITE } from "@/data/catalog";
 import { coverSrc, coverSrcSet } from "@/lib/covers";
+import { previewPdfUrl } from "@/lib/previews";
 import BuyButton from "./BuyButton";
 import StickyBuyBar from "./StickyBuyBar";
 import ExpandableText from "./ExpandableText";
@@ -28,13 +32,48 @@ import DisclaimerBanner from "./DisclaimerBanner";
 import Carousel from "./Carousel";
 import ProductGallery from "./ProductGallery";
 import { useLanguage } from "./LanguageProvider";
-import { LOCALE_TO_PRODUCT_LANGUAGE } from "@/lib/i18n";
+import { UI_COPY } from "@/lib/i18n";
 
+// Same steps as the previous site; the payment window asks for the mobile number.
 const MINI_STEPS = [
   { n: "1", label: "बटन दाबा", en: "Click" },
-  { n: "2", label: "पेमेंट करा", en: "Pay" },
-  { n: "3", label: "PDF मिळवा", en: "Download" },
-  { n: "✓", label: "WhatsApp ऐच्छिक", en: "Optional" },
+  { n: "2", label: "माहिती भरा", en: "Fill Info" },
+  { n: "3", label: "पेमेंट करा", en: "Pay" },
+  { n: "✓", label: "PDF मिळवा", en: "Get PDF" },
+];
+
+const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
+
+// Same questions as the previous site; answers describe how this site delivers.
+const PRODUCT_FAQ = [
+  {
+    q: "हे पुस्तक मला कसे मिळेल?",
+    a: "पेमेंट यशस्वी झाल्यानंतर तुम्हाला लगेच Download Button दिसेल आणि PDF डाउनलोड होईल. ही लिंक याच मोबाईलवर ‘माझी पुस्तके’ मध्ये जतन राहते, त्यामुळे नंतरही पुन्हा डाउनलोड करता येते.",
+  },
+  {
+    q: "पेमेंट सुरक्षित आहे का?",
+    a: "हो, Razorpay 100% सुरक्षित आहे. GooglePay, PhonePe, Paytm किंवा कार्डद्वारे पेमेंट करा.",
+  },
+  {
+    q: "मोबाईलवर वाचता येते का?",
+    a: "हो! PDF फाइल कोणत्याही मोबाईल, लॅपटॉप किंवा टॅब्लेटवर वाचता येते.",
+  },
+  {
+    q: "हे Physical पुस्तक आहे का?",
+    a: "नाही. हे पूर्णपणे Digital PDF E-Book आहे. कोणतीही Printed / Hard Copy पाठवली जात नाही.",
+  },
+  {
+    q: "किती डिव्हाइसवर वाचता येईल?",
+    a: "PDF वर कोणतेही बंधन नाही — तुम्ही तुमच्या Mobile, Tablet, Laptop, Desktop — कोणत्याही डिव्हाइसवर वाचू शकता.",
+  },
+  {
+    q: "भविष्यात Update मिळेल का?",
+    a: "कायद्यात महत्त्वाचे बदल झाल्यास आम्ही Updated Edition प्रकाशित करतो. Current Version ची माहिती Product Page वर दिली आहे.",
+  },
+  {
+    q: "हे पुस्तक कायदेशीर सल्ला देते का?",
+    a: "नाही. हे पुस्तक केवळ संदर्भ आणि शैक्षणिक उद्देशाने आहे. हा कोणत्याही प्रकारचा कायदेशीर सल्ला (Legal Advice) नाही. तुमच्या विशिष्ट कायदेशीर समस्येसाठी नेहमी तज्ञ वकिलाचा सल्ला घ्या.",
+  },
 ];
 
 export default function ProductDetail({
@@ -48,11 +87,13 @@ export default function ProductDetail({
 }) {
   const { locale } = useLanguage();
   const product = localizeProduct(sourceProduct, locale);
-  const related = relatedProducts
-    .filter((item) =>
-      productHasLanguage(item, LOCALE_TO_PRODUCT_LANGUAGE[locale]),
-    )
-    .map((item) => localizeProduct(item, locale));
+  // Every other title, each shown in its own edition (as on the previous site).
+  const related = relatedProducts.map((item) => localizeProduct(item, locale));
+  const editionLocale = editionLocaleFor(sourceProduct, locale);
+  const previewUrl = sourceProduct.availableLocales?.includes(editionLocale)
+    ? previewPdfUrl(product.slug, editionLocale)
+    : null;
+  const copy = UI_COPY[locale];
   const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
@@ -96,7 +137,7 @@ export default function ProductDetail({
 
   return (
     <div className="container-x py-6 lg:py-8">
-      <StickyBuyBar product={product} targetId="buy-now" />
+      <StickyBuyBar product={product} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -115,27 +156,25 @@ export default function ProductDetail({
       </nav>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[380px_1fr] lg:gap-8">
-        {/* Cover — compact on phones so title, price and Buy fit the first screen */}
-        <div className="mx-auto w-[46%] max-w-[240px] lg:sticky lg:top-24 lg:w-full lg:max-w-none lg:self-start">
-          <div className="relative overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
-            <ProductGallery key={`${product.id}-${locale}`} product={product} />
-            {pct > 0 && (
-              // Phones already show the discount next to the price; on the small
-              // mobile cover the badge would cover the placeholder label.
-              <span className="badge-sale absolute right-4 top-4 hidden rounded-full px-3 py-1 text-xs font-bold text-white shadow lg:inline-block">
-                {pct}% सवलत
-              </span>
-            )}
-          </div>
+        {/* Preview viewer — full width on phones; the sticky bar keeps price
+            and Buy on screen (as on the previous site). */}
+        <div className="mx-auto w-full max-w-md lg:sticky lg:top-24 lg:max-w-none lg:self-start">
+          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} />
         </div>
 
         {/* Info */}
         <div>
-          {product.isCombo && (
-            <span className="badge-combo font-deva mb-3 inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-              Combo Pack{product.setSize ? ` · ${product.setSize} Book Set` : ""}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-teal px-2 py-0.5 text-xs font-black text-white">
+              <span className="text-[9px] tracking-wider text-brand-gold">ID</span>
+              {product.id}
             </span>
-          )}
+            {product.isCombo && (
+              <span className="badge-combo font-deva inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                Combo Pack{product.setSize ? ` · ${product.setSize} Book Set` : ""}
+              </span>
+            )}
+          </div>
           <h1 className="font-deva text-2xl font-extrabold leading-snug text-brand-900 sm:text-3xl">
             {product.title}
           </h1>
@@ -178,7 +217,7 @@ export default function ProductDetail({
             </p>
 
             <div id="buy-now" className="mt-4">
-              <BuyButton product={product} />
+              <BuyButton product={product} label={copy.downloadNow} />
               <p className="font-deva mt-2 text-center text-xs font-semibold text-brand-600">
                 Login / Account ची गरज नाही · पेमेंटनंतर PDF लगेच डाउनलोड
               </p>
@@ -265,6 +304,42 @@ export default function ProductDetail({
             </div>
           </div>
 
+          {/* buy again + payment methods + share */}
+          <div className="mt-6 space-y-4 rounded-2xl border border-brand-100 bg-white p-4">
+            <BuyButton product={product} label={`${copy.downloadNow} (Download Now)`} />
+            <div>
+              <p className="font-deva flex items-center gap-1.5 text-xs font-bold text-brand-700">
+                <ShieldCheck className="h-4 w-4 text-green-600" /> सुरक्षित पेमेंट (Safe &amp; Secure Payment)
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {PAYMENT_METHODS.map((method) => (
+                  <span key={method} className="rounded-md border border-brand-100 bg-brand-50/60 px-2 py-1 text-[11px] font-bold text-brand-600">
+                    {method}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <ShareButton title={product.title} />
+          </div>
+
+          {/* FAQ */}
+          <div className="mt-8">
+            <h3 className="font-deva text-lg font-bold text-brand-900">
+              नेहमी विचारले जाणारे प्रश्न
+            </h3>
+            <div className="mt-3 divide-y divide-brand-100 rounded-2xl border border-brand-100 bg-white">
+              {PRODUCT_FAQ.map((item) => (
+                <details key={item.q} className="group px-4 py-3">
+                  <summary className="font-deva flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-brand-800">
+                    {item.q}
+                    <ChevronDown className="h-4 w-4 shrink-0 text-brand-400 transition group-open:rotate-180" />
+                  </summary>
+                  <p className="font-deva mt-2 text-sm leading-relaxed text-brand-600">{item.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+
           <DisclaimerBanner className="mt-8" />
         </div>
       </div>
@@ -275,16 +350,14 @@ export default function ProductDetail({
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <h2 className="font-deva text-xl font-extrabold text-brand-900 sm:text-2xl">
-                हे देखील पहा
+                तुम्हाला हे देखील आवडेल
               </h2>
               <p className="font-deva mt-1 text-sm text-brand-500">
-                {product.isCombo
-                  ? "इतर उपयुक्त कॉम्बो पॅक्स"
-                  : "तुम्हाला आवडतील अशी इतर पुस्तके"}
+                आमची इतर काही महत्वाची पुस्तके पहा
               </p>
             </div>
             <Link
-              href={backHref}
+              href="/ebooks"
               className="font-deva flex-shrink-0 text-sm font-semibold text-brand-teal hover:underline"
             >
               सर्व पहा
@@ -293,6 +366,8 @@ export default function ProductDetail({
           <Carousel products={related} />
         </section>
       )}
+      {/* room for the always-on mobile buy bar */}
+      <div className="h-20 lg:hidden" aria-hidden="true" />
     </div>
   );
 }
@@ -328,5 +403,31 @@ function Notice({
       <Icon className="mt-0.5 h-4 w-4 flex-shrink-0" />
       <p className="font-deva">{children}</p>
     </div>
+  );
+}
+
+/** Native share sheet on phones; copies the link elsewhere. */
+function ShareButton({ title }: { title: string }) {
+  const share = async () => {
+    const url = window.location.href.split("#")[0];
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      window.alert("लिंक कॉपी झाली! / Link copied");
+    } catch {
+      // Share sheet dismissed — nothing to do.
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={share}
+      className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-bold text-brand-700 transition hover:bg-brand-50"
+    >
+      <Share2 className="h-4 w-4" /> मित्रांना शेअर करा (SHARE LINK)
+    </button>
   );
 }
