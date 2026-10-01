@@ -100,10 +100,10 @@ export default function MyBooksPage() {
 
       <section className="mx-auto mt-10 max-w-md">
         <h2 className="font-deva text-sm font-bold text-brand-700">
-          दुसऱ्या फोनवर खरेदी केली? लिंक WhatsApp वर मिळवा
+          दुसऱ्या फोनवर खरेदी केली? पुस्तक WhatsApp वर मिळवा
         </h2>
         <p className="font-deva mt-1 text-xs text-brand-500">
-          पेमेंट करताना किंवा नंतर दिलेला नंबर टाका. डाउनलोड लिंक त्याच WhatsApp नंबरवर पाठवली जाईल.
+          पेमेंट करताना किंवा नंतर दिलेला नंबर टाका. पुस्तक PDF स्वरूपात त्याच WhatsApp नंबरवर पाठवले जाईल.
         </p>
         <form onSubmit={submit} className="mt-3 flex flex-col gap-3 sm:flex-row">
           <div className="flex flex-1 items-center rounded-xl border border-brand-200 focus-within:border-brand-teal focus-within:ring-2 focus-within:ring-brand-teal/20">
@@ -131,7 +131,7 @@ export default function MyBooksPage() {
         )}
         {sent && (
           <p className="font-deva mt-4 rounded-2xl bg-green-50 p-4 text-center text-sm text-green-700">
-            या नंबरवर खरेदी असल्यास, डाउनलोड लिंक काही मिनिटांत WhatsApp वर येईल.
+            या नंबरवर खरेदी असल्यास, पुस्तक PDF स्वरूपात काही मिनिटांत WhatsApp वर येईल.
           </p>
         )}
 

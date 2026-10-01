@@ -18,7 +18,7 @@ export default function Page() {
         {
           heading: "2. How You Receive Your Ebook",
           body: [
-            "Immediately after successful payment, the website displays the download link and attempts to start the download automatically. No account or mobile number is required. You may optionally provide a WhatsApp number after payment to receive the link there and access the purchase later through ‘माझी पुस्तके (My Books)’.",
+            "Immediately after successful payment, the website displays the download link and attempts to start the download automatically. No account is required. The ebook PDF is also sent on WhatsApp to the mobile number entered during payment, and the purchase stays available on the same device through ‘माझी पुस्तके (My Books)’.",
           ],
         },
         {

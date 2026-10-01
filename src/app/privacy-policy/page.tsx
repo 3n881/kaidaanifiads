@@ -18,7 +18,7 @@ export default function Page() {
         {
           heading: "2. How We Use Your Information",
           body: [
-            "Optional contact details are used solely to deliver the purchased ebook link on WhatsApp, provide purchase recovery through My Books, and offer order support. We send only order-related messages unless you separately consent to marketing.",
+            "The mobile number entered during payment is used solely to deliver the purchased ebook on WhatsApp, to send one reminder if a payment does not complete, to provide purchase recovery through My Books, and to offer order support. We send only order-related messages unless you separately consent to marketing.",
           ],
         },
         {
