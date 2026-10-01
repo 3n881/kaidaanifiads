@@ -68,8 +68,9 @@ export async function reconcileOrder(order: PendingOrder): Promise<boolean> {
 }
 
 /**
- * Sweeps every `created` order from the last `hours` hours (cron). One
- * Razorpay list call per 100 payments, not one per order.
+ * Sweeps every unpaid order from the last `hours` hours (cron). `failed`
+ * orders are included: a buyer can retry inside the same Razorpay order and
+ * succeed. One Razorpay list call per 100 payments, not one per order.
  */
 export async function reconcileRecentOrders(hours = 48): Promise<{
   pending: number;
@@ -80,7 +81,7 @@ export async function reconcileRecentOrders(hours = 48): Promise<{
   const { data, error } = await getSupabaseAdmin()
     .from("orders")
     .select("id, razorpay_order_id, amount")
-    .eq("status", "created")
+    .in("status", ["created", "failed"])
     .not("razorpay_order_id", "is", null)
     .gte("created_at", since.toISOString())
     .limit(2000);

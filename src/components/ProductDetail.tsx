@@ -27,6 +27,7 @@ import { coverSrc, coverSrcSet } from "@/lib/covers";
 import { previewPdfUrl } from "@/lib/previews";
 import BuyButton from "./BuyButton";
 import StickyBuyBar from "./StickyBuyBar";
+import { TrackViewContent } from "./MetaPixel";
 import ExpandableText from "./ExpandableText";
 import DisclaimerBanner from "./DisclaimerBanner";
 import Carousel from "./Carousel";
@@ -138,6 +139,7 @@ export default function ProductDetail({
 
   return (
     <div className="container-x py-6 lg:py-8">
+      <TrackViewContent product={sourceProduct} />
       <StickyBuyBar product={product} />
       <script
         type="application/ld+json"

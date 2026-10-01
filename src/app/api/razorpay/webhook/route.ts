@@ -77,6 +77,16 @@ async function handle(req: NextRequest) {
       .eq("id", order.id)
       .eq("status", "created");
     if (error) throw new DatabaseUnavailableError("mark failed", error);
+    // The phone typed into Razorpay is the only way to send the "payment not
+    // completed" reminder (src/lib/reminders.ts). Never overwrite.
+    const contact = normalizePhone(payment.contact);
+    if (!order.buyer_contact && contact) {
+      await admin
+        .from("orders")
+        .update({ buyer_contact: contact })
+        .eq("id", order.id)
+        .is("buyer_contact", null);
+    }
     return NextResponse.json({ ok: true });
   }
 

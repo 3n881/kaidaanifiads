@@ -10,6 +10,7 @@ import PriceTag from "./PriceTag";
 import { UI_COPY, type Locale } from "@/lib/i18n";
 import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
+import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
 
 type Step = "processing" | "error";
 
@@ -153,6 +154,8 @@ function BuyModal({
     started.current = true;
 
     const beginCheckout = async () => {
+      const pixelParams = pixelProduct({ id: product.id, title: product.title, price: product.price });
+      trackPixel("InitiateCheckout", pixelParams);
       try {
         const checkoutRequest = fetch("/api/checkout", {
           method: "POST",
@@ -197,6 +200,14 @@ function BuyModal({
           theme: { color: "#0A2342" },
           handler: async (payment: RazorpayResponse) => {
             setStep("processing");
+            // Sent from the book page, before redirecting: the order page URL
+            // holds the access token and never loads the pixel. eventID =
+            // our order id, so a later server-side event can de-duplicate.
+            trackPixel(
+              "Purchase",
+              { ...pixelParams, value: (data.amount ?? product.price * 100) / 100 },
+              data.orderId,
+            );
             try {
               const confirmation = await fetch("/api/checkout/confirm", {
                 method: "POST",
@@ -223,7 +234,7 @@ function BuyModal({
     };
 
     void beginCheckout();
-  }, [fail, locale, editionLocale, product.price, product.slug, product.title]);
+  }, [fail, locale, editionLocale, product.id, product.price, product.slug, product.title]);
 
   const copy = UI_COPY[locale];
 
