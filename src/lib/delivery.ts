@@ -50,15 +50,16 @@ export async function createSignedPdfUrl(
  */
 export async function sendOrderOnWhatsApp(
   orderId: string,
-  opts: { force?: boolean; phone?: string } = {},
+  opts: { force?: boolean; phone?: string; skipIfDelivered?: boolean } = {},
 ): Promise<boolean> {
   const admin = getSupabaseAdmin();
   const { data: order } = await admin
     .from("orders")
-    .select("id, name, status, locale, product_id, whatsapp_number, buyer_contact, products(title, title_mr, title_hi, title_en)")
+    .select("id, name, status, delivered, locale, product_id, whatsapp_number, buyer_contact, products(title, title_mr, title_hi, title_en)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order || order.status !== "paid") return false;
+  if (opts.skipIfDelivered && order.delivered) return false;
 
   const phone = normalizePhone(
     opts.phone || order.whatsapp_number || order.buyer_contact,
@@ -110,11 +111,14 @@ export async function sendOrderOnWhatsApp(
   return sent;
 }
 
-/** Runs once when an order first becomes paid. */
+/**
+ * Automatic WhatsApp after payment. Also runs on webhook redeliveries, so it
+ * skips orders that already got WhatsApp (e.g. via the order page popup).
+ */
 export async function onOrderPaid(orderId: string): Promise<void> {
   if (!AUTO_WHATSAPP_ON_PAYMENT) return;
   try {
-    await sendOrderOnWhatsApp(orderId);
+    await sendOrderOnWhatsApp(orderId, { skipIfDelivered: true });
   } catch (error) {
     console.error("[delivery] auto WhatsApp failed", error);
   }
