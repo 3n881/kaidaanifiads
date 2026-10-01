@@ -7,6 +7,7 @@ import { hasServiceRole } from "@/lib/supabase/config";
 import { verifyOrderAccessToken } from "@/lib/razorpay";
 import { getDeliverableItems } from "@/lib/orders";
 import { reconcileOrder } from "@/lib/reconcile";
+import { autoWhatsAppEnabled } from "@/lib/delivery";
 import { SITE } from "@/data/catalog";
 import { OrderMemory, PendingRefresh, WhatsAppOptIn } from "@/components/order/OrderClient";
 import InAppBrowserHint from "@/components/order/InAppBrowserHint";
@@ -22,9 +23,17 @@ export const metadata: Metadata = {
 };
 
 const ABANDONED_AFTER_MS = 30 * 60 * 1000;
+// How long a freshly paid order waits for the automatic WhatsApp before
+// offering the number popup, and for how long after payment that applies.
+const AUTO_WHATSAPP_WAIT_MS = 8000;
+const AUTO_WHATSAPP_WAIT_WINDOW_MS = 3 * 60 * 1000;
 
 function isAbandoned(createdAt: string): boolean {
   return Date.now() - new Date(createdAt).getTime() > ABANDONED_AFTER_MS;
+}
+
+function paidRecently(paidAt: string | null): boolean {
+  return Boolean(paidAt) && Date.now() - new Date(paidAt!).getTime() < AUTO_WHATSAPP_WAIT_WINDOW_MS;
 }
 
 export default async function OrderPage({
@@ -35,13 +44,16 @@ export default async function OrderPage({
   const query = await searchParams;
   const token = typeof query.t === "string" ? query.t : "";
 
-  if (!hasServiceRole || !verifyOrderAccessToken(orderId, token)) notFound();
+  if (!hasServiceRole) notFound();
+  // A link without (or with a broken) ?t= token: never say "not found" to a
+  // buyer — their order is saved in My Books on the phone they paid on.
+  if (!verifyOrderAccessToken(orderId, token)) return <IncompleteLink />;
 
   const admin = getSupabaseAdmin();
   const loadOrder = () =>
     admin
       .from("orders")
-      .select("id, status, amount, created_at, product_id, locale, whatsapp_number, razorpay_order_id, products(title, title_mr, title_hi, title_en, slug, is_combo)")
+      .select("id, status, amount, created_at, paid_at, delivered, product_id, locale, whatsapp_number, razorpay_order_id, products(title, title_mr, title_hi, title_en, slug, is_combo)")
       .eq("id", orderId)
       .maybeSingle();
   let { data: order, error: orderError } = await loadOrder();
@@ -119,6 +131,14 @@ export default async function OrderPage({
   const downloadHref = (itemId: number) =>
     `/api/download/${orderId}?t=${token}&item=${itemId}`;
 
+  // Just paid and WhatsApp goes out automatically (from the webhook, usually
+  // a few seconds after this page opens): give it time before asking for a
+  // number, so the buyer isn't asked for nothing and messaged twice.
+  const waitForAutoMs =
+    autoWhatsAppEnabled && !order.delivered && paidRecently(order.paid_at)
+      ? AUTO_WHATSAPP_WAIT_MS
+      : 0;
+
   return (
     <div className="container-x max-w-md py-10">
       <OrderMemory
@@ -161,11 +181,47 @@ export default async function OrderPage({
         <p className="font-deva text-center text-[11px] text-brand-500">
           {copy.bookmark}
         </p>
-        {!order.whatsapp_number && <WhatsAppOptIn orderId={orderId} token={token} locale={locale} />}
+        <WhatsAppOptIn
+          orderId={orderId}
+          token={token}
+          locale={locale}
+          delivered={Boolean(order.delivered || order.whatsapp_number)}
+          waitForAutoMs={waitForAutoMs}
+        />
         <a href={supportHref} className="font-deva flex items-center justify-center gap-1.5 pt-2 text-xs font-semibold text-brand-teal hover:underline">
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {copy.help}
         </a>
       </div>
+    </div>
+  );
+}
+
+function IncompleteLink() {
+  return (
+    <div className="container-x max-w-md py-12 text-center">
+      <XCircle className="mx-auto h-12 w-12 text-amber-500" aria-hidden="true" />
+      <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">
+        ही लिंक अपूर्ण आहे
+      </h1>
+      <p className="font-deva mt-2 text-sm text-brand-600">
+        काळजी करू नका — तुमची खरेदी सुरक्षित आहे. ज्या मोबाईलवर पेमेंट केले, त्यावर
+        ‘माझी पुस्तके’ मध्ये तुमची पुस्तके आहेत.
+      </p>
+      <p className="mt-1 text-xs text-brand-500">
+        This link is incomplete. Your purchase is safe — open My Books on the phone you paid on.
+      </p>
+      <Link
+        href="/my-books"
+        className="font-deva mt-6 inline-block rounded-xl bg-brand-teal px-6 py-3 text-sm font-bold text-white"
+      >
+        माझी पुस्तके उघडा (My Books)
+      </Link>
+      <a
+        href={`https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}`}
+        className="font-deva mt-6 flex items-center justify-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline"
+      >
+        <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> मदत हवी आहे? WhatsApp करा
+      </a>
     </div>
   );
 }

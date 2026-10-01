@@ -1,7 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
-import { sendWhatsAppDelivery, templateAttachesPdf } from "./interakt";
+import { isInteraktConfigured, sendWhatsAppDelivery, templateAttachesPdf } from "./interakt";
 import { getDeliverableItems, normalizePhone, orderPageUrl } from "./orders";
 import { localizedTitle, normalizeLocale } from "./i18n";
 
@@ -19,6 +19,9 @@ const WHATSAPP_SEND_LIMIT = Number(process.env.WHATSAPP_SEND_LIMIT || 3);
 // Send the order link to the phone the buyer entered in Razorpay checkout,
 // without waiting for the optional form. Off unless explicitly enabled.
 const AUTO_WHATSAPP_ON_PAYMENT = process.env.AUTO_WHATSAPP_ON_PAYMENT === "true";
+
+/** True when paid orders get WhatsApp without the buyer asking. */
+export const autoWhatsAppEnabled = AUTO_WHATSAPP_ON_PAYMENT && isInteraktConfigured;
 
 /** Creates a short-lived signed download URL for a private PDF. */
 export async function createSignedPdfUrl(

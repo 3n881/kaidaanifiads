@@ -132,6 +132,8 @@ export const ORDER_COPY = {
     invalidPhone: "कृपया वैध १० अंकी WhatsApp नंबर भरा.",
     later: "आत्ता नको",
     help: "डाउनलोडमध्ये अडचण? WhatsApp करा",
+    alreadySent: "पुस्तक PDF WhatsApp वरही पाठवले आहे.",
+    otherNumber: "दुसऱ्या नंबरवर पाठवा",
   },
   hi: {
     pending: "पेमेंट की पुष्टि हो रही है…",
@@ -152,6 +154,8 @@ export const ORDER_COPY = {
     invalidPhone: "कृपया सही 10 अंकों का WhatsApp नंबर दर्ज करें।",
     later: "अभी नहीं",
     help: "डाउनलोड में समस्या? WhatsApp करें",
+    alreadySent: "किताब की PDF WhatsApp पर भी भेज दी गई है।",
+    otherNumber: "दूसरे नंबर पर भेजें",
   },
   en: {
     pending: "Confirming your payment…",
@@ -172,5 +176,7 @@ export const ORDER_COPY = {
     invalidPhone: "Enter a valid 10-digit WhatsApp number.",
     later: "Not now",
     help: "Download problem? Message us on WhatsApp",
+    alreadySent: "The book PDF was also sent on WhatsApp.",
+    otherNumber: "Send to another number",
   },
 } as const;
