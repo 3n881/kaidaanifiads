@@ -1,8 +1,8 @@
 # Project handoff — Kaydyacha Ani Faydyach ebook store
 
-> Written 2026-09-30 for the next developer / AI agent. Read this first, then
-> `AGENTS.md`, then the two deeper docs it points to. Everything below was
-> checked against the code, the database or the live sites on the date above.
+> Written 2026-09-30, updated 2026-10-01 for the next developer / AI agent. Read
+> this first, then `AGENTS.md`, then the two deeper docs it points to. Everything
+> below was checked against the code, the database or the live sites on those dates.
 
 ---
 
@@ -18,6 +18,7 @@ this flow:
 
 ```
 Reel → book page → Buy → Razorpay → pay → PDF downloads immediately
+                                        + PDF arrives on WhatsApp
 (no login, no account, no cart, no form before payment)
 ```
 
@@ -35,8 +36,8 @@ ISR), never by a fresh render or a Supabase query per visit.
 
 | | URL | What it is |
 |---|---|---|
-| **Ours** | https://kaidyachaanifaidyacha-28da.replov.com | This repo, deployed on **Replov**. The user redeploys it manually from the latest `main` commit. |
-| **Original** | https://www.kaydyachaanifaydyach.com | The client's **previous** site (hosted on Vercel, its own database + Cloudflare R2 images). **Reference only — never change it.** We copy its look, content and product numbering. The domain will later be moved to our site. |
+| **Ours** | https://kaidyachaanifaidyacha-28da.replov.com | This repo, deployed on **Replov** (testing host — production will be Lightsail, §7). The user redeploys it manually from the latest `main` commit. |
+| **Original** | https://www.kaydyachaanifaydyach.com | The client's **previous** site (hosted on Vercel, its own database + Cloudflare R2 images). **Reference only — never change it.** We copy its look, content and product numbering. The domain will later be moved to our site. **It shares the client's Razorpay and Interakt accounts with us** (§8). |
 
 The big number on each card on the original `/ebooks` page **is our product `id`**.
 
@@ -50,28 +51,38 @@ The big number on each card on the original `/ebooks` page **is our product `id`
 - **Supabase** project `yjsmebmytltwwihvivbd` — Postgres, Auth (admin login), Storage.
   Local `.env.local` points at the **same project the live site uses**, so any
   database or storage write you make locally **is live immediately**.
-- **Razorpay** for payments. **Interakt** (WhatsApp) is wired but switched off.
+- **Razorpay** for payments (test mode working; live pending — §8).
+- **Interakt** (WhatsApp Business API) — **on**: PDF delivery after payment +
+  "payment not completed" reminder (§3).
+- **Meta Pixel** — code ready, **off** until the client gives pixel IDs.
 - `sharp` (image variants), `pdf-lib` (preview PDFs).
 - Output: `standalone` Docker image (`Dockerfile`, node 22-slim).
 
 ```
 src/app/                 routes (pages, API routes, dashboard, order page)
+  ebooks/(list), combos/(list)   list pages + their loading.tsx (route group, see §10)
   api/checkout           create order (server-side price) → Razorpay order
   api/checkout/confirm   verify Razorpay signature → mark paid (atomic)
-  api/razorpay/webhook   backup path to mark paid (HMAC + amount check)
+  api/razorpay/webhook   backup path to mark paid (HMAC + amount check); saves the
+                         buyer's phone (paid AND failed); triggers auto-WhatsApp
   api/download/[orderId] token + paid check → 5-min signed Supabase URL (302)
-  api/cron/reconcile     sweep unpaid orders against Razorpay (Bearer CRON_SECRET)
+  api/orders/contact     order page popup: save a WhatsApp number + send the PDF
+  api/cron/reconcile     every 10 min: sweep unpaid orders against Razorpay, then
+                         send payment reminders (Bearer CRON_SECRET)
   order/[orderId]        refreshable order page, auto-downloads once
-  my-books               orders saved on this device (localStorage)
+  my-books               orders saved on this device (localStorage) + WhatsApp resend
   dashboard/*            admin (products, orders, setup, content, integrations, launch)
   dashboard/products/[id]/pdf   admin-only "View PDF" (5-min signed URL)
-src/components/          UI (ProductDetail, ProductGallery, BuyButton, StickyBuyBar, …)
+src/components/          UI (ProductDetail, ProductGallery, BuyButton, StickyBuyBar,
+                         MetaPixel, order/OrderClient …)
 src/lib/                 products.ts (catalog read + cache), catalog.ts (locale helpers),
-                         orders.ts, delivery.ts, reconcile.ts, razorpay.ts, onboarding.ts,
+                         orders.ts, delivery.ts (signed URLs + WhatsApp send),
+                         interakt.ts (templates), reminders.ts, reconcile.ts,
+                         razorpay.ts, meta-pixel.ts, onboarding.ts,
                          previews.ts / preview-pdf.ts, covers.ts, cdn.ts, i18n.ts
 src/data/catalog.ts      seed data (used only when Supabase isn't configured) + SITE constants
 scripts/                 seed.ts, upload-pdfs.ts
-supabase/                schema.sql, migrations 001–004 applied, 005 (payment reminders) to run, checks/verify.sql
+supabase/                schema.sql, migrations 001–005 (ALL APPLIED), checks/verify.sql
 deploy/                  Lightsail/Caddy/docker-compose setup (planned production, not in use)
 docs/                    viral-launch-plan.md, deploy-lightsail.md, this file
 loadtest/                k6 scripts + failure drills
@@ -80,7 +91,7 @@ content/                 LOCAL ONLY, git- and docker-ignored: ebook PDFs + origi
 
 ---
 
-## 3. Buyer flow (as built)
+## 3. Buyer flow (as built — tested end to end in Razorpay test mode on 2026-10-01)
 
 1. Visitor opens `/ebooks/<slug>` or `/combos/<slug>` (cached page).
 2. Taps **आत्ताच डाऊनलोड करा** (main button, second button under the description,
@@ -92,15 +103,34 @@ content/                 LOCAL ONLY, git- and docker-ignored: ebook PDFs + origi
    redirect to `/order/<id>?t=<token>`.
 4. Order page **auto-starts the download once** and always shows Download buttons.
    `/api/download` mints a **5-minute** signed URL each click (cap 30 per order).
-5. The order stays in **माझी पुस्तके** (`/my-books`) on that phone for re-downloads.
-6. If the browser dies after paying: webhook marks it paid; the order page and the
-   10-minute cron ask Razorpay directly, so no paid order is lost.
+5. **WhatsApp:** Razorpay's webhook (`payment.captured`) saves the number typed in
+   Razorpay (`buyer_contact`) and sends template `payment_sucess_pdf_v2` with the
+   **PDF attached** (1-hour signed URL that WhatsApp fetches). Usually arrives
+   within seconds. Webhook retries never message twice (`skipIfDelivered`).
+6. **Order page popup (fallback):** if WhatsApp wasn't sent, the page waits ~8 s
+   (refreshing twice) for the webhook, then opens a "PDF on WhatsApp" popup asking
+   for a number. Already sent → no popup, just "पुस्तक PDF WhatsApp वरही पाठवले आहे"
+   + "send to another number". The popup has **no `<form>`** on purpose (a native
+   submit reloaded the page without `?t=` → "page not found").
+7. The order stays in **माझी पुस्तके** (`/my-books`) on that phone for re-downloads;
+   it can also re-send the PDF to the buyer's WhatsApp.
+8. **Payment failed / abandoned:** the webhook (`payment.failed`) saves the phone.
+   30 min later, if still unpaid, the 10-min cron sends **one** `pending_followup_v2`
+   reminder with a link to the book page (`src/lib/reminders.ts`). At most one per
+   phone + book per day; skipped if the buyer paid since. No phone = no reminder
+   (buyer closed Razorpay before typing it).
+9. If the browser dies after paying: webhook marks it paid; the order page and the
+   10-minute cron ask Razorpay directly (`created` **and** `failed` orders), so no
+   paid order is lost.
+10. A link with a missing/broken `?t=` shows **"ही लिंक अपूर्ण आहे"** with a button
+    to माझी पुस्तके (not a 404).
 
 **Language editions:** each product has `mr` / `hi` / `en` editions (title,
 descriptions, pages, cover, previews, PDF). The site UI language defaults to
 Marathi. If a book has no edition in the visitor's language, the page shows and
 **sells the edition it has** (`editionLocaleFor` in `src/lib/catalog.ts`); checkout
-also falls back server-side. Hindi-only books (#27, #30) are buyable from Marathi mode.
+also falls back server-side, and the order's `locale` is the edition sold. Hindi-only
+books (#27, #30) are buyable from Marathi mode and get the Hindi PDF.
 
 ---
 
@@ -126,17 +156,28 @@ its combos list); its slug still says `combo` — harmless, keep it (URLs/redire
   their own). Don't tick member books in the dashboard unless that changes.
 - Covers + previews were imported from the original site; originals are kept in
   `content/images/<id>-<slug>/`.
-- **Missing from our site (exist on the original):** #22, #28, #29, #31 (deleted as
-  placeholders) and #32 ग्रामपंचायत योद्धा (never created). They come back when Ajay
-  sends their PDFs. Their old URLs temporarily redirect to `/ebooks` / `/combos`.
+- PDFs total **187 MB** (avg ~20 MB; #26 is 49.5 MB, #25 33 MB, #30 29 MB).
+- **Missing from our site (exist on the original)** — come back when Ajay sends
+  their PDFs; their old URLs temporarily redirect to `/ebooks` / `/combos`:
+
+  | ID | Title on the original | Price there |
+  |---|---|---|
+  | 32 | EBOOK ग्रामपंचायत योद्धा | ₹99 |
+  | 31 | वडिलोपार्जित जमीन एकाच भावाने विकली तर काय कराल | **₹49** |
+  | 29 | हक्कसोडपत्र : हिस्सा परत मिळविणे, फसवणूक आणि कायदेशीर उपाय | ₹99 |
+  | 28 | ऊसाचा हिशोब आणि कायदेशीर लढा | ₹99 |
+  | 22 | लग्न, फसवणूक + हुंडा प्रतिबंध (Combo Pack) | ₹99 |
 - `available_locales` = editions on sale (listing complete + PDF). Recomputed when an
   edition is saved in the dashboard.
+- **4 test orders** (Razorpay test mode, 2026-10-01: #30, #25, #26 paid, #8 failed)
+  are in the `orders` table and show in Dashboard → Orders / funnel stats. Harmless;
+  the user may delete them in Supabase — don't delete them yourself.
 
 ### Storage layout (Supabase)
 
 | Bucket | Path | Notes |
 |---|---|---|
-| `pdfs` (private) | `<slug>-<locale>-<timestamp>.pdf` | Served only via 5-min signed URLs |
+| `pdfs` (private) | `<slug>-<locale>-<timestamp>.pdf` | Served only via signed URLs (5 min for downloads, 1 h for WhatsApp attachments) |
 | `covers` (public) | `<slug>-<locale>-v<ts>-{200,400,800}.webp` | Cover + preview-page variants, 1-year cache |
 | `covers` (public) | `previews/<slug>-<locale>.pdf` | Free first-6-pages preview PDF (fixed path, 1-hour cache) |
 
@@ -165,6 +206,7 @@ its combos list); its slug still says `combo` — harmless, keep it (URLs/redire
     for past buyers of that edition) / cancel a new pick;
   - combos: "Books in this set" number + a collapsed "Also send separate books" list.
   - Uploading a PDF rebuilds its preview PDF; removing deletes it.
+- Orders: resend WhatsApp on an order (admin; bypasses the per-order cap).
 - A product is **Ready** when every language it is sold in is complete
   (`productIsReady` in `src/lib/onboarding.ts`). All 9 are Ready.
 - Setup progress was 38% on 2026-09-28: business details pre-filled from the original site
@@ -189,11 +231,13 @@ The user wants our site to **look and behave like the original**. Done:
 - Old URLs redirect (`next.config.js` → `redirects()`): `/ebooks/<old cuid>` → our slug
   (permanent for the 9, temporary for the 5 pending), `/ebooks/hindi`, `/ebooks/english`,
   `/site-index`.
+- WhatsApp uses the **same approved templates and sender** as the original site.
 
-**Deliberate differences (keep them):** the original says buyers fill in name +
-WhatsApp before paying and receive the PDF by WhatsApp and email. Our site has no
-pre-payment form and delivers by instant download + माझी पुस्तके, so the FAQ answers
-and the "How to buy" steps describe **our** flow (commit `e51b856`).
+**Deliberate differences (keep them):** the original collects name + WhatsApp
+before paying. Our site has no pre-payment form: the PDF downloads instantly, goes
+to WhatsApp at the number typed in Razorpay, and stays in माझी पुस्तके. The FAQ,
+"How to buy" steps, My Books / order page text and the terms, shipping and
+privacy policies all describe **our** flow (commits `e51b856`, `f09052e`).
 
 ---
 
@@ -215,15 +259,16 @@ Full detail: `docs/viral-launch-plan.md` (audit, phases, cache rules) and
 |---|---|
 | Caching | ISR 5 min on home/list/book pages (`s-maxage=300, stale-while-revalidate`); static policy pages; React `cache()` = one catalog query per render; `no-store` on `/api/*`, `/order/*`, `/my-books` |
 | CDN purge | `src/lib/cdn.ts` purges Cloudflare on admin save (needs `CLOUDFLARE_ZONE_ID` + token) |
-| Page weight | slim search index (not full catalog) in every page; visible server HTML; below-fold animations only |
+| Page weight | slim search index (not full catalog) in every page; visible server HTML; below-fold animations only; Meta Pixel (when on) loads after the page is interactive |
 | Images | covers/previews as 200/400/800 px WebP with srcset, lazy loading, 1-year cache; `hero.webp` 32 KB; logo sized to display; optimizer cache 31 days |
 | Checkout speed | Razorpay preconnect + `checkout.js` prewarm on touch/hover |
 | Reliability | atomic paid transition shared by confirm + webhook; unique Razorpay ids; amount check; 8 s Supabase timeouts, no retry storms; webhook returns 503 on DB errors so Razorpay redelivers; order page + 10-min cron reconcile with Razorpay; busy/retry messages instead of errors |
-| Security | security headers, `pdf_path` never public, 5-min signed download URLs, per-order caps, admin fails closed, Next.js 16.3.6 / sharp 0.35.5 (0 audit vulnerabilities) |
-| Observability | `funnel_daily` view (migration 002); log tags `[checkout]`, `[confirm]`, `[webhook]`, `[download]`… |
+| Security | security headers, `pdf_path` never public, short-lived signed URLs, per-order caps, admin fails closed, order tokens never sent to Meta, Next.js 16.3.6 / sharp 0.35.5 (0 audit vulnerabilities) |
+| SEO | unknown book URLs return a real **404** |
+| Observability | `funnel_daily` view (migration 002); log tags `[checkout]`, `[confirm]`, `[webhook]`, `[download]`, `[reconcile]`, `[reminders]`, `[interakt] send failed`… |
 | Load tests | `loadtest/` k6 scripts (landing spike, checkout, webhook replay, download) + 12 failure drills — **written, not yet run** |
 
-### Target production architecture (planned, NOT live)
+### Target production architecture (planned, NOT live — the user will do this after everything else is set up)
 
 ```
 Visitor → Cloudflare (cache key = path + `_rsc` only, WAF, rate limits, Load Balancing)
@@ -242,26 +287,22 @@ so `?igsh=`/`fbclid` don't bust the cache), Rocket Loader off, Bot Fight Mode of
 
 ### ⚠️ Current reality on Replov
 
-Checked 2026-09-30: responses from the Replov URL carry **no CDN headers** (no
-`cf-cache-status`, no `age`) — every visit reaches the Next.js server directly.
-ISR still avoids per-visit database queries, but there is **no edge cache, no rate
-limiting and no failover**. `X-Nextjs-Cache` also showed `STALE` repeatedly on book
-pages — worth checking that background revalidation succeeds on Replov.
+Replov is the **testing host**, not production. Responses carry **no CDN headers**
+— every visit reaches the Next.js server directly. ISR still avoids per-visit
+database queries, but there is **no edge cache, no rate limiting and no failover**,
+and a `*.replov.com` address can never sit behind our Cloudflare. `X-Nextjs-Cache`
+also showed `STALE` repeatedly on book pages (2026-09-30) — worth checking.
 
-**Before a Reel points at this site**, do one of:
-1. Put **Cloudflare (proxied)** in front of the production domain with the Phase 5
-   cache/WAF rules (works with Replov as the origin if Replov allows a custom domain
-   behind a proxy), or
-2. Move to the planned **Lightsail ×2 + Cloudflare** setup (`docs/deploy-lightsail.md`;
-   GitHub workflow `.github/workflows/deploy.yml` is ready but skipped until
-   `DEPLOY_ENABLED=true`).
+**Before a Reel points at the site:** Lightsail ×2 + Cloudflare on the real domain
+(`docs/deploy-lightsail.md`; GitHub workflow `.github/workflows/deploy.yml` is ready
+but skipped until `DEPLOY_ENABLED=true`), then the `loadtest/` scripts and the
+per-Reel runbook (`viral-launch-plan.md` §Phase 8).
 
-Then run the `loadtest/` scripts against staging and the per-Reel runbook
-(`viral-launch-plan.md` §Phase 8).
-
-**Watch costs:** PDFs download straight from Supabase (not through the CDN) —
-Supabase egress is the main variable cost (250 GB on Pro). Some PDFs are up to 50 MB;
-compressing them would cut egress and speed up downloads on mobile data.
+**Watch costs:** PDFs download straight from Supabase (not through the CDN), and
+each WhatsApp PDF is one more fetch — Supabase egress is the main variable cost.
+~20 MB per sale → ~20 GB per 1,000 sales: the free plan (~5 GB) is not enough,
+**Supabase Pro (250 GB) is required** (plan not yet confirmed). Compressing the
+PDFs would cut egress and speed up downloads on mobile data.
 
 ---
 
@@ -271,34 +312,98 @@ compressing them would cut egress and speed up downloads on mobile data.
 
 Push to `main` → the user clicks redeploy of the **latest commit** on Replov. (An
 earlier redeploy served an old build — always confirm the commit, e.g. check a
-feature from the newest commit on the live URL.) The GitHub "Deploy" workflow runs on
-every push but is **skipped** (`DEPLOY_ENABLED` unset). The "Reconcile payments" cron
-workflow is skipped for the same reason — so **the 10-minute payment sweep is not
-running**; set it up on whatever host is used.
+feature from the newest commit on the live URL.) `NEXT_PUBLIC_*` values are inlined
+at build time → changing one needs a redeploy. The GitHub "Deploy" and "Reconcile
+payments" workflows are **skipped** (`DEPLOY_ENABLED` unset; the reconcile workflow
+would also call `NEXT_PUBLIC_SITE_URL`, i.e. the wrong host). The cron runs on
+**cron-job.org** instead (below).
 
-### Build-time (public, inlined into the JS)
+### Third-party accounts (all the client's; shared with the original site)
 
-| Var | Missing → |
+**Razorpay** — status 2026-10-01: **test mode fully working** on Replov (test keys,
+test webhook returning 200). Live not set up yet.
+- Test and live keys/webhooks are separate; nothing in test mode affects the
+  original site (Razorpay docs: test-mode actions have no live consequences).
+- The live **key secret can't be read back** from the dashboard and nobody has it.
+  Plan: the client regenerates the live key (OTP to their registered mobile) and
+  chooses **"deactivate old key within 24 hours"**; within that window the new
+  secret goes on our host **and** the original site's Vercel env → no downtime.
+  Never regenerate with "immediately".
+- Add a **separate live webhook** (don't edit/delete the original site's):
+  URL `https://<our host>/api/razorpay/webhook`, events `payment.captured`,
+  `order.paid`, `payment.failed`, secret = our `RAZORPAY_WEBHOOK_SECRET`.
+  Webhook **400** in Razorpay's log = secret mismatch. Our webhook also receives the
+  original site's payments and ignores unknown orders (200).
+- Auto-capture must be ON.
+
+**Interakt** — API key set on Replov. Approved templates in the account
+(9 total; 3 belong to "A S Consultancy" and are not ours). Sender name shown to
+buyers: **"AS Consultancy Services"** (same number the original site uses — the
+user is fine with it).
+
+| Template | Used for | Header | Body blanks |
+|---|---|---|---|
+| `payment_sucess_pdf_v2` (sic) | after payment (auto + popup + My Books + dashboard resend) | **Document** (the PDF) | `{{1}}` book |
+| `pending_followup_v2` | payment reminder (cron) | none | `{{1}}` name, `{{2}}` book, `{{3}}` link |
+
+Both are **Marathi only**. Hindi buyers currently get the Marathi text with the
+Hindi title + Hindi PDF. Hindi texts for both templates were drafted (2026-10-01
+conversation); once approved in Interakt set `INTERAKT_TEMPLATE_LANGUAGE_HI=hi` and
+`INTERAKT_REMINDER_TEMPLATE_LANGUAGE_HI=hi`. Other success templates
+(`payment_success_pdf_v1` etc.) are older versions; `payment_success_pdf_v1` has an
+Interakt click-tracking button that doesn't work via API — don't use it.
+
+**Meta Pixel** — the original has 5 pixel IDs (`25798398699825779`,
+`938102005677893`, `1323976956324834`, `2087926305438648`, `4549881145333883`; it
+sends PageView only). Ours sends PageView, ViewContent, InitiateCheckout and
+Purchase (from the book page before the redirect, `eventID` = order id); never on
+`/order`, `/my-books`, `/dashboard`; Meta's automatic events + history tracking
+off. **Off until the client confirms which IDs to use** — not set on Replov.
+
+**cron-job.org** — set up 2026-10-01: `POST https://kaidyachaanifaidyacha-28da.replov.com/api/cron/reconcile`
+every 10 min, header `Authorization: Bearer <CRON_SECRET>`. Response
+`{"ok":true,"pending":…,"recovered":…,"reminders":{"due":…,"sent":…}}`; 401 = bad
+secret. Move the URL with the host.
+
+### Environment variables
+
+Build-time (public, inlined into the JS — redeploy after changing):
+
+| Var | Value / if missing |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | site shows seed books with no covers/previews; image optimizer blocks Supabase images |
-| `NEXT_PUBLIC_SITE_URL` | currently the original domain (correct for after the domain move; sitemap/canonical point there meanwhile) |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | site shows seed books with no covers/previews |
+| `NEXT_PUBLIC_SITE_URL` | **set to the Replov URL for testing** (WhatsApp/reminder links and the "other books" link are built from it). Change to `https://kaydyachaanifaydyach.com` on domain-move day |
+| `NEXT_PUBLIC_META_PIXEL_IDS` | comma-separated; empty = pixel off (current) |
 
-### Runtime (server secrets — never in git)
+Runtime (server secrets — never in git):
 
 | Var | Purpose / if missing |
 |---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | all server DB/storage access; checkout returns 503 |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | payments; missing → "Payment gateway temporarily unavailable" (production never uses demo mode) |
-| `RAZORPAY_WEBHOOK_SECRET` | webhook verification (webhook URL `https://<domain>/api/razorpay/webhook`, events `payment.captured`, `order.paid`, `payment.failed`; auto-capture ON) |
-| `ORDER_ACCESS_SECRET` | signs order/download links (`openssl rand -hex 32`; never change after launch) |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | currently **test** keys; missing → "Payment gateway temporarily unavailable" |
+| `RAZORPAY_WEBHOOK_SECRET` | we choose it; must equal the secret typed in the Razorpay webhook (test and live webhooks get different ones) |
+| `CHECKOUT_DEMO_MODE` | `false` in production |
+| `ORDER_ACCESS_SECRET` | signs order/download links (random 64 hex); **never change after real sales** — it breaks every buyer's saved link. Falls back to the Razorpay key secret if unset |
 | `ADMIN_EMAILS` | who can open the dashboard |
-| `CRON_SECRET` | protects `/api/cron/reconcile` |
-| `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | optional cache purge on admin save |
-| `DOWNLOAD_LIMIT` (30), `WHATSAPP_SEND_LIMIT` (3), `AUTO_WHATSAPP_ON_PAYMENT` (false), `INTERAKT_*` | limits / WhatsApp (off) |
+| `CRON_SECRET` | ≥ 32 chars; protects `/api/cron/reconcile` |
+| `INTERAKT_API_KEY` | Interakt → Settings → Developer Setting (secret key, pasted as-is) |
+| `INTERAKT_TEMPLATE_NAME_MR` / `_LANGUAGE_MR` / `_HEADER_MR` / `_BODY_MR` | `payment_sucess_pdf_v2` / `mr` / `document` / `product` |
+| `INTERAKT_TEMPLATE_NAME_HI` / `_LANGUAGE_HI` / `_HEADER_HI` / `_BODY_HI` | same template; language `mr` until a Hindi version is approved |
+| `INTERAKT_TEMPLATE_BUTTON_<LANG>` | URL-button blank value; empty for our templates |
+| `AUTO_WHATSAPP_ON_PAYMENT` | `true` — send the PDF from the webhook |
+| `INTERAKT_REMINDER_TEMPLATE_NAME` / `_LANGUAGE` | `pending_followup_v2` / `mr` (empty name = reminders off) |
+| `INTERAKT_REMINDER_TEMPLATE_LANGUAGE_HI` / `_EN` | empty until Hindi/English versions are approved |
+| `PAYMENT_REMINDER_DELAY_MINUTES` | `30` |
+| `DOWNLOAD_LIMIT` (30), `WHATSAPP_SEND_LIMIT` (3) | per-order caps |
+| `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | optional cache purge on admin save (after Cloudflare) |
 
-Local `.env.local` (2026-09-30) has Supabase keys but **empty** Razorpay keys,
-`ADMIN_EMAILS`, `ORDER_ACCESS_SECRET`, `CRON_SECRET` and webhook secret. Whether Replov
-has them set is **unknown** — verify.
+`.env.local.example` documents all of these. Local `.env.local` has Supabase keys
+only (Razorpay/Interakt/secrets empty) — the live values are on Replov.
+
+### Domain / host move day (checklist)
+`NEXT_PUBLIC_SITE_URL` → real domain (rebuild); new Razorpay live webhook URL (and
+website in Razorpay settings); cron-job.org URL; Supabase Auth site URL;
+Cloudflare DNS + Phase 5 rules + `CLOUDFLARE_*` env; one real purchase on the new host.
 
 ---
 
@@ -306,72 +411,80 @@ has them set is **unknown** — verify.
 
 - Windows machine. **Windows Application Control blocks Turbopack's native binary**
   since the 16.3.6 upgrade → use **`npm run dev:webpack`** (preview config
-  `kaida-dev-webpack`; first compile ~45 s) and `npx next build --webpack` for local
-  build checks. Production builds on Linux are unaffected (verified with a local
-  `docker build` + container run). Don't try to change the Windows policy.
+  `kaida-dev-webpack`; first compile ~45 s) and `npx next build --webpack` +
+  preview config `kaida-prod` (`next start -p 3100`) for production checks.
+  Production builds on Linux are unaffected. Don't try to change the Windows policy.
+- After moving route files, delete `.next/types` and `.next/dev/types` or `tsc`
+  reports stale "Cannot find module …/page.js" errors.
 - Port 3000 may be taken by another session's server; `autoPort` is on in
   `.claude/launch.json`.
 - `npx tsc --noEmit` and `npx eslint` must stay clean (React Compiler lint rejects
-  manual `useCallback` it can't preserve).
+  manual `useCallback` it can't preserve and `Date.now()` in a component body —
+  put it in a helper function).
 - **Testing checkout safely:** stub `window.fetch` for `/api/checkout` in the browser
   to see what Buy sends; never trigger a real checkout without the user's OK (it
-  creates a Razorpay order + DB order in the shared project).
+  creates a Razorpay order + DB order in the shared project). The user runs test
+  purchases on their phone; check results with a read-only Node script against
+  Supabase (mask phone numbers in output).
+- Order pages locally: the token is HMAC-SHA256 of `order-contact:<id>` with the
+  local fallback secret (`SUPABASE_SERVICE_ROLE_KEY`, since local
+  `ORDER_ACCESS_SECRET`/Razorpay secret are empty) — it differs from production's.
+  Set `sessionStorage['kaf-dl-<id>']='1'` first to avoid an auto-download.
 - Dashboard pages need an admin login — agents can't log in (don't enter passwords).
   To test the product form, render it on a temporary local-only page and delete it
   afterwards.
 - Shell tip: long bash heredocs containing Devanagari broke several times — write
-  edit scripts to a file and run them.
+  edit scripts to a file and run them (the Edit tool handles Devanagari fine).
 
 ---
 
 ## 10. Open items (prioritised)
 
-### Before sending Reel traffic / moving the domain
-1. **Payment never tested end to end.** Confirm Razorpay live keys + webhook on the
-   host, then one real purchase on Android (Instagram in-app browser) and iOS.
-2. **CDN + rate limiting** in front of the site (§7 "Current reality").
-3. Verify runtime env on the host (`ADMIN_EMAILS`, `ORDER_ACCESS_SECRET`,
-   `CRON_SECRET`, webhook secret) and set up the reconcile cron.
-4. **5 missing books** (#22, 28, 29, 31, 32) — need PDFs from Ajay; then create/restore
-   them and point their redirects in `next.config.js` at the real pages.
-5. **Past buyers of the original site**: their orders live in the old database; their
-   links won't work on our site. Decide: keep the old site on another address, or migrate orders.
-6. **Meta/Facebook pixels**: the original has 5, ours has none — ask the client whether
-   ads tracking is needed before the switch.
-7. Old `/api/preview/<old id>` links from the original aren't redirected yet (easy add
-   in `next.config.js`).
-8. Domain move: DNS from Vercel to our host; update Razorpay webhook URL; Supabase Auth site URL.
+### Before real sales
+1. **Razorpay live**: regenerate the live key with the 24-hour option (client, OTP) →
+   new secret on our host + original site's Vercel; separate live webhook + new
+   webhook secret; redeploy; one real ₹99 purchase on Android (Instagram in-app
+   browser) and iPhone, then refund.
+2. **Supabase plan → Pro** (egress, §7) — confirm.
+3. Client: dashboard Setup approvals (approver name, disclaimer approval).
 
-### WhatsApp (Interakt) + Meta Pixel — added 2026-10-01
-- Uses the client's existing approved Interakt templates (sender shows as
-  "AS Consultancy Services"): **`payment_sucess_pdf_v2`** (Document header = the
-  order's PDF, `{{1}}` book name) after payment; **`pending_followup_v2`**
-  (`{{1}}` name, `{{2}}` book, `{{3}}` book page link) as a once-per-phone-per-book
-  reminder 30 min after a failed payment, sent by the reconcile cron
-  (`src/lib/reminders.ts`, needs migration 005). Both are Marathi-only; Hindi
-  versions can be added in Interakt and switched on with `*_LANGUAGE_HI=hi`.
-- Meta Pixel: `NEXT_PUBLIC_META_PIXEL_IDS` (the original site's 5 IDs). PageView,
-  ViewContent, InitiateCheckout, Purchase (fired on the book page before the
-  redirect, eventID = order id). Never loads on `/order`, `/my-books`, `/dashboard`
-  (order URLs carry the access token).
+### Before sending Reel traffic / moving the domain
+4. **Lightsail ×2 + Cloudflare** + domain move (§7, §8 checklist) + load tests.
+5. **5 missing books** (#22, 28, 29, 31, 32 — table in §4) — need PDFs from Ajay; then
+   create/restore them and point their redirects in `next.config.js` at the real pages.
+6. **Past buyers of the original site**: they already have their PDFs in WhatsApp;
+   only their old download links on the old domain break after the move. Options:
+   keep the old site on a subdomain, or resend on request.
+7. **Meta Pixel IDs** from the client → `NEXT_PUBLIC_META_PIXEL_IDS` → redeploy →
+   check in Meta Events Manager → Test Events.
+8. Hindi versions of both Interakt templates (optional; §8).
+9. Old `/api/preview/<old id>` links from the original aren't redirected yet (easy add
+   in `next.config.js`).
 
 ### Known issues / tech debt
-- ~~Unknown book URLs returned HTTP 200~~ fixed: the list pages' `loading.tsx`
-  moved into `(list)` route groups so book pages don't stream → real 404.
-- `docs/viral-launch-plan.md` status table is outdated in places: migrations 003/004
+- ~~Unknown book URLs returned HTTP 200~~ fixed (`1e54bdc`): the list pages'
+  `loading.tsx` moved into `(list)` route groups, so book pages no longer stream
+  before `notFound()`. Book pages have no loading skeleton on purpose — don't add a
+  `loading.tsx` under `ebooks/` or `combos/` (it would bring the 200 back).
+- If the success template is ever switched to a link-only one, the "PDF on
+  WhatsApp" wording (My Books, order page, FAQ, policies) must change back.
+- `docs/viral-launch-plan.md` status table is outdated in places: migrations 003–005
   are applied; mobile now uses a full-width viewer + always-on sticky bar (not the
   compact cover of item 1.17); combos are one merged PDF (not member books, R9).
 - `README.md` is still the create-next-app boilerplate.
 - Big PDFs (up to ~50 MB) — consider compressing.
-- P2: trim font weights, CSP header after checkout is verified, refund status handling.
+- P2: trim font weights, CSP header (must allow Razorpay + connect.facebook.net),
+  refund status handling.
 
 ### User preferences (important)
-- **WhatsApp/Interakt is not a priority** — don't propose WhatsApp work unless asked.
-  (Interakt is wired but off: `INTERAKT_API_KEY` empty.)
+- WhatsApp/Interakt is **now set up and wanted** (2026-10-01). Don't propose
+  unrelated WhatsApp features unless asked.
 - The user wants the UI to **match the original site**; flow text must describe our
   real checkout.
 - Explain in plain, short English; the user often writes quickly with typos.
-- Commit/push only when asked (they usually say "… and push"); they deploy on Replov themselves.
+- Commit/push only when asked (they usually say "… and push"); they deploy on Replov
+  themselves and usually ask "check the database" after each test.
+- Smooth experience under high traffic is the main goal for production hosting.
 
 ---
 
@@ -379,6 +492,10 @@ has them set is **unknown** — verify.
 
 | Commit | What |
 |---|---|
+| `9c23a35` | Automatic WhatsApp skips orders already delivered (webhook retries never message twice) |
+| `40b9472` | Order page: popup only if WhatsApp not sent (waits for the webhook first), no `<form>` (fixed token-less reload → "not found"), "ही लिंक अपूर्ण आहे" page for broken links |
+| `f09052e` | Wording: the book arrives as a **PDF** on WhatsApp (My Books, order page mr/hi/en, FAQ, terms/shipping/privacy) |
+| `1e54bdc` | Interakt per-language templates (Document header = PDF, body/button mapping), payment reminders + migration 005, reconcile also checks `failed`, Meta Pixel, real 404 for unknown books, this doc |
 | `e51b856` | How-to-buy steps (home + product page) describe our real flow |
 | `e4cb78b` | `dev:webpack` script |
 | `4703714` | Next.js 16.3.6 + sharp 0.35.5 (security; 0 audit vulnerabilities) |
@@ -389,3 +506,9 @@ has them set is **unknown** — verify.
 | `6c070c9` | Combos listed on `/ebooks` |
 | `547f9ed` | Real PDFs + upload script, dummy products removed, #19/#26 fixed, Hindi-only purchase fix, combo save fix, Ready rule, old-URL redirects |
 | ≤ `918f2ae` | Earlier: viral-readiness phases 1–3, outage handling, Docker/Lightsail, multilingual editions, dashboard onboarding |
+
+### Tested 2026-10-01 (Razorpay test mode, user's phone)
+Paid → auto-download → order page ✅ · webhook 200 + phone saved + PDF on WhatsApp
+without popup ✅ · popup fallback while webhook was failing (no 404) ✅ · failed
+payment → one reminder ~36 min later, none for paid orders ✅ · unknown book URL →
+404 ✅ · My Books Interakt check ✅. Not yet tested: Purchase pixel event, live mode.
