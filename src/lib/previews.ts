@@ -8,6 +8,8 @@
 // uploading are in `preview-pdf.ts`.
 // ---------------------------------------------------------------------------
 
+import { mediaUrl } from "./covers";
+
 export const PREVIEW_PAGES = 6;
 
 export function previewPdfPath(slug: string, locale: string): string {
@@ -18,5 +20,5 @@ export function previewPdfPath(slug: string, locale: string): string {
 export function previewPdfUrl(slug: string, locale: string): string | null {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
-  return `${base.replace(/\/$/, "")}/storage/v1/object/public/covers/${previewPdfPath(slug, locale)}`;
+  return mediaUrl(`${base.replace(/\/$/, "")}/storage/v1/object/public/covers/${previewPdfPath(slug, locale)}`);
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, ChevronLeft, ChevronRight, FileText, Maximize2, Sparkles, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
-import { coverSrc, coverSrcSet } from "@/lib/covers";
+import { coverSrc, coverSrcSet, mediaUrl } from "@/lib/covers";
 import { PREVIEW_PAGES } from "@/lib/previews";
 import CoverImage from "./CoverImage";
 
@@ -245,7 +245,7 @@ function Lightbox({
       </div>
       <div className="relative min-h-0 flex-1" {...swipe}>
         {/* eslint-disable-next-line @next/next/no-img-element -- full-size storage image. */}
-        <img src={images[index]} alt={`${title} — पान ${index + 1}`} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />
+        <img src={mediaUrl(images[index])} alt={`${title} — पान ${index + 1}`} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />
         {index > 0 && <ArrowButton side="left" onClick={() => go(-1)} label="मागील पान" />}
         {index < total - 1 && <ArrowButton side="right" onClick={() => go(1)} label="पुढील पान" />}
       </div>

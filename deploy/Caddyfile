@@ -13,7 +13,9 @@
 	}
 }
 
-kaydyachaanifaydyach.com, www.kaydyachaanifaydyach.com {
+# new. = staging hostname used before switch day (docs/go-live-plan.md).
+# The Origin certificate covers *.kaydyachaanifayddyacha.com.
+kaydyachaanifayddyacha.com, www.kaydyachaanifayddyacha.com, new.kaydyachaanifayddyacha.com {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
 
 	encode zstd gzip

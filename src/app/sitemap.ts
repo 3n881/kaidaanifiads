@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { getEbooks, getCombos } from "@/lib/products";
+import { SITE_URL } from "@/lib/supabase/config";
 
-const BASE = "https://kaydyachaanifaydyach.com";
+const BASE = SITE_URL.replace(/\/$/, "");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = [

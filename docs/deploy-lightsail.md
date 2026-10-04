@@ -69,7 +69,7 @@ One server handles roughly 100× that. Capacity is not the reason for the second
 | Where | What |
 |---|---|
 | Supabase | Upgrade to **Pro**, turn **spend cap on**, note the region (Mumbai ideal) |
-| Cloudflare | Add the domain (Free plan). **SSL/TLS → Origin Server → Create certificate** (15 years, `kaydyachaanifaydyach.com`, `*.kaydyachaanifaydyach.com`) — the **same** cert/key goes on both servers |
+| Cloudflare | Add the domain (Free plan). **SSL/TLS → Origin Server → Create certificate** (15 years, `kaydyachaanifayddyacha.com`, `*.kaydyachaanifayddyacha.com`) — the **same** cert/key goes on both servers |
 | Cloudflare | **Traffic → Load Balancing → enable** (US$5/month) |
 | Cloudflare | API token with only *Zone → Cache Purge* → `CLOUDFLARE_API_TOKEN`; Zone ID → `CLOUDFLARE_ZONE_ID` |
 | GitHub → Settings → Secrets and variables → Actions | **Secrets:** `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`), `LIGHTSAIL_SSH_KEY`, `CRON_SECRET` (`openssl rand -hex 32`, same value as in `app.env`). **Variables:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `LIGHTSAIL_HOSTS` = `"<ip-A> <ip-B>"`, and `DEPLOY_ENABLED=true` **last** |
@@ -137,24 +137,24 @@ To roll back, run the same command with the previous SHA (`cat /opt/kaf/.current
 
 1. **Monitor:** Traffic → Load Balancing → Manage Monitors → Create
    - Type HTTPS, path `/api/health`, port 443, expected code `200`
-   - Header `Host: kaydyachaanifaydyach.com`
+   - Header `Host: kaydyachaanifayddyacha.com`
    - Interval 60 s, retries 2, timeout 5 s
 2. **Pool:** `kaf-mumbai`
    - Origins `kaf-a` → `<ip-A>` and `kaf-b` → `<ip-B>`, weight 1 each
    - Attach the monitor. Health-check region: *India* / *Asia*
    - Notification e-mail on unhealthy
-3. **Load balancer:** hostname `kaydyachaanifaydyach.com`
+3. **Load balancer:** hostname `kaydyachaanifayddyacha.com`
    - Proxied (orange cloud), pool `kaf-mumbai`, steering *Off* (failover) or *Random*
    - Session affinity **off** (the app is stateless)
-4. Repeat for `www.kaydyachaanifaydyach.com`, or add `CNAME www @` proxied.
+4. Repeat for `www.kaydyachaanifayddyacha.com`, or add `CNAME www @` proxied.
 5. SSL/TLS: **Full (strict)**.
 6. Apply the Cache/WAF rules from `docs/viral-launch-plan.md` → Phase 5. The HTML rule must **respect origin TTL**.
 
 **Check it works:**
 
 ```bash
-curl -s https://kaydyachaanifaydyach.com/api/health            # {"ok":true,"deployment":"<sha>"}
-curl -sI "https://kaydyachaanifaydyach.com/ebooks/<slug>?igsh=a" | grep -i cf-cache-status   # twice → HIT
+curl -s https://kaydyachaanifayddyacha.com/api/health            # {"ok":true,"deployment":"<sha>"}
+curl -sI "https://kaydyachaanifayddyacha.com/ebooks/<slug>?igsh=a" | grep -i cf-cache-status   # twice → HIT
 curl -sk --max-time 5 https://<ip-A>/ ; echo "exit=$?"      # must time out (firewall)
 ```
 
@@ -169,7 +169,7 @@ curl -sk --max-time 5 https://<ip-A>/ ; echo "exit=$?"      # must time out (fir
 
 - Cloudflare → Load Balancing → pool health, plus the e-mail alert when a server drops.
 - Lightsail → Metrics → alarms on each server: CPU > 70 % for 5 min, status check failed.
-- Free uptime monitor (e.g. UptimeRobot) on `https://kaydyachaanifaydyach.com/api/health`.
+- Free uptime monitor (e.g. UptimeRobot) on `https://kaydyachaanifayddyacha.com/api/health`.
 - Logs per server: `docker compose logs -f app1 app2 | grep -E "\[(checkout|confirm|webhook|download)\]"`.
 - Sales funnel: `select * from funnel_daily;` in Supabase.
 

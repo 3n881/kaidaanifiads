@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/supabase/config";
 import Link from "next/link";
 import { Target, BookOpen, ShieldCheck } from "lucide-react";
 import { SITE } from "@/data/catalog";
@@ -23,7 +24,7 @@ const BUSINESS: Array<[string, string]> = [
   ["Brand Name", "कायद्याचं आणि फायद्याचं"],
   ["Business Type", "Digital Goods — Educational Ebooks (PDF only)"],
   ["Registration", `Udyam Registration (MSME) — ${SITE.udyam}`],
-  ["Website", "kaydyachaanifaydyach.com"],
+  ["Website", new URL(SITE_URL).host],
   ["Operating Since", "2024"],
   ["Support Hours", "Mon – Sat, 9:00 AM – 6:00 PM IST"],
   ["Email", SITE.email],

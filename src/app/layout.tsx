@@ -11,6 +11,7 @@ import MetaPixel from "@/components/MetaPixel";
 import LanguageProvider from "@/components/LanguageProvider";
 import { getAllProducts } from "@/lib/products";
 import type { SearchItem } from "@/data/catalog";
+import { SITE_URL } from "@/lib/supabase/config";
 
 const lato = Lato({
   variable: "--font-lato",
@@ -27,7 +28,7 @@ const devanagari = Noto_Sans_Devanagari({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://kaydyachaanifaydyach.com"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "कायद्याचं आणि फायद्याचं | सोप्या भाषेत कायदे",
     template: "%s | कायद्याचं आणि फायद्याचं",

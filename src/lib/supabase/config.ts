@@ -14,5 +14,10 @@ export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 /** True once the server has the service-role key (admin writes, webhook). */
 export const hasServiceRole = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+// Public origin of this deployment (links in sitemap, metadata, WhatsApp).
+// Tolerates an empty value, a missing "https://" or a trailing slash so a
+// typo in a host's settings can't break `new URL(SITE_URL)` on every page.
+const RAW_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").trim();
+export const SITE_URL = (
+  /^https?:\/\//.test(RAW_SITE_URL) ? RAW_SITE_URL : `https://${RAW_SITE_URL}`
+).replace(/\/+$/, "");

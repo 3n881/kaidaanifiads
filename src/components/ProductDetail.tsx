@@ -25,6 +25,7 @@ import {
 import { SITE } from "@/data/catalog";
 import { coverSrc, coverSrcSet } from "@/lib/covers";
 import { previewPdfUrl } from "@/lib/previews";
+import { SITE_URL } from "@/lib/supabase/config";
 import BuyButton from "./BuyButton";
 import StickyBuyBar from "./StickyBuyBar";
 import { TrackViewContent } from "./MetaPixel";
@@ -125,7 +126,7 @@ export default function ProductDetail({
       price: product.price,
       priceCurrency: "INR",
       availability: "https://schema.org/InStock",
-      url: `https://kaydyachaanifaydyach.com/${
+      url: `${SITE_URL.replace(/\/$/, "")}/${
         product.isCombo ? "combos" : "ebooks"
       }/${product.slug}`,
     },

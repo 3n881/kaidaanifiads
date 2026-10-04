@@ -16,7 +16,7 @@ import { check, sleep } from "k6";
 
 const { BASE, SLUG, KEY_SECRET, WEBHOOK_SECRET } = __ENV;
 if (!BASE || !SLUG) throw new Error("Set BASE and SLUG");
-if (/kaydyachaanifaydyach\.com/.test(BASE)) throw new Error("Refusing to run against production");
+if (/kaydyachaanifaydyach\.com|kaydyachaanifayddyacha\.com/.test(BASE) && !/\/\/new\./.test(BASE)) throw new Error("Refusing to run against production");
 
 export const options = {
   scenarios: {

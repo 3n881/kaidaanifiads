@@ -37,7 +37,7 @@ ISR), never by a fresh render or a Supabase query per visit.
 | | URL | What it is |
 |---|---|---|
 | **Ours** | https://kaidyachaanifaidyacha-28da.replov.com | This repo, deployed on **Replov** (testing host — production will be Lightsail, §7). The user redeploys it manually from the latest `main` commit. |
-| **Original** | https://www.kaydyachaanifaydyach.com | The client's **previous** site (hosted on Vercel, its own database + Cloudflare R2 images). **Reference only — never change it.** We copy its look, content and product numbering. The domain will later be moved to our site. **It shares the client's Razorpay and Interakt accounts with us** (§8). |
+| **Original** | https://www.kaydyachaanifaydyach.com | The client's **previous** site (hosted on Vercel, its own database + Cloudflare R2 images). **Reference only — never change it.** We copy its look, content and product numbering. Our site will go live on a **different** domain, `kaydyachaanifayddyacha.com` (Hostinger, decided 2026-10-04; see `docs/go-live-plan.md`); the original keeps its own domain. **It shares the client's Razorpay and Interakt accounts with us** (§8). |
 
 The big number on each card on the original `/ebooks` page **is our product `id`**.
 
@@ -372,7 +372,7 @@ Build-time (public, inlined into the JS — redeploy after changing):
 | Var | Value / if missing |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | site shows seed books with no covers/previews |
-| `NEXT_PUBLIC_SITE_URL` | **set to the Replov URL for testing** (WhatsApp/reminder links and the "other books" link are built from it). Change to `https://kaydyachaanifaydyach.com` on domain-move day |
+| `NEXT_PUBLIC_SITE_URL` | **set to the Replov URL for testing** (WhatsApp/reminder links and the "other books" link are built from it). Change to `https://kaydyachaanifayddyacha.com` on go-live day |
 | `NEXT_PUBLIC_META_PIXEL_IDS` | comma-separated; empty = pixel off (current) |
 
 Runtime (server secrets — never in git):
