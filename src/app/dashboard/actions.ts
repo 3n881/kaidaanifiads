@@ -7,10 +7,11 @@ import { requireAdmin } from "@/lib/auth";
 import { ADMIN_UPLOAD_TIMEOUT_MS, getSupabaseAdmin } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
-import { purgePublicPages } from "@/lib/cdn";
+import { purgeFiles, purgePublicPages } from "@/lib/cdn";
 import { COVER_WIDTHS, coverVariantPath } from "@/lib/covers";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { publishPreview, removePreview } from "@/lib/preview-pdf";
+import { previewPdfPath } from "@/lib/previews";
 
 async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/");
@@ -175,6 +176,8 @@ export async function saveProduct(formData: FormData) {
     ["pdf_file_hi", "pdf_path_hi", "hi"],
     ["pdf_file_en", "pdf_path_en", "en"],
   ] as const;
+  // Preview PDFs keep a fixed name, so Cloudflare must drop the old copy.
+  const changedPreviews: string[] = [];
   for (const [field, column, locale] of pdfFields) {
     const pdf = formData.get(field);
     if (pdf instanceof File && pdf.size > 0) {
@@ -191,13 +194,16 @@ export async function saveProduct(formData: FormData) {
       } catch (error) {
         console.error("[saveProduct] preview PDF failed", slug, locale, error);
       }
+      changedPreviews.push(`/media/${previewPdfPath(slug, locale)}`);
     } else if (formData.get(`remove_${field.replace("_file", "")}`) === "1") {
       // The file stays in storage; only this edition stops delivering it.
       row[column] = null;
       if (locale === "mr") row.pdf_path = null;
       await removePreview(admin, slug, locale);
+      changedPreviews.push(`/media/${previewPdfPath(slug, locale)}`);
     }
   }
+  await purgeFiles(changedPreviews);
 
   const previewFiles = formData
     .getAll(`preview_files_${locale}`)

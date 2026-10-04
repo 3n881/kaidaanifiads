@@ -13,6 +13,29 @@ export const isCdnPurgeConfigured = Boolean(ZONE_ID && API_TOKEN);
  * Prefix purges also clear the `?_rsc=` variants Next uses for navigation.
  * Never throws — a failed purge only means the edge TTL (s-maxage, 5 min) applies.
  */
+/**
+ * Purges single files from Cloudflare, e.g. a rebuilt preview PDF at its fixed
+ * /media path (`/media/previews/<slug>-<locale>.pdf`). Never throws.
+ */
+export async function purgeFiles(paths: string[]): Promise<void> {
+  if (!isCdnPurgeConfigured || paths.length === 0) return;
+  const origin = new URL(SITE_URL).origin;
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/purge_cache`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ files: paths.map((p) => `${origin}${p}`) }),
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) console.error("[cdn] file purge failed", res.status, await res.text());
+  } catch (error) {
+    console.error("[cdn] file purge error", error);
+  }
+}
+
 export async function purgePublicPages(paths: string[]): Promise<void> {
   if (!isCdnPurgeConfigured || paths.length === 0) return;
 

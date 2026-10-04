@@ -13,9 +13,10 @@ const ALLOWED = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*\.(webp|png|jpe?g
 
 // Image variants have versioned names (…-v<timestamp>-400.webp) and never
 // change → cache for a year. Preview PDFs keep a fixed name and are rebuilt
-// when a PDF is re-uploaded → cache for an hour.
+// when a PDF is re-uploaded → browsers 5 min, Cloudflare 1 h (the dashboard
+// also purges that file from Cloudflare when it rebuilds it).
 const LONG = "public, max-age=31536000, immutable";
-const SHORT = "public, max-age=3600, s-maxage=3600";
+const SHORT = "public, max-age=300, s-maxage=3600";
 
 async function serve(ctx: { params: Promise<{ path: string[] }> }, method: "GET" | "HEAD") {
   const { path } = await ctx.params;
