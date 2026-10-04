@@ -1,8 +1,91 @@
 # Go-live plan — Lightsail + Cloudflare on kaydyachaanifayddyacha.com
 
-> Updated 2026-10-04. Builds on `docs/deploy-lightsail.md` (server how-to) and
+> Updated 2026-10-05. Builds on `docs/deploy-lightsail.md` (server how-to) and
 > `docs/viral-launch-plan.md` §Phase 5 (Cloudflare rules) — this file is the
 > **order of work**, what to test, and how to switch over safely.
+> **New agent? Read "▶ Current status" first, then "Problems we hit".**
+
+## ▶ Current status (2026-10-05) — start here
+
+| Area | State |
+|---|---|
+| Code | All go-live code is on `main` (latest `e4c4d82`): new domain in server config, one-server plan, `/media` image caching, preview-PDF purge, WhatsApp/reminder settings in `deploy/app.env.example`. |
+| Domain + Cloudflare | ✅ `kaydyachaanifayddyacha.com` active on Cloudflare (Free), SSL Full (strict), Origin certificate created, Cache Purge token + Zone ID **tested** (single-file and prefix purge both work on Free). DNS still shows Hostinger's parking record — replaced with the server IP in Stage 3 (`new.`) / Stage 6 (apex). |
+| Database | ✅ **Mumbai** Supabase project `ntqwvfksdqdyoyknkprh` holds the real data (copied + verified 2026-10-04). Tokyo project `yjsmebmytltwwihvivbd` is now only used by Replov. |
+| Replov (old test host) | Stays on **Tokyo** on purpose (user decision 2026-10-04). Treat it as a test site only: **no book edits / uploads on Replov's dashboard** — they would land in Tokyo, not Mumbai. If anything must change before go-live, change it in Mumbai (local scripts / the new server) or ask Claude to copy it. |
+| **Server** | ❌ **BLOCKED** — Lightsail refuses the 2 GB plan on this new AWS account (error below). **Decision pending:** wait for AWS Support, or use another provider (options + recommendation in "Hosting options"). |
+| GitHub variables (Stage 1D) | Not confirmed yet. |
+| Next action | User picks the hosting option → Claude updates Stage 2 for that provider (and writes a `ufw` firewall script if it isn't Lightsail) → create server → Stage 2/3. |
+
+### Where the secrets and key files are (never commit, never paste in chat)
+
+| What | Where |
+|---|---|
+| Mumbai Supabase URL / anon / service-role key, DB URL; Cloudflare Zone ID + Cache Purge token | `.env.mumbai` in the project folder (git-ignored) |
+| Local dev settings (now pointing at **Mumbai**) | `.env.local` (git-ignored); the old Tokyo values are in `.env.local.tokyo-backup` |
+| Cloudflare Origin certificate + private key | `origin.pem` + `origin.key` on the user's laptop → go to `/opt/kaf/certs/` on the server |
+| Razorpay, Interakt, `ORDER_ACCESS_SECRET`, `CRON_SECRET`, `ADMIN_EMAILS` | Replov's environment settings (reuse for the server's `app.env`) |
+| Server SSH key | downloaded when the server is created → GitHub secret `LIGHTSAIL_SSH_KEY` |
+
+## Problems we hit (and what we did)
+
+| # | Date | Problem | Resolution |
+|---|---|---|---|
+| 1 | 10-04 | Plan assumed the original domain `kaydyachaanifaydyach.com` (GoDaddy, client/old developer). We only control **Hostinger**, and the domain bought there is spelled **`kaydyachaanifayddyacha.com`**. | Go live on the Hostinger domain (user decision). Original site untouched; old buyers keep using it. Code made domain-agnostic (`NEXT_PUBLIC_SITE_URL`). |
+| 2 | 10-04 | Supabase was in **Tokyo** (`ap-northeast-1`): each DB call from India +~160 ms (≈ +0.7 s per Buy), cover images 0.6–1.3 s each. | New project in **Mumbai**, everything copied by Claude (schema, storage, rows), verified. Measured from Pune: cover image 630 → 390 ms avg (best 550 → 170 ms), 5 MB preview PDF 1.3–1.6 → 1.0 s. |
+| 3 | 10-04 | Mumbai DB "direct connection" host (`db.<ref>.supabase.co`) is **IPv6-only**; the local network has no IPv6. | Use the IPv4 **session pooler** `aws-0-ap-south-1.pooler.supabase.com:5432`, user `postgres.<ref>`, same password (derived automatically; `.env.mumbai` unchanged). |
+| 4 | 10-04 | Images were the slowest part of the site (served straight from Supabase on every visit). | `/media/<path>` route + `NEXT_PUBLIC_MEDIA_PROXY=true` → Cloudflare caches covers/previews in India (images 1 year, preview PDFs 1 hour + purge on rebuild). Off on hosts without a CDN (Replov). |
+| 5 | 10-04 | "Do we need two servers + load balancer?" | No — start with **one** server behind Cloudflare (capacity ~100× a Reel peak); add the second server only for whole-machine failover later ("Later: second server" below). |
+| 6 | 10-04 | Replov can't/won't be moved to Mumbai. | Replov stays on Tokyo as a test site; data is split — see Current status. |
+| 7 | 10-04 | Unsure if Cloudflare Free allows purge-by-prefix (used to refresh pages after admin edits). | Tested with the real token: prefix and single-file purge both work. Note: the token also has *Zone → Read* (harmless; remove it in Cloudflare if you want purge-only). |
+| 8 | 10-05 | **Lightsail blocks the 2 GB plan** in all Mumbai zones (a, b, c): `CreateInstances[ap-south-1] Sorry, your account can not create an instance using this Lightsail plan size. Please try a smaller plan size or contact Customer Support if you need to use a larger plan. (400)` — a restriction on new AWS accounts. | Open a free AWS Support case (text below) **or** switch provider ("Hosting options"). Don't use the 0.5–1 GB plans: the setup runs two app containers and needs 2 GB. |
+| 9 | 09-29 | Local Windows PC blocks Turbopack's native binary (Application Control). | Local only: `npm run dev:webpack`. Production builds on Linux are unaffected. |
+| 10 | 10-04 | The site shows `support@kaydyachaanifaydyach.com` — that domain has **no mail server**, mails never arrive. | Open question (below). |
+
+### AWS Support case text (for problem 8)
+
+Support Center → **Create case** → *Service limit increase* (or *Account and billing*) →
+Service **Lightsail**, Region **Asia Pacific (Mumbai)**, request: 2 GB plan, 2 instances:
+
+> Hello, when I create a Lightsail instance in ap-south-1 (Mumbai) with the $12/month
+> plan (2 GB RAM, 2 vCPU, dual-stack), I get: "Sorry, your account can not create an
+> instance using this Lightsail plan size. Please try a smaller plan size or contact
+> Customer Support if you need to use a larger plan." (CreateInstances, 400). Please
+> enable the 2 GB plan for my account in ap-south-1. I need up to 2 instances for a
+> production website (an ebook store on Docker). Thank you.
+
+## Hosting options (decision pending — problem 8)
+
+Requirements: Ubuntu 24.04, Docker, SSH from GitHub Actions, **public IPv4**,
+**≥ 2 GB RAM** (two app containers + Caddy), close to the Mumbai database. Prices are
+approximate (Oct 2026) — confirm on each site.
+
+| Option | Server | ≈ / month | To Mumbai DB | Ready? | Notes |
+|---|---|---|---|---|---|
+| **AWS Lightsail** (current plan) | 2 GB / 2 vCPU | **$12** | same city, ~1 ms | ❌ waiting for AWS Support | Cheapest; docs and firewall script written for it |
+| **DigitalOcean** — Bangalore (BLR1) | 2 GB / 1 vCPU · 2 GB / 2 vCPU | **$12 · $18** | ~15–20 ms | ✅ instant | Very reliable and simple; Replov already runs on DigitalOcean |
+| **Vultr** — Mumbai | 2 GB / 1 vCPU | ~$12 | same city | ✅ instant | Good value, same city as the DB |
+| **AWS EC2** `t3.small` — Mumbai | 2 GB / 2 vCPU | ~$22 (server ~$16 + 20 GB disk ~$2 + public IPv4 ~$4) | same city, ~1 ms | ✅ usually | Pricier; burstable CPU; same AWS account |
+| **Hostinger VPS** — India (KVM 2) | 2 vCPU / 8 GB | ~₹700–900 on a 1–2-year prepay | close | ✅ instant | Account already exists; most RAM per rupee, but long prepay and higher renewal |
+
+**Recommendation (given 2026-10-05):**
+- Can wait ~1 day → **open the AWS case and stay on Lightsail** ($12, closest, everything ready).
+- Want to proceed today → **DigitalOcean Bangalore, 2 GB** ($18 with 2 vCPU for headroom; $12 with
+  1 vCPU also works). +15–20 ms per DB call ≈ +0.1 s per Buy — negligible.
+- 1 vs 2 vCPU: with Cloudflare absorbing ~99 % of Reel traffic the server mostly runs Buy/order/
+  download — 1 vCPU is enough, 2 gives headroom.
+
+**What changes if it's not Lightsail** (everything else — `setup-server.sh`, Docker, Caddy,
+Cloudflare, GitHub auto-deploy — works as-is):
+- Firewall: `deploy/lightsail-firewall.sh` uses the AWS CLI. Elsewhere, Claude writes a small
+  `ufw` script: ports 80/443 only from Cloudflare's IP ranges, SSH only from the user's IP
+  (plus the provider's cloud firewall if it has one).
+- Snapshots/backups: turn on the provider's automatic backups (DigitalOcean/Vultr ≈ +20 % of the
+  server price).
+- GitHub secret name stays `LIGHTSAIL_SSH_KEY` and variable `LIGHTSAIL_HOSTS` (just the names the
+  workflow uses) — put the new server's SSH key and IP there.
+- Monitoring: UptimeRobot on `/api/health` (provider alarms optional).
+
 
 ## Decisions (2026-10-04)
 
@@ -10,9 +93,10 @@
 |---|---|
 | Domain | **`kaydyachaanifayddyacha.com`** — registered at **Hostinger** on 2026-10-03 (we have access). Note the spelling: `fay`**`dd`**`yach`**`a`**. The original site stays on `kaydyachaanifaydyach.com` (GoDaddy → Vercel) and is **not touched**. |
 | Staging hostname | `new.kaydyachaanifayddyacha.com` |
-| Supabase | currently **Tokyo (`ap-northeast-1`)** → **move to a new project in Mumbai (`ap-south-1`)** before go-live (Stage 1B) |
-| Servers | **Start with ONE Lightsail server** (Mumbai) behind Cloudflare — no Load Balancing. Measure under real traffic; add a second server + Load Balancing later only if needed ("Later: second server" below). |
+| Supabase | moved from **Tokyo** to a new **Mumbai** project `ntqwvfksdqdyoyknkprh` — ✅ done 2026-10-04 (Stage 1B) |
+| Servers | **Start with ONE server** (2 GB, India) behind Cloudflare — no Load Balancing. Measure under real traffic; add a second server + Load Balancing later only if needed ("Later: second server" below). **Provider: Lightsail blocked for now — see "Hosting options".** |
 | Payment-check cron | stays on **cron-job.org** (GitHub `RECONCILE_ENABLED` stays unset) |
+| Replov | stays on the Tokyo database as a test site; not switched (2026-10-04) |
 
 ## Goal
 
@@ -35,16 +119,16 @@ that risk expensive.
 ## How we switch without risk
 
 1. Nothing is live on the new domain yet, so there is no old site to replace on it.
-2. Build the servers, test everything on **`new.kaydyachaanifayddyacha.com`** with
+2. Build the server, test everything on **`new.kaydyachaanifayddyacha.com`** with
    **Razorpay test keys**.
-3. When every test passes: live Razorpay keys, then put the load balancer on the
-   apex + `www` of the new domain. Replov keeps running until we're sure.
+3. When every test passes: live Razorpay keys, then point the apex + `www` of the new
+   domain at the server in Cloudflare DNS. Replov keeps running until we're sure.
 
 | Stage | Who | Status |
 |---|---|---|
 | 0. Repo prep | Claude | ✅ done 2026-10-04 |
-| 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | in progress — Cloudflare active 2026-10-04, Mumbai project created |
-| 2. Server (one) | you | |
+| 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, GitHub variables ⏳ |
+| 2. Server (one) | you | ❌ blocked — Lightsail plan limit; choose a provider |
 | 3. First deploy on staging | you | |
 | 4. Functional tests on staging | you (phone) + Claude (database) | |
 | 5. Speed + load tests | you + Claude | |
@@ -80,11 +164,11 @@ that risk expensive.
       paste both → save. Wait for Cloudflare to say **Active** (minutes to a few hours).
 - [x] **SSL/TLS → Overview: Full (strict)**. **Edge Certificates**: Always Use HTTPS on,
       Min TLS 1.2, TLS 1.3 on, 0-RTT **off**. (HTTP/3 on under Network.)
-- [ ] **SSL/TLS → Origin Server → Create certificate**: hostnames
+- [x] **SSL/TLS → Origin Server → Create certificate**: hostnames
       `kaydyachaanifayddyacha.com` + `*.kaydyachaanifayddyacha.com`, 15 years →
       save the **certificate and the private key** (key is shown once).
 - ~~Load Balancing~~ — **not needed with one server** (only for the second server later).
-- [ ] **My Profile → API Tokens → Create**: only *Zone → Cache Purge* for this zone →
+- [x] **My Profile → API Tokens → Create**: only *Zone → Cache Purge* for this zone →
       `CLOUDFLARE_API_TOKEN`; note the **Zone ID** (domain Overview page).
 
 ### 1B. Supabase → Mumbai (you + Claude)
@@ -93,16 +177,16 @@ Supabase can't change a project's region, so we create a new project and copy
 everything. Only 9 books and 5 test orders exist — cheapest moment to do it.
 
 You:
-- [ ] supabase.com → **New project** in the same organization → Region **South Asia
+- [x] supabase.com → **New project** in the same organization → Region **South Asia
       (Mumbai) `ap-south-1`** → plan **Pro**, spend cap **on** → set a strong database
       password and save it.
-- [ ] In the new project, **Authentication → Users → Add user**: the admin e-mail(s)
+- [x] In the new project, **Authentication → Users → Add user**: the admin e-mail(s)
       with a password (tick *auto confirm*). Same e-mail as `ADMIN_EMAILS`.
-- [ ] **Authentication → URL Configuration**: Site URL
+- [ ] **Authentication → URL Configuration** *(not confirmed yet — check)*: Site URL
       `https://kaydyachaanifayddyacha.com`; Redirect URLs:
       `https://kaydyachaanifayddyacha.com/**`, `https://new.kaydyachaanifayddyacha.com/**`,
       `https://kaidyachaanifaidyacha-28da.replov.com/**`.
-- [ ] Create a file **`.env.mumbai`** in the project folder (it is git-ignored) with:
+- [x] Create a file **`.env.mumbai`** in the project folder (it is git-ignored) with:
       ```
       NEW_SUPABASE_URL=            # Settings → API → Project URL
       NEW_SUPABASE_ANON_KEY=       # Settings → API → anon public key
@@ -124,17 +208,17 @@ Claude:
       functions + `funnel_daily` work, 2 confirmed auth users. Local `.env.local`
       now points at Mumbai (Tokyo values kept in `.env.local.tokyo-backup`).
 
-You (after Claude's OK):
-- [ ] **Replov** env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-      `SUPABASE_SERVICE_ROLE_KEY` → new values → **redeploy** (the public ones are baked
-      into the build). Claude updates `.env.local`.
-- [ ] Test on Replov: books + covers + previews show, admin login works, one test
-      purchase (Razorpay test mode) → PDF + WhatsApp.
-- [ ] After ~1 week without problems: **pause, then delete the Tokyo project**
-      (until then it costs extra compute).
+~~You: switch Replov to Mumbai~~ — **skipped** (2026-10-04): Replov stays on Tokyo as a
+test site; the first real test on Mumbai happens on the new server (Stage 4). `.env.local`
+already points at Mumbai.
+- [ ] After go-live + ~1 week without problems: **pause, then delete the Tokyo project**
+      (until then it costs extra compute) — and delete the Replov deployment.
 
-### 1C. AWS (you)
-- [ ] AWS account with billing; **AWS CLI** on your laptop (for the firewall script).
+### 1C. Hosting account (you)
+- [x] AWS account with billing — but **Lightsail 2 GB plan blocked** (problem 8).
+- [ ] Either AWS Support lifts the limit, or create an account at the chosen provider
+      ("Hosting options").
+- [ ] Lightsail only: **AWS CLI** on your laptop (for `deploy/lightsail-firewall.sh`).
 
 ### 1D. GitHub (you) — repo → Settings → Secrets and variables → Actions
 - [ ] Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (**Mumbai**
@@ -146,7 +230,10 @@ You (after Claude's OK):
       `read:packages` (servers use it to pull the image).
 - [ ] Secret `LIGHTSAIL_SSH_KEY` comes in Stage 2 (private key of the server key pair).
 
-## Stage 2 — Servers (you) — `docs/deploy-lightsail.md` §2–§5
+## Stage 2 — Server (you) — `docs/deploy-lightsail.md` §2–§5
+
+> Written for Lightsail. If another provider is chosen, Claude adapts the first and
+> the firewall step (see "Hosting options → What changes").
 
 - [ ] Lightsail → create **`kaf-a`** (Mumbai, zone **ap-south-1a**): Ubuntu 24.04,
       **2 GB** plan (US$12), download the SSH key pair, attach a **static IP**,

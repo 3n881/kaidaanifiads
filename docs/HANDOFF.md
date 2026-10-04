@@ -4,6 +4,10 @@
 > this first, then `AGENTS.md`, then the two deeper docs it points to. Everything
 > below was checked against the code, the database or the live sites on those dates.
 
+> **Go-live in progress (Oct 2026):** current status, blockers, problems we hit, hosting
+> options and the step-by-step plan are in **`docs/go-live-plan.md`** — read its
+> "▶ Current status" section first.
+
 ---
 
 ## 1. What this is
