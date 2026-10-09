@@ -15,7 +15,7 @@
 | Replov (old test host) | Stays on **Tokyo** on purpose (user decision 2026-10-04). Treat it as a test site only: **no book edits / uploads on Replov's dashboard** — they would land in Tokyo, not Mumbai. If anything must change before go-live, change it in Mumbai (local scripts / the new server) or ask Claude to copy it. |
 | **Server** | **Decided 2026-10-09: AWS EC2 `t3.small` in Mumbai** (Lightsail still refused the 2 GB plan after 5 days). Budget ≈ ₹4,100/month incl. Supabase Pro — **approved by the user**. (Leaner options discussed and declined for now: Lightsail $7 / EC2 `t3.micro`, 1 GB — measured ~60 MB per app container, so 1 GB would also work.) Not created yet → **Stage 2 (EC2 steps)**. |
 | GitHub variables (Stage 1D) | Not confirmed yet. |
-| Next action | User: Stage 1D GitHub variables/secrets → **Stage 2: create the EC2 server** (click-by-click below) → send Claude the Elastic IP → Stage 2 server setup → Stage 3 first deploy. |
+| Next action | Follow **`docs/setup-steps-ec2.md`** (Steps 1–7: GitHub settings, Supabase URLs, create EC2, firewall, GitHub deploy access, server setup, first deploy — with fixes for common errors). |
 
 ### Where the secrets and key files are (never commit, never paste in chat)
 
