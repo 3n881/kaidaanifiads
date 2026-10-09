@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# One-time setup of a fresh Lightsail Ubuntu 24.04 instance. Run as the
-# default `ubuntu` user:
+# One-time setup of a fresh Ubuntu 24.04 server (AWS EC2 or Lightsail). Run as
+# the default `ubuntu` user:
 #
 #   curl -fsSL https://raw.githubusercontent.com/3n881/kaidaanifiads/main/deploy/setup-server.sh | bash
 #   (or scp the deploy/ folder and run ./setup-server.sh)
 #
-# Afterwards (see docs/deploy-lightsail.md):
+# Afterwards (see docs/go-live-plan.md Stage 2B):
 #   1. put the Cloudflare Origin CA cert/key in /opt/kaf/certs/origin.{pem,key}
 #   2. fill /opt/kaf/app.env from app.env.example
 #   3. docker login ghcr.io (read:packages token)

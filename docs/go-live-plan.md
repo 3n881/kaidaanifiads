@@ -1,21 +1,21 @@
-# Go-live plan — Lightsail + Cloudflare on kaydyachaanifayddyacha.com
+# Go-live plan — AWS EC2 + Cloudflare on kaydyachaanifayddyacha.com
 
-> Updated 2026-10-05. Builds on `docs/deploy-lightsail.md` (server how-to) and
+> Updated 2026-10-09. Builds on `docs/deploy-lightsail.md` (server how-to) and
 > `docs/viral-launch-plan.md` §Phase 5 (Cloudflare rules) — this file is the
 > **order of work**, what to test, and how to switch over safely.
 > **New agent? Read "▶ Current status" first, then "Problems we hit".**
 
-## ▶ Current status (2026-10-05) — start here
+## ▶ Current status (2026-10-09) — start here
 
 | Area | State |
 |---|---|
-| Code | All go-live code is on `main` (latest `e4c4d82`): new domain in server config, one-server plan, `/media` image caching, preview-PDF purge, WhatsApp/reminder settings in `deploy/app.env.example`. |
+| Code | All go-live code is on `main`: new domain in server config, one-server plan, `/media` image caching, preview-PDF purge, WhatsApp/reminder settings, **EC2 firewall script + deploy SSH fix (2026-10-09)**. |
 | Domain + Cloudflare | ✅ `kaydyachaanifayddyacha.com` active on Cloudflare (Free), SSL Full (strict), Origin certificate created, Cache Purge token + Zone ID **tested** (single-file and prefix purge both work on Free). DNS still shows Hostinger's parking record — replaced with the server IP in Stage 3 (`new.`) / Stage 6 (apex). |
 | Database | ✅ **Mumbai** Supabase project `ntqwvfksdqdyoyknkprh` holds the real data (copied + verified 2026-10-04). Tokyo project `yjsmebmytltwwihvivbd` is now only used by Replov. |
 | Replov (old test host) | Stays on **Tokyo** on purpose (user decision 2026-10-04). Treat it as a test site only: **no book edits / uploads on Replov's dashboard** — they would land in Tokyo, not Mumbai. If anything must change before go-live, change it in Mumbai (local scripts / the new server) or ask Claude to copy it. |
-| **Server** | ❌ **BLOCKED** — Lightsail refuses the 2 GB plan on this new AWS account (error below). **Decision pending:** wait for AWS Support, or use another provider (options + recommendation in "Hosting options"). |
+| **Server** | **Decided 2026-10-09: AWS EC2 `t3.small` in Mumbai** (Lightsail still refused the 2 GB plan after 5 days). Budget ≈ ₹4,100/month incl. Supabase Pro — **approved by the user**. (Leaner options discussed and declined for now: Lightsail $7 / EC2 `t3.micro`, 1 GB — measured ~60 MB per app container, so 1 GB would also work.) Not created yet → **Stage 2 (EC2 steps)**. |
 | GitHub variables (Stage 1D) | Not confirmed yet. |
-| Next action | User picks the hosting option → Claude updates Stage 2 for that provider (and writes a `ufw` firewall script if it isn't Lightsail) → create server → Stage 2/3. |
+| Next action | User: Stage 1D GitHub variables/secrets → **Stage 2: create the EC2 server** (click-by-click below) → send Claude the Elastic IP → Stage 2 server setup → Stage 3 first deploy. |
 
 ### Where the secrets and key files are (never commit, never paste in chat)
 
@@ -25,7 +25,8 @@
 | Local dev settings (now pointing at **Mumbai**) | `.env.local` (git-ignored); the old Tokyo values are in `.env.local.tokyo-backup` |
 | Cloudflare Origin certificate + private key | `origin.pem` + `origin.key` on the user's laptop → go to `/opt/kaf/certs/` on the server |
 | Razorpay, Interakt, `ORDER_ACCESS_SECRET`, `CRON_SECRET`, `ADMIN_EMAILS` | Replov's environment settings (reuse for the server's `app.env`) |
-| Server SSH key | downloaded when the server is created → GitHub secret `LIGHTSAIL_SSH_KEY` |
+| Server SSH key (`kaf-key.pem`) | downloaded when the EC2 instance is created → GitHub secret `DEPLOY_SSH_KEY` |
+| AWS access key for GitHub deploys (IAM user `github-deploy`) | GitHub secrets `AWS_DEPLOY_ACCESS_KEY_ID` / `AWS_DEPLOY_SECRET_ACCESS_KEY` only |
 
 ## Problems we hit (and what we did)
 
@@ -38,9 +39,12 @@
 | 5 | 10-04 | "Do we need two servers + load balancer?" | No — start with **one** server behind Cloudflare (capacity ~100× a Reel peak); add the second server only for whole-machine failover later ("Later: second server" below). |
 | 6 | 10-04 | Replov can't/won't be moved to Mumbai. | Replov stays on Tokyo as a test site; data is split — see Current status. |
 | 7 | 10-04 | Unsure if Cloudflare Free allows purge-by-prefix (used to refresh pages after admin edits). | Tested with the real token: prefix and single-file purge both work. Note: the token also has *Zone → Read* (harmless; remove it in Cloudflare if you want purge-only). |
-| 8 | 10-05 | **Lightsail blocks the 2 GB plan** in all Mumbai zones (a, b, c): `CreateInstances[ap-south-1] Sorry, your account can not create an instance using this Lightsail plan size. Please try a smaller plan size or contact Customer Support if you need to use a larger plan. (400)` — a restriction on new AWS accounts. | Open a free AWS Support case (text below) **or** switch provider ("Hosting options"). Don't use the 0.5–1 GB plans: the setup runs two app containers and needs 2 GB. |
+| 8 | 10-05 | **Lightsail blocks the 2 GB plan** in all Mumbai zones (a, b, c): `CreateInstances[ap-south-1] Sorry, your account can not create an instance using this Lightsail plan size. Please try a smaller plan size or contact Customer Support if you need to use a larger plan. (400)` — a restriction on new AWS accounts. | Waited 5 days, still blocked → **switched to EC2 `t3.small` Mumbai (2026-10-09)**. Don't use the 0.5–1 GB plans: the setup runs two app containers and needs 2 GB. |
 | 9 | 09-29 | Local Windows PC blocks Turbopack's native binary (Application Control). | Local only: `npm run dev:webpack`. Production builds on Linux are unaffected. |
 | 10 | 10-04 | The site shows `support@kaydyachaanifaydyach.com` — that domain has **no mail server**, mails never arrive. | Open question (below). |
+| 11 | 10-09 | **Gap in the existing deploy:** the firewall allowed SSH only from the admin's IP, but GitHub's deploy logs in over SSH from GitHub's machines — every automatic deploy would have been blocked. | `deploy.yml` now opens SSH for the runner's own IP only while it deploys and always closes it (EC2 security group, IAM user limited to that one group: `deploy/github-deploy-iam-policy.json`). New EC2 firewall script `deploy/ec2-firewall.sh`. |
+| 12 | 10-09 | "Which server is fastest?" | EC2 Mumbai: Supabase Mumbai runs on AWS `ap-south-1`, so DB calls are ~1 ms (vs ~15–20 ms from DigitalOcean Bangalore). Page/image speed is decided by Cloudflare's India edge (~99 % of requests never reach the server). |
+| 13 | 10-09 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` is passed by `deploy.yml` as a build secret, but the Dockerfile doesn't read it (legacy builder, no BuildKit secrets). | Harmless: one image is built per release and runs on every container, so Server Action keys already match. Leave the secret unset. |
 
 ### AWS Support case text (for problem 8)
 
@@ -54,7 +58,7 @@ Service **Lightsail**, Region **Asia Pacific (Mumbai)**, request: 2 GB plan, 2 i
 > enable the 2 GB plan for my account in ap-south-1. I need up to 2 instances for a
 > production website (an ebook store on Docker). Thank you.
 
-## Hosting options (decision pending — problem 8)
+## Hosting options (decided: EC2 `t3.small` Mumbai, 2026-10-09)
 
 Requirements: Ubuntu 24.04, Docker, SSH from GitHub Actions, **public IPv4**,
 **≥ 2 GB RAM** (two app containers + Caddy), close to the Mumbai database. Prices are
@@ -62,13 +66,16 @@ approximate (Oct 2026) — confirm on each site.
 
 | Option | Server | ≈ / month | To Mumbai DB | Ready? | Notes |
 |---|---|---|---|---|---|
-| **AWS Lightsail** (current plan) | 2 GB / 2 vCPU | **$12** | same city, ~1 ms | ❌ waiting for AWS Support | Cheapest; docs and firewall script written for it |
+| **AWS Lightsail** (original plan) | 2 GB / 2 vCPU | **$12** | same city, ~1 ms | ❌ blocked 5+ days | Cheapest, but the 2 GB plan is refused on this account |
 | **DigitalOcean** — Bangalore (BLR1) | 2 GB / 1 vCPU · 2 GB / 2 vCPU | **$12 · $18** | ~15–20 ms | ✅ instant | Very reliable and simple; Replov already runs on DigitalOcean |
 | **Vultr** — Mumbai | 2 GB / 1 vCPU | ~$12 | same city | ✅ instant | Good value, same city as the DB |
-| **AWS EC2** `t3.small` — Mumbai | 2 GB / 2 vCPU | ~$22 (server ~$16 + 20 GB disk ~$2 + public IPv4 ~$4) | same city, ~1 ms | ✅ usually | Pricier; burstable CPU; same AWS account |
+| **AWS EC2** `t3.small` — Mumbai ✅ **chosen** | 2 GB / 2 vCPU | ~$22 (server ~$16 + 30 GB disk ~$3 + Elastic IP ~$4) | same AWS region as the DB, ~1 ms | ✅ | Fastest Buy (same region as Supabase); burstable CPU; same AWS account |
 | **Hostinger VPS** — India (KVM 2) | 2 vCPU / 8 GB | ~₹700–900 on a 1–2-year prepay | close | ✅ instant | Account already exists; most RAM per rupee, but long prepay and higher renewal |
 
-**Recommendation (given 2026-10-05):**
+**Decision 2026-10-09: EC2 `t3.small`, Mumbai** — Lightsail stayed blocked; EC2 is in the same AWS
+region as the Supabase database (fastest Buy). The table is kept for reference.
+
+**Recommendation given 2026-10-05 (before the decision):**
 - Can wait ~1 day → **open the AWS case and stay on Lightsail** ($12, closest, everything ready).
 - Want to proceed today → **DigitalOcean Bangalore, 2 GB** ($18 with 2 vCPU for headroom; $12 with
   1 vCPU also works). +15–20 ms per DB call ≈ +0.1 s per Buy — negligible.
@@ -77,13 +84,12 @@ approximate (Oct 2026) — confirm on each site.
 
 **What changes if it's not Lightsail** (everything else — `setup-server.sh`, Docker, Caddy,
 Cloudflare, GitHub auto-deploy — works as-is):
-- Firewall: `deploy/lightsail-firewall.sh` uses the AWS CLI. Elsewhere, Claude writes a small
-  `ufw` script: ports 80/443 only from Cloudflare's IP ranges, SSH only from the user's IP
-  (plus the provider's cloud firewall if it has one).
+- Firewall: EC2 → `deploy/ec2-firewall.sh` (security group, done). Non-AWS providers → a small
+  `ufw` script (not written yet): ports 80/443 only from Cloudflare's IP ranges, SSH only from
+  the user's IP, and GitHub's deploy needs SSH access (problem 11).
 - Snapshots/backups: turn on the provider's automatic backups (DigitalOcean/Vultr ≈ +20 % of the
   server price).
-- GitHub secret name stays `LIGHTSAIL_SSH_KEY` and variable `LIGHTSAIL_HOSTS` (just the names the
-  workflow uses) — put the new server's SSH key and IP there.
+- GitHub: secret `DEPLOY_SSH_KEY` + variable `DEPLOY_HOSTS` (the older `LIGHTSAIL_*` names still work).
 - Monitoring: UptimeRobot on `/api/health` (provider alarms optional).
 
 
@@ -94,7 +100,7 @@ Cloudflare, GitHub auto-deploy — works as-is):
 | Domain | **`kaydyachaanifayddyacha.com`** — registered at **Hostinger** on 2026-10-03 (we have access). Note the spelling: `fay`**`dd`**`yach`**`a`**. The original site stays on `kaydyachaanifaydyach.com` (GoDaddy → Vercel) and is **not touched**. |
 | Staging hostname | `new.kaydyachaanifayddyacha.com` |
 | Supabase | moved from **Tokyo** to a new **Mumbai** project `ntqwvfksdqdyoyknkprh` — ✅ done 2026-10-04 (Stage 1B) |
-| Servers | **Start with ONE server** (2 GB, India) behind Cloudflare — no Load Balancing. Measure under real traffic; add a second server + Load Balancing later only if needed ("Later: second server" below). **Provider: Lightsail blocked for now — see "Hosting options".** |
+| Servers | **ONE AWS EC2 `t3.small`** (2 vCPU / 2 GB, Mumbai `ap-south-1`) behind Cloudflare — no Load Balancing. Measure under real traffic; add a second server + Load Balancing later only if needed ("Later: second server" below). |
 | Payment-check cron | stays on **cron-job.org** (GitHub `RECONCILE_ENABLED` stays unset) |
 | Replov | stays on the Tokyo database as a test site; not switched (2026-10-04) |
 
@@ -105,11 +111,13 @@ PDF (download + WhatsApp) **always works**, and nothing breaks if one server die
 
 ```
 Visitor ─► Cloudflare (cache, SSL, WAF, rate limit)
-             └─► Server A  Lightsail Mumbai ap-south-1a   Caddy ─► app1 + app2
+             └─► Server A  EC2 t3.small Mumbai ap-south-1   Caddy ─► app1 + app2
                          ─► Supabase Pro Mumbai (DB + PDFs) · Razorpay · Interakt
 ```
 
-≈ ₹3,300/month (1 server ₹1,000, snapshots ₹170, Supabase Pro ₹2,100; Cloudflare Free).
+≈ ₹4,100/month (EC2 t3.small ~₹1,400 + 30 GB disk ~₹230 + Elastic IP ~₹310 + snapshots ~₹100,
+Supabase Pro ₹2,100; Cloudflare Free). New AWS accounts may get free-tier credits that cover
+the first months of EC2.
 Why one is enough: with Cloudflare caching, a 1M-view Reel sends ~5 req/s to the
 server at peak; one 2 GB server handles ~100× that. Two app containers on the server
 keep deploys and app crashes gap-free. The only thing a second server adds is
@@ -127,8 +135,8 @@ that risk expensive.
 | Stage | Who | Status |
 |---|---|---|
 | 0. Repo prep | Claude | ✅ done 2026-10-04 |
-| 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, GitHub variables ⏳ |
-| 2. Server (one) | you | ❌ blocked — Lightsail plan limit; choose a provider |
+| 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, AWS ✅ (EC2), GitHub variables ⏳ |
+| 2. Server (one EC2) | you + Claude | ⏳ next — EC2 steps below |
 | 3. First deploy on staging | you | |
 | 4. Functional tests on staging | you (phone) + Claude (database) | |
 | 5. Speed + load tests | you + Claude | |
@@ -214,11 +222,11 @@ already points at Mumbai.
 - [ ] After go-live + ~1 week without problems: **pause, then delete the Tokyo project**
       (until then it costs extra compute) — and delete the Replov deployment.
 
-### 1C. Hosting account (you)
-- [x] AWS account with billing — but **Lightsail 2 GB plan blocked** (problem 8).
-- [ ] Either AWS Support lifts the limit, or create an account at the chosen provider
-      ("Hosting options").
-- [ ] Lightsail only: **AWS CLI** on your laptop (for `deploy/lightsail-firewall.sh`).
+### 1C. AWS (you)
+- [x] AWS account with billing (Lightsail 2 GB blocked → using EC2, problem 8).
+- [ ] Nothing to install: run `deploy/ec2-firewall.sh` in **AWS CloudShell** (the `>_` icon in
+      the AWS console top bar, region Mumbai) — it has the AWS CLI built in. (Alternative: AWS
+      CLI on your laptop with `aws configure`.)
 
 ### 1D. GitHub (you) — repo → Settings → Secrets and variables → Actions
 - [ ] Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (**Mumbai**
@@ -228,29 +236,68 @@ already points at Mumbai.
       **`DEPLOY_ENABLED` last** (Stage 3).
 - [ ] Your GitHub profile → Developer settings → **classic token** with only
       `read:packages` (servers use it to pull the image).
-- [ ] Secret `LIGHTSAIL_SSH_KEY` comes in Stage 2 (private key of the server key pair).
+- [ ] Secrets that come in Stage 2: `DEPLOY_SSH_KEY` (contents of `kaf-key.pem`),
+      `AWS_DEPLOY_ACCESS_KEY_ID` + `AWS_DEPLOY_SECRET_ACCESS_KEY` (IAM user `github-deploy`);
+      variables `DEPLOY_HOSTS` (the Elastic IP) and `DEPLOY_SG_ID` (the security group ID).
 
-## Stage 2 — Server (you) — `docs/deploy-lightsail.md` §2–§5
+## Stage 2 — Server: AWS EC2 `t3.small`, Mumbai (you + Claude)
 
-> Written for Lightsail. If another provider is chosen, Claude adapts the first and
-> the firewall step (see "Hosting options → What changes").
+### 2A. Create the server (AWS console, ~20 min)
+- [ ] console.aws.amazon.com → top-right region **Asia Pacific (Mumbai) `ap-south-1`** → **EC2**.
+- [ ] **Security group first:** EC2 → Network & Security → **Security Groups → Create security
+      group** → name `kaf-web`, description "kaf web server", VPC = default → **no inbound
+      rules** (the script adds them) → Create. Note its **ID** (`sg-…`).
+- [ ] **Launch instances:**
+  - Name **`kaf-a`**
+  - AMI: **Ubuntu Server 24.04 LTS (HVM), SSD Volume Type**, architecture **64-bit (x86)**
+  - Instance type **`t3.small`** (2 vCPU, 2 GiB)
+  - Key pair → **Create new key pair**: name `kaf-key`, type RSA, format **.pem** → it downloads
+    once — keep it with `origin.pem`/`origin.key`, never share it
+  - Network settings → **Edit** → *Select existing security group* → **`kaf-web`**;
+    auto-assign public IP: Enable
+  - Storage: **30 GiB, gp3**
+  - Advanced details → Credit specification: leave **Unlimited** (default; extra charge only if
+    CPU stays above 20 % for long periods)
+  - **Launch instance**. If AWS refuses `t3.small` on the new account, open the same kind of
+    support case as for Lightsail (problem 8) — and tell Claude.
+- [ ] **Elastic IP** (a fixed address): EC2 → Network & Security → **Elastic IPs → Allocate** →
+      then **Actions → Associate** → instance `kaf-a`. Send Claude this IP (not secret).
+- [ ] **Daily backups:** EC2 → Elastic Block Store → **Lifecycle Manager → Create lifecycle
+      policy** → EBS snapshot policy → target: *Instance*, tag `Name` = `kaf-a` → every 24 h,
+      keep 7 → Create.
+- [ ] **Firewall** in **AWS CloudShell** (`>_` icon, top bar):
+      `curl -fsSLO https://raw.githubusercontent.com/3n881/kaidaanifiads/main/deploy/ec2-firewall.sh && bash ec2-firewall.sh <sg-id> <your-laptop-ip>/32`
+      (your laptop's IP: open https://checkip.amazonaws.com **on your laptop**, not in CloudShell).
+      Result: 80/443 only from Cloudflare, SSH only from you. Home IPs change — re-run it if
+      SSH from your laptop stops working.
+- [ ] **IAM user for GitHub deploys:** IAM → Users → **Create user** `github-deploy` (no console
+      access) → Permissions: *Attach policies directly* → **Create policy** → JSON → paste
+      `deploy/github-deploy-iam-policy.json` with `ACCOUNT_ID` (top-right menu, 12 digits) and
+      `SECURITY_GROUP_ID` (the `sg-…`) filled in → name `kaf-github-deploy-ssh` → attach →
+      create user → user → **Security credentials → Create access key** → *Application running
+      outside AWS* → copy both values into GitHub secrets `AWS_DEPLOY_ACCESS_KEY_ID` /
+      `AWS_DEPLOY_SECRET_ACCESS_KEY`.
+- [ ] GitHub: secret **`DEPLOY_SSH_KEY`** = full contents of `kaf-key.pem`; variables
+      **`DEPLOY_HOSTS`** = the Elastic IP, **`DEPLOY_SG_ID`** = the `sg-…` ID.
+- [ ] Optional: CloudWatch alarm on the instance — *CPUUtilization > 70 % for 5 min* and
+      *StatusCheckFailed* → e-mail.
 
-- [ ] Lightsail → create **`kaf-a`** (Mumbai, zone **ap-south-1a**): Ubuntu 24.04,
-      **2 GB** plan (US$12), download the SSH key pair, attach a **static IP**,
-      **automatic snapshots** on. Put the key pair's private key in the GitHub
-      secret `LIGHTSAIL_SSH_KEY`.
-- [ ] On the server: `setup-server.sh` → Origin cert/key into `/opt/kaf/certs/` →
-      `/opt/kaf/app.env` → `docker login ghcr.io` (the `read:packages` token).
-- [ ] `app.env` for staging:
-  - Supabase: **Mumbai** values.
+### 2B. Set up the server (SSH, ~30 min — Claude guides live)
+- [ ] From your laptop: `ssh -i kaf-key.pem ubuntu@<elastic-ip>` (Windows: in Git Bash; if it
+      complains about key permissions, Claude will help).
+- [ ] `curl -fsSL https://raw.githubusercontent.com/3n881/kaidaanifiads/main/deploy/setup-server.sh | bash`
+      → log out and back in (Docker group).
+- [ ] Copy the Origin certificate: `origin.pem` → `/opt/kaf/certs/origin.pem`,
+      `origin.key` → `/opt/kaf/certs/origin.key` (e.g. `scp -i kaf-key.pem origin.* ubuntu@<ip>:/opt/kaf/certs/`).
+- [ ] `/opt/kaf/app.env` for staging (`chmod 600`):
+  - Supabase: **Mumbai** values (from `.env.mumbai`).
   - Razorpay **test** key ID + secret; a **new** webhook secret for the staging webhook.
-  - `ORDER_ACCESS_SECRET`, `CRON_SECRET`: **reuse Replov's values** (test-order links
-    keep working). `ORDER_ACCESS_SECRET` must never change after real sales.
-  - Interakt + `ADMIN_EMAILS`: same as on Replov.
+  - `ORDER_ACCESS_SECRET`, `CRON_SECRET`: **reuse Replov's values** (test-order links keep
+    working). `ORDER_ACCESS_SECRET` must never change after real sales.
+  - Interakt + `ADMIN_EMAILS`: same as on Replov. Cloudflare `CLOUDFLARE_ZONE_ID` /
+    `CLOUDFLARE_API_TOKEN` from `.env.mumbai`.
   - `NEXT_PUBLIC_SITE_URL=https://new.kaydyachaanifayddyacha.com`
-- [ ] Firewall: `./deploy/lightsail-firewall.sh kaf-a <your-ip>/32` —
-      web ports only from Cloudflare, SSH only from you.
-- [ ] GitHub variable `LIGHTSAIL_HOSTS="<static-ip-of-kaf-a>"`.
+- [ ] `docker login ghcr.io -u 3n881` with the `read:packages` token (Stage 1D).
 
 ## Stage 3 — First deploy on staging (you)
 
@@ -352,7 +399,7 @@ site changes at any point.
 ## Stage 7 — After launch
 
 - [ ] UptimeRobot (free) on `https://kaydyachaanifayddyacha.com/api/health`, alerts to phone.
-- [ ] Lightsail alarms on the server: CPU > 70 % for 5 min, status check failed.
+- [ ] CloudWatch alarms on the EC2 instance: CPU > 70 % for 5 min, status check failed.
 - [ ] UptimeRobot monitor moved to the apex (set up in Stage 3 for `new.`).
 - [ ] Weekly: Supabase egress vs 250 GB; consider compressing the biggest PDFs
       (#26 49.5 MB, #25 33 MB, #30 29 MB) to cut cost and download time.
@@ -369,13 +416,13 @@ site changes at any point.
 Add it when: a Reel peak pushes server CPU above ~60 % for minutes, the uptime
 monitor ever reports the server down, or sales per Reel make an outage expensive.
 No code changes needed:
-1. Lightsail → snapshot of `kaf-a` → create `kaf-b` from it in **ap-south-1b** + static IP;
-   same `/opt/kaf/app.env` and certs (they come with the snapshot).
-2. Firewall script for `kaf-b`; GitHub `LIGHTSAIL_HOSTS="<ip-A> <ip-B>"`.
+1. EC2 → `kaf-a` → **Actions → Image and templates → Create image** (AMI) → launch `kaf-b`
+   from it in another zone (e.g. `ap-south-1b`), same `kaf-web` security group, own Elastic IP.
+   `/opt/kaf/app.env` and certs come with the image.
+2. GitHub `DEPLOY_HOSTS="<ip-A> <ip-B>"` (same security group → the deploy SSH opening covers both).
 3. Cloudflare → Traffic → **Load Balancing** (≈ US$5/month): monitor `GET /api/health`,
    pool with both IPs, load balancers on the apex + `www` (replace the A/CNAME records).
 4. Failover drill: stop `kaf-a` during a test purchase → still completes via `kaf-b`.
-Details: `docs/deploy-lightsail.md` §7.
 
 ## Open questions
 
