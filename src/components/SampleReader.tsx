@@ -207,13 +207,13 @@ export default function SampleReader({
   const tool = "flex h-8 w-8 items-center justify-center rounded-md text-white transition hover:bg-white/15 disabled:opacity-40";
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-3 backdrop-blur-[3px] sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`${product.title} — ${g.reader}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[100dvh] w-full flex-col overflow-hidden bg-brand-teal text-white shadow-2xl sm:h-[92vh] sm:max-w-3xl sm:rounded-2xl"
+        className="animate-fade-in-up flex h-[86dvh] max-h-[820px] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-brand-teal text-white shadow-2xl ring-1 ring-white/15 sm:h-[90vh] sm:max-h-none"
       >
         {/* header */}
         <div className="flex items-center gap-3 border-b border-white/10 px-3 py-2.5 sm:px-4">

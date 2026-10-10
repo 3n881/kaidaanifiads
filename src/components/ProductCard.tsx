@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Flame } from "lucide-react";
+import { Flame, Loader2 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { discountPercent, localizeProduct } from "@/lib/catalog";
 import CoverImage from "./CoverImage";
@@ -14,6 +15,8 @@ const BADGES = {
   hi: { off: "छूट", bestseller: "बेस्टसेलर" },
   en: { off: "OFF", bestseller: "Bestseller" },
 } as const;
+
+const LOADING = { mr: "लोड होत आहे…", hi: "लोड हो रहा है…", en: "Loading…" } as const;
 
 export default function ProductCard({
   product,
@@ -33,10 +36,34 @@ export default function ProductCard({
     : `/ebooks/${product.slug}`;
   const pct = discountPercent(product);
   const badge = BADGES[locale];
+  // Tapped card shows a frosted "loading" layer until the book page opens.
+  const [opening, setOpening] = useState(false);
+  useEffect(() => {
+    if (!opening) return;
+    const id = window.setTimeout(() => setOpening(false), 15000); // never stuck
+    const reset = () => setOpening(false);
+    window.addEventListener("pageshow", reset); // back-button restores
+    return () => {
+      window.clearTimeout(id);
+      window.removeEventListener("pageshow", reset);
+    };
+  }, [opening]);
+  const onOpen = (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    setOpening(true);
+  };
 
   return (
-    <article className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-brand-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-cardhover)]">
-      <Link href={href} className="relative block overflow-hidden">
+    <article className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-brand-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-cardhover)]">
+      {opening && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm" role="status" aria-live="polite">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-brand-teal" aria-hidden="true" />
+            <span className="font-deva animate-pulse text-sm font-medium text-brand-teal">{LOADING[locale]}</span>
+          </div>
+        </div>
+      )}
+      <Link href={href} onClick={onOpen} className="relative block overflow-hidden">
         <CoverImage
           product={product}
           priority={priority}
@@ -72,7 +99,7 @@ export default function ProductCard({
       </Link>
 
       <div className="flex flex-1 flex-col p-3">
-        <Link href={href} className="mb-1 min-h-11">
+        <Link href={href} onClick={onOpen} className="mb-1 min-h-11">
           <h3 className="font-deva text-[15px] font-bold leading-tight text-brand-900 line-clamp-2 transition-colors group-hover:text-brand-700">
             {product.title}
           </h3>

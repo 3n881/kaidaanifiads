@@ -71,7 +71,7 @@ export default function ProductGallery({
             height={1067}
             loading={selected === 0 ? "eager" : "lazy"}
             fetchPriority={selected === 0 ? "high" : "auto"}
-            className="absolute inset-0 h-full w-full cursor-zoom-in object-contain"
+            className="absolute inset-0 h-full w-full cursor-pointer object-contain"
             onClick={() => setReaderAt(readerPages.length || !previewUrl ? selected : 0)}
           />
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white">

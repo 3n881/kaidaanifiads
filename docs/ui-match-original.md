@@ -95,3 +95,7 @@ Status: ⬜ to do · 🟡 in progress · ✔️ done (commit) · ⏸ waiting for
 | 44 | Mobile: list-page language tabs touched the dark banner | ✔️ 10-10 | Extra space above the tabs |
 | 45 | Home book rows should move by themselves on phones too | ✔️ 10-10 | Auto-advance every 3.5 s on all screen sizes; pauses while touched (resumes 5 s later), off-screen or in a background tab |
 | 46 | Original site leaks full books | ⚠️ owner/client | Book data on the original site includes `fileUrl` (full-PDF path) and its R2 bucket is public → anyone can download the full PDF. Ours: full PDFs only via paid-order download links; previews contain only 6 pages (checked). Client must make the original's bucket private / remove the files |
+| 47 | Reader took the full phone screen | ✔️ 10-11 | Pop-up on every device: 12 px margin, 86 % height, site visible behind (dimmed + light blur); tap outside or ✕ to close |
+| 48 | "Plus/zoom" cursor on book preview image | ✔️ 10-11 | Hand pointer (`cursor-pointer`) |
+| 49 | Loading when a book card is tapped | ✔️ 10-11 | Same as original: tapped card gets a frosted-glass layer (`bg-white/60 backdrop-blur-sm`) with spinner + "लोड होत आहे…" (translated) until the book page opens |
+| — | Book file names readable with the public database key | ❌ owner: keep as is (10-11) | Files stay private (tested: download / signed link refused with a real name); lock not applied |
