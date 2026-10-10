@@ -83,6 +83,11 @@ jobs:
       DEPLOY_SG_ID: ${{ vars.DEPLOY_SG_ID }}
       DEPLOY_LIGHTSAIL_INSTANCE: ${{ vars.DEPLOY_LIGHTSAIL_INSTANCE }}
     steps:
+      # Only for the server files in deploy/ (copied to /opt/kaf below).
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy
+
       - name: Open SSH for this runner only (EC2 security group)
         if: vars.DEPLOY_SG_ID != ''
         run: |
@@ -127,8 +132,12 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh_key
           for host in $HOSTS; do
             echo "::group::Deploy $image to $host"
+            # Keep the server's compose file, Caddyfile and deploy script in sync with
+            # the repo (app.env and certs stay server-only).
+            scp -i ~/.ssh_key -o StrictHostKeyChecking=accept-new \
+              deploy/deploy.sh deploy/docker-compose.yml deploy/Caddyfile ubuntu@"$host":/opt/kaf/
             ssh -i ~/.ssh_key -o StrictHostKeyChecking=accept-new ubuntu@"$host" \
-              "IMAGE='$image' /opt/kaf/deploy.sh"
+              "IMAGE='$image' bash /opt/kaf/deploy.sh"
             echo "::endgroup::"
           done
 

@@ -60,5 +60,21 @@ docker compose up -d caddy
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
 
 echo "$IMAGE" > .current-image
+
+# Clear Cloudflare's cache so no visitor gets a cached page that points at the
+# old release's /_next/static files (they no longer exist in the new image).
+env_val() { grep -m1 "^$1=" app.env | cut -d= -f2- | tr -d "\"'\r" || true; }
+zone="$(env_val CLOUDFLARE_ZONE_ID)"
+token="$(env_val CLOUDFLARE_API_TOKEN)"
+if [ -n "$zone" ] && [ -n "$token" ]; then
+  if curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/$zone/purge_cache" \
+      -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
+      --data '{"purge_everything":true}' >/dev/null; then
+    echo "Cloudflare cache purged"
+  else
+    echo "WARNING: Cloudflare purge failed - pages refresh within 5 min, /about etc. may stay old" >&2
+  fi
+fi
+
 docker image prune -f >/dev/null
 echo "Deployed $IMAGE"

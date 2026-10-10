@@ -15,7 +15,7 @@
 | Replov (old test host) | Stays on **Tokyo** on purpose (user decision 2026-10-04). Treat it as a test site only: **no book edits / uploads on Replov's dashboard** — they would land in Tokyo, not Mumbai. If anything must change before go-live, change it in Mumbai (local scripts / the new server) or ask Claude to copy it. |
 | **Server** | ✅ **Lightsail `$12` created 2026-10-10** — AWS lifted the plan limit. Instance **`kaf-a`** (Mumbai `ap-south-1a`, Ubuntu 24.04, 2 GB / 2 vCPU, dual-stack), key pair `kaf-key`, static IP `kaf-a-ip`, automatic snapshots. (EC2 `t3.small` was the planned fallback — guide kept in `docs/setup-steps-ec2.md`, not used.) Server ≈ ₹1,000/month → total ≈ ₹3,300 incl. Supabase Pro. |
 | GitHub variables (Stage 1D) | Not confirmed yet. |
-| Next action | Site is **live on `kaydyachaanifayddyacha.com`** (Razorpay **test** keys, not announced). Finish Stage 3: Cloudflare cache rules + `media` rule + WAF, Razorpay test webhook, cron-job.org URL, UptimeRobot → then Stage 4 tests. |
+| Next action | Site **live on `kaydyachaanifayddyacha.com`** (Razorpay **test** keys, not announced); Stage 3 done. Next: **Stage 4** functional tests (test purchase with `success@razorpay`, failed payment → reminder, dashboard edit, Instagram in-app). |
 
 ### Where the secrets and key files are (never commit, never paste in chat)
 
@@ -45,6 +45,7 @@
 | 11 | 10-09 | **Gap in the existing deploy:** the firewall allowed SSH only from the admin's IP, but GitHub's deploy logs in over SSH from GitHub's machines — every automatic deploy would have been blocked. | `deploy.yml` now opens SSH for the runner's own IP only while it deploys and always closes it (EC2 security group, IAM user limited to that one group: `deploy/github-deploy-iam-policy.json`). New EC2 firewall script `deploy/ec2-firewall.sh`. |
 | 12 | 10-09 | "Which server is fastest?" | EC2 Mumbai: Supabase Mumbai runs on AWS `ap-south-1`, so DB calls are ~1 ms (vs ~15–20 ms from DigitalOcean Bangalore). Page/image speed is decided by Cloudflare's India edge (~99 % of requests never reach the server). |
 | 14 | 10-10 | Lightsail needs the same "SSH only while deploying" as EC2 (problem 11). | `deploy.yml` also handles Lightsail: with variable `DEPLOY_LIGHTSAIL_INSTANCE=kaf-a` it reads the instance's firewall, adds the runner's IP to port 22, deploys, then restores the exact previous rules (IAM policy `deploy/github-deploy-iam-policy-lightsail.json`; rule logic tested with jq). |
+| 19 | 10-10 | (a) Deploys didn't clear Cloudflare, so cached pages (and `/about` etc. with `s-maxage` 1 year) could point at the old release's `/_next/static` files. (b) Server files (`deploy.sh`, `docker-compose.yml`, `Caddyfile`) had to be copied by hand (problem 16), and the admin laptop's IP changed so SSH from it was blocked. | (a) `deploy.sh` now purges the whole Cloudflare cache after every deploy (uses `CLOUDFLARE_ZONE_ID`/`CLOUDFLARE_API_TOKEN` from `app.env`). (b) The Deploy workflow now copies those 3 files from `deploy/` to `/opt/kaf/` before each rollout and runs `bash /opt/kaf/deploy.sh`. If the admin IP changes, update the port-22 rule in Lightsail → Networking (only needed for manual SSH). |
 | 18 | 10-10 | After adding the variables, the **build** failed: Turbopack `next/font/google` error for Noto Sans Devanagari ("Can't resolve '@vercel/turbopack-next/internal/font/google/font' … next/font/google queries have exactly one entry"). Same code had built 20 min earlier — Turbopack downloads Google Fonts during the build and that step is flaky. | Fonts are now stored in the repo (`src/app/fonts/*.woff2`, from Google Fonts) and loaded with `next/font/local` in `src/app/layout.tsx` — builds no longer contact Google. Same look (Lato 400/700/900 + Noto Sans Devanagari variable 400–700). |
 | 17 | 10-10 | Second deploy ✅ (app1, app2, Caddy healthy) but the site showed **no books**, sitemap said `http://localhost:3000`, no `/media` links. The `NEXT_PUBLIC_*` values are **baked in at build time** from GitHub **Variables**; they were missing (the server's `app.env` can't fix these). | Add them under repo → Settings → Secrets and variables → Actions → **Variables** tab (not Secrets): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Mumbai), `NEXT_PUBLIC_SITE_URL=https://kaydyachaanifayddyacha.com`, `NEXT_PUBLIC_MEDIA_PROXY=true`; then run Deploy again. Check: the sitemap shows the real domain. |
 | 16 | 10-10 | First Deploy run: build ✅, "Roll out" ❌ — app1 started fine but stayed **unhealthy**: `deploy/docker-compose.yml` health check called `wget`, which the `node:22-slim` image doesn't have ("exec: \"wget\": executable file not found"). | Health check now uses `node -e "fetch(...)"` (same as the Dockerfile). Copied the fixed file to `/opt/kaf/docker-compose.yml` (deploy.sh does **not** copy it — any change to `deploy/docker-compose.yml` or `deploy/Caddyfile` must be copied to the server by hand), then re-ran Deploy. |
@@ -142,7 +143,7 @@ that risk expensive.
 | 0. Repo prep | Claude | ✅ done 2026-10-04 |
 | 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, AWS ✅, GitHub variables ⏳ |
 | 2. Server (one Lightsail) | you + Claude | ✅ 10-10: instance, firewall, GitHub deploy access, server setup (`docs/setup-steps-lightsail.md` Steps 3–6) |
-| 3. First deploy on the main domain | you + Claude | ✅ site live 10-10 (problems 16–18 fixed) → next: Cloudflare cache/WAF rules, Razorpay test webhook, cron URL, UptimeRobot |
+| 3. First deploy on the main domain | you + Claude | ✅ 10-10: site live, Cloudflare rules, webhook, cron, UptimeRobot |
 | 4. Functional tests on staging | you (phone) + Claude (database) | |
 | 5. Speed + load tests | you + Claude | |
 | 6. Go-live day | you + client | |
@@ -307,22 +308,35 @@ already points at Mumbai.
   - `NEXT_PUBLIC_SITE_URL=https://kaydyachaanifayddyacha.com`
 - [ ] `docker login ghcr.io -u 3n881` with the `read:packages` token (Stage 1D).
 
-## Stage 3 — First deploy on the main domain (you + Claude)
+## Stage 3 — First deploy on the main domain (you + Claude) — ✅ done 2026-10-10
 
-- [ ] GitHub variable `DEPLOY_ENABLED=true` → Actions → **Deploy** → Run workflow.
+- [x] GitHub variable `DEPLOY_ENABLED=true` → Actions → **Deploy** → Run workflow.
       Builds one image and rolls it out to the server (two containers, one at a time).
-- [ ] Cloudflare **DNS**: delete the Hostinger parking records on `@`/`www`; add `A @ → static IP`
+- [x] Cloudflare **DNS**: delete the Hostinger parking records on `@`/`www`; add `A @ → static IP`
       and `CNAME www → kaydyachaanifayddyacha.com`, both **Proxied**.
-- [ ] UptimeRobot (free): HTTPS monitor on `https://kaydyachaanifayddyacha.com/api/health`,
+- [x] UptimeRobot (free): HTTPS monitor on `https://kaydyachaanifayddyacha.com/api/health`,
       every 5 min, alert to your phone/e-mail.
-- [ ] Cloudflare **Cache Rules** 1–5 and **WAF** rules (`viral-launch-plan.md` §Phase 5),
+- [x] Cloudflare **Cache Rules** 1–5 and **WAF** rules (`viral-launch-plan.md` §Phase 5),
       plus rule **`media`**: path starts with `/media/` → *Eligible for cache*, Edge TTL
       *respect origin* (1 year for images, 1 hour for preview PDFs).
       Smart Tiered Cache on; Rocket Loader, Email obfuscation, Bot Fight Mode **off**.
-- [ ] Razorpay **Test Mode** → Webhooks → add
+      **Done by Claude via API 10-10** (token `CLOUDFLARE_RULES_TOKEN` in `.env.mumbai`; script
+      logic = the tables in `viral-launch-plan.md`). Free-plan limits found:
+      - `public-html` **can't** use a custom cache key (Free plan) → full query string is in the key.
+        Still correct (`_rsc` kept); `?igsh=` Instagram links just MISS once each (origin ~15 ms).
+      - Rate limit: only **Block, 10 s** allowed (no Managed Challenge / 60 s) → `checkout-rate-limit`
+        = 30 POST / 10 s per IP → block 10 s. Other rate-limit rules don't fit on Free.
+      - WAF custom rules: `allow-razorpay-webhook` (skip), `block-bad-methods` (block).
+      - Email obfuscation turned **off**, Rocket Loader off, Smart Tiered Cache **on**.
+      - Bot Fight Mode: token can't read it — check by hand: Security → Bots → **off**.
+      Verified: `/`, `/ebooks`, book page, `/about`, `/media`, `/_next/image` → **HIT**;
+      `/api/*`, `/my-books` → DYNAMIC; `PUT /` → 403; webhook with bad signature → 400 (reaches app).
+- [x] Razorpay **Test Mode** → Webhooks → add
       `https://kaydyachaanifayddyacha.com/api/razorpay/webhook` (events
       `payment.captured`, `order.paid`, `payment.failed`; staging secret).
-- [ ] cron-job.org → change the URL to `https://kaydyachaanifayddyacha.com/api/cron/reconcile`.
+- [x] cron-job.org → change the URL to `https://kaydyachaanifayddyacha.com/api/cron/reconcile`.
+      Must be **POST** with header `Authorization: Bearer <CRON_SECRET>` (GET → 405, no secret → 401).
+      Check cron-job.org → job → History shows **200**.
 
 **Check (Claude can run these):**
 ```bash
