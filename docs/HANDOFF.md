@@ -1,5 +1,9 @@
 # Project handoff — Kaydyacha Ani Faydyach ebook store
 
+> **Start with `docs/PROJECT-STATUS.md`** (master status doc, 2026-10-10). The hosting/database parts
+> of this file (Replov, Tokyo Supabase) are out of date. Production is now `kaydyachaanifayddyacha.com`
+> on Lightsail with the Mumbai Supabase project; see PROJECT-STATUS §12.
+
 > Written 2026-09-30, updated 2026-10-01 for the next developer / AI agent. Read
 > this first, then `AGENTS.md`, then the two deeper docs it points to. Everything
 > below was checked against the code, the database or the live sites on those dates.

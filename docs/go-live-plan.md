@@ -3,7 +3,8 @@
 > Updated 2026-10-10. Builds on `docs/deploy-lightsail.md` (server how-to) and
 > `docs/viral-launch-plan.md` §Phase 5 (Cloudflare rules) — this file is the
 > **order of work**, what to test, and how to switch over safely.
-> **New agent? Read "▶ Current status" first, then "Problems we hit".**
+> **New agent? Read `docs/PROJECT-STATUS.md` (master overview) first, then "▶ Current status" and
+> "Problems we hit" here.**
 
 ## ▶ Current status (2026-10-10) — start here
 
