@@ -52,7 +52,7 @@ export default function Hero() {
             </span>
 
             <h1
-              className="font-deva animate-fade-in-up mt-5 text-3xl font-black leading-[1.15] tracking-tight text-white sm:text-5xl"
+              className="font-deva animate-slide-in-up mt-5 text-3xl font-black leading-[1.15] tracking-tight text-white sm:text-5xl"
               style={{ animationDelay: "0.15s" }}
             >
               {copy.title}{" "}
@@ -62,7 +62,7 @@ export default function Hero() {
             </h1>
 
             <p
-              className="font-deva animate-fade-in-up mx-auto mt-4 max-w-md text-base text-slate-300 lg:mx-0"
+              className="font-deva animate-slide-in-up mx-auto mt-4 max-w-md text-base text-slate-300 lg:mx-0"
               style={{ animationDelay: "0.25s" }}
             >
               {copy.body}

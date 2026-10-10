@@ -148,6 +148,21 @@ body {
   animation: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Same slide-up, but visible from the first paint. Used for the hero headline
+   and intro text: invisible (opacity 0) text can't count as the page's main
+   content, which pushed mobile LCP to ~4 s in PageSpeed. */
+@keyframes slide-in-up {
+  from {
+    transform: translateY(24px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-slide-in-up {
+  animation: slide-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Matches the live site exactly */
 @keyframes float {
   0%,
