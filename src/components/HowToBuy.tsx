@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CreditCard, FileDown, MousePointerClick } from "lucide-react";
+import { BookOpen, CreditCard, FileDown, Headphones, MousePointerClick } from "lucide-react";
 import { SITE } from "@/data/catalog";
 import { useLanguage } from "./LanguageProvider";
 
@@ -29,60 +29,81 @@ const STEPS = {
 } as const;
 
 const COPY = {
-  mr: { badge: "सोपी प्रक्रिया", title: "ई-बुक कसे खरेदी करावे?", body: "Account, Login किंवा वेगळा फॉर्म नाही — थेट पेमेंट आणि लगेच डाउनलोड.", help: "डाउनलोडमध्ये मदत हवी आहे?", support: "आमची सपोर्ट टीम मदतीसाठी उपलब्ध आहे.", action: "WhatsApp करा" },
-  hi: { badge: "आसान प्रक्रिया", title: "ई-बुक कैसे खरीदें?", body: "कोई अकाउंट, लॉगिन या अलग फ़ॉर्म नहीं — सीधे पेमेंट और तुरंत डाउनलोड।", help: "डाउनलोड में मदद चाहिए?", support: "हमारी सपोर्ट टीम आपकी मदद के लिए उपलब्ध है।", action: "WhatsApp करें" },
-  en: { badge: "Simple process", title: "How to buy an ebook", body: "No account, login or extra form — pay and download straight away.", help: "Need download help?", support: "Our support team is ready to help.", action: "Message on WhatsApp" },
+  mr: { badge: "सोपी प्रक्रिया", title: "ई-बुक कसे खरेदी करावे?", body: "Account, Login किंवा वेगळा फॉर्म नाही — थेट पेमेंट आणि लगेच डाउनलोड.", help: "काही अडचण येत आहे?", support: "पेमेंट केल्यानंतर ई-बुक मिळाले नाही? काळजी करू नका! आमची सपोर्ट टीम तुम्हाला मदत करेल.", action: "व्हॉट्सॲप करा" },
+  hi: { badge: "आसान प्रक्रिया", title: "ई-बुक कैसे खरीदें?", body: "कोई अकाउंट, लॉगिन या अलग फ़ॉर्म नहीं — सीधे पेमेंट और तुरंत डाउनलोड।", help: "कोई परेशानी आ रही है?", support: "पेमेंट के बाद ई-बुक नहीं मिली? चिंता न करें! हमारी सपोर्ट टीम आपकी मदद करेगी।", action: "व्हॉट्सऐप करें" },
+  en: { badge: "Simple process", title: "How to buy an ebook", body: "No account, login or extra form — pay and download straight away.", help: "Having trouble?", support: "Paid but didn't get the ebook? Don't worry — our support team will help.", action: "WhatsApp" },
 } as const;
+
+// Icon box colours per step, as on the original site.
+const TONES = [
+  "bg-blue-50 text-blue-600",
+  "bg-purple-50 text-purple-600",
+  "bg-green-50 text-green-600",
+  "bg-amber-50 text-brand-gold",
+];
 
 export default function HowToBuy() {
   const { locale } = useLanguage();
   const copy = COPY[locale];
+  const steps = STEPS[locale];
   return (
-    <section className="bg-brand-50/60 py-16">
-      <div className="container-x">
-        <div className="mx-auto max-w-2xl text-center">
-          <span className="font-deva inline-block rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
+    <section className="relative overflow-hidden bg-white py-16 lg:py-24">
+      <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 opacity-5">
+        <div className="h-64 w-64 rounded-full bg-brand-teal blur-3xl" />
+      </div>
+      <div className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 opacity-5">
+        <div className="h-64 w-64 rounded-full bg-brand-gold blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto max-w-6xl px-4">
+        <div className="mx-auto mb-12 max-w-2xl text-center lg:mb-16">
+          <span className="font-deva mb-2 inline-block rounded-full bg-brand-teal/10 px-4 py-1.5 text-sm font-bold text-brand-teal">
             {copy.badge}
           </span>
-          <h2 className="font-deva mt-3 text-2xl font-extrabold text-brand-900 sm:text-3xl">
-            {copy.title}
-          </h2>
-          <p className="font-deva mt-2 text-brand-500">
-            {copy.body}
-          </p>
+          <h2 className="font-deva mb-4 text-3xl font-black text-brand-teal lg:text-4xl">{copy.title}</h2>
+          <p className="font-deva text-lg font-medium text-gray-600">{copy.body}</p>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS[locale].map((step, index) => (
-            <div
-              key={step.title}
-              className="relative rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]"
-            >
-              <span className="absolute right-4 top-4 text-3xl font-black text-brand-100">
-                {index + 1}
-              </span>
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
-                <step.icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <h3 className="font-deva mt-4 text-base font-bold text-brand-900">
-                {step.title}
-              </h3>
-              <p className="font-deva mt-1.5 text-sm leading-relaxed text-brand-500">
-                {step.desc}
-              </p>
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {steps.map((step, index) => (
+            <div key={step.title} className="group relative flex flex-col items-center text-center">
+              {/* connecting line between steps (desktop) */}
+              {index < steps.length - 1 && (
+                <div className="absolute left-1/2 top-8 -z-10 hidden w-full -translate-y-1/2 lg:block">
+                  <div className="h-0.5 w-full bg-gray-100" />
+                </div>
+              )}
+              <div
+                className={`mb-6 flex h-16 w-16 items-center justify-center rounded-2xl shadow-sm transition-transform duration-300 group-hover:scale-110 ${TONES[index % TONES.length]}`}
+              >
+                <step.icon className="h-7 w-7" aria-hidden="true" />
+              </div>
+              <h3 className="font-deva mb-2 text-xl font-bold text-gray-900">{step.title}</h3>
+              <p className="font-deva text-sm leading-relaxed text-gray-600">{step.desc}</p>
             </div>
           ))}
         </div>
 
-        <div className="font-deva mx-auto mt-8 max-w-xl rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-600">
-          <b className="text-brand-800">{copy.help}</b> {copy.support}
-          <br />
-          <a
-            href={`https://wa.me/${SITE.supportPhone.replace(/\D/g, "")}`}
-            className="mt-2 inline-block font-semibold text-brand-700 hover:underline"
-          >
-            {copy.action}: {SITE.supportPhone}
-          </a>
+        {/* Help card */}
+        <div className="mx-auto mt-12 max-w-3xl rounded-2xl bg-brand-teal/5 p-6 text-center lg:mt-16">
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-teal/10 text-brand-teal">
+              <Headphones className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <div className="text-center sm:text-left">
+              <h4 className="font-deva text-lg font-bold text-brand-teal">{copy.help}</h4>
+              <p className="font-deva text-sm font-medium text-gray-600">
+                {copy.support} <br className="hidden sm:block" />
+                {copy.action}:{" "}
+                <a
+                  href={`https://wa.me/${SITE.supportPhone.replace(/\D/g, "")}`}
+                  className="font-bold text-gray-900 hover:underline"
+                >
+                  {SITE.supportPhone}
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>

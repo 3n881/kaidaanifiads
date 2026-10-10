@@ -1,4 +1,4 @@
-import { Quote } from "lucide-react";
+import { Quote, Star } from "lucide-react";
 import { testimonials } from "@/data/catalog";
 
 function initials(name: string) {
@@ -9,40 +9,40 @@ function initials(name: string) {
     .slice(0, 2);
 }
 
+/** Customer quotes — swipe row with 5 gold stars per card (as on the original site). */
 export default function Testimonials() {
   return (
-    <section className="bg-brand-50/60 py-16">
-      <div className="container-x">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-deva text-2xl font-extrabold text-brand-900 sm:text-3xl">
-            आमचे समाधानी ग्राहक
-          </h2>
-          <p className="font-deva mt-2 text-brand-500">
+    <section className="overflow-hidden bg-white py-12 md:py-24">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="mb-10 space-y-3 text-center md:mb-16">
+          <h2 className="font-deva text-2xl font-extrabold text-brand-teal md:text-5xl">आमचे समाधानी ग्राहक</h2>
+          <p className="font-deva mx-auto max-w-2xl text-base text-brand-500 md:text-lg">
             हजारो नागरिकांनी आमच्या सेवेवर विश्वास दाखवला आहे. त्यांचे अनुभव वाचा.
           </p>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-2">
           {testimonials.map((t, i) => (
             <figure
               key={i}
-              className="flex flex-col rounded-2xl border border-brand-100 bg-white p-6 shadow-[var(--shadow-card)]"
+              className="relative flex min-w-0 shrink-0 basis-[85%] snap-center flex-col rounded-3xl border border-gray-100 bg-gray-50 p-6 shadow-sm transition-shadow hover:shadow-md md:basis-[45%] md:p-8 lg:basis-[32%]"
             >
-              <Quote className="h-6 w-6 text-brand-200" />
-              <blockquote className="font-deva mt-3 flex-1 text-sm leading-relaxed text-brand-700">
+              <Quote className="absolute right-6 top-6 h-10 w-10 text-gray-200" aria-hidden="true" />
+              <div className="mb-6 flex gap-1" aria-label="5/5">
+                {[0, 1, 2, 3, 4].map((n) => (
+                  <Star key={n} className="h-5 w-5 fill-brand-gold text-brand-gold" aria-hidden="true" />
+                ))}
+              </div>
+              <blockquote className="font-deva relative z-10 mb-6 line-clamp-4 min-h-[5.625rem] text-sm font-medium leading-relaxed text-gray-700 md:min-h-[6.25rem] md:text-base">
                 “{t.quote}”
               </blockquote>
-              <figcaption className="mt-5 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
+              <figcaption className="mt-auto flex items-center gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white bg-brand-teal/10 text-xs font-bold text-brand-teal shadow-sm">
                   {initials(t.name)}
                 </span>
                 <span>
-                  <span className="font-deva block text-sm font-bold text-brand-900">
-                    {t.name}
-                  </span>
-                  <span className="font-deva block text-xs text-brand-400">
-                    {t.role}
-                  </span>
+                  <span className="font-deva block text-sm font-bold text-gray-900">{t.name}</span>
+                  <span className="font-deva block text-xs text-brand-500">{t.role}</span>
                 </span>
               </figcaption>
             </figure>

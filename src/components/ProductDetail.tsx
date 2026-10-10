@@ -8,8 +8,7 @@ import {
   Star,
   ChevronRight,
   BookOpen,
-  Info,
-  AlertCircle,
+  Flame,
   ShieldCheck,
   Share2,
   ChevronDown,
@@ -166,104 +165,125 @@ export default function ProductDetail({
           <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} />
         </div>
 
-        {/* Info */}
+        {/* Info — styling follows the original site's book page */}
         <div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-teal px-2 py-0.5 text-xs font-black text-white">
-              <span className="text-[9px] tracking-wider text-brand-gold">ID</span>
-              {product.id}
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand-gold/30 bg-brand-teal px-2 py-0.5 text-brand-gold">
+              <span className="text-[8px] font-bold uppercase tracking-wider opacity-80">ID</span>
+              <span className="border-l border-brand-gold/20 pl-1.5 font-mono text-[11px] font-bold tracking-widest">
+                {product.id}
+              </span>
             </span>
             {product.isCombo && (
-              <span className="badge-combo font-deva inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+              <span className="badge-combo font-deva inline-block rounded-full px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
                 Combo Pack{product.setSize ? ` · ${product.setSize} Book Set` : ""}
               </span>
             )}
           </div>
-          <h1 className="font-deva text-2xl font-extrabold leading-snug text-brand-900 sm:text-3xl">
+          <h1 className="font-deva mb-3 text-xl font-black leading-tight text-brand-teal sm:text-2xl md:text-3xl lg:text-4xl">
             {product.title}
           </h1>
 
           {/* trust row */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-brand-500">
-            <span className="inline-flex items-center gap-1">
-              <Star className="h-4 w-4 fill-gold-500 text-gold-500" />
-              <b className="text-brand-700">{product.rating}/5</b>
+          <div className="font-deva mb-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+            <span className="flex items-center gap-0.5" aria-label={`${product.rating}/5`}>
+              {[0, 1, 2, 3, 4].map((n) => (
+                <Star key={n} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
+              ))}
+              <span className="ml-1 font-semibold text-gray-700">{product.rating}/5</span>
             </span>
-            <span className="text-brand-200">|</span>
-            <span>📦 {SITE.stats.trust} वाचकांनी विश्वास ठेवला</span>
-            <span className="text-brand-200">|</span>
-            <span className="inline-flex items-center gap-1 text-brand-600">
-              <Zap className="h-4 w-4" /> Instant Digital Delivery
+            <span className="text-gray-300">|</span>
+            <span>
+              📦 <strong className="text-gray-700">{SITE.stats.trust}</strong> वाचकांचा विश्वास
             </span>
+            <span className="text-gray-300">|</span>
+            <span className="font-medium text-green-600">✓ लगेच डिजिटल डिलिव्हरी</span>
           </div>
 
-          {/* price block */}
-          <div className="mt-5 rounded-2xl border border-brand-100 bg-brand-50/50 p-5">
-            <div className="flex flex-wrap items-end gap-3">
-              <span className="text-lg text-brand-400 line-through">
-                ₹{product.mrp}
-              </span>
-              <span className="text-4xl font-extrabold text-brand-700">
-                ₹{product.price}
-              </span>
-              <span className="font-deva pb-1 text-sm text-brand-500">फक्त</span>
-              {pct > 0 && (
-                <span className="badge-sale font-deva mb-1 rounded-md px-2 py-0.5 text-xs font-bold text-white">
-                  {pct}% सवलत
+          {/* price */}
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-green-100 bg-green-50/60 p-3 md:p-4">
+            <div className="flex flex-col">
+              {product.mrp > product.price && (
+                <span className="text-[11px] font-semibold text-gray-400 line-through decoration-red-400/60">
+                  ₹{product.mrp}
                 </span>
               )}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-black tracking-tight text-green-600 sm:text-4xl md:text-5xl">
+                  ₹{product.price}
+                </span>
+                <span className="font-deva text-[10px] font-bold text-gray-500 sm:text-xs">फक्त</span>
+              </div>
+              <span className="font-deva mt-0.5 text-[10px] font-semibold text-gray-500">
+                सर्व कर समाविष्ट (Inclusive of all taxes)
+              </span>
             </div>
-            <p className="mt-1 text-xs text-brand-400">
-              Inclusive of all taxes · No GST applicable
-            </p>
-            <p className="font-deva mt-1 text-xs font-medium text-sale-600">
-              ऑफर मर्यादित वेळेसाठी फक्त
-            </p>
-
-            <div id="buy-now" className="mt-4">
-              <BuyButton product={product} label={copy.downloadNow} />
-              <p className="font-deva mt-2 text-center text-xs font-semibold text-brand-600">
-                Login / Account ची गरज नाही · पेमेंटनंतर PDF लगेच डाउनलोड
-              </p>
-            </div>
-
-            {/* chips */}
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <Chip icon={FileText} title={`PDF (${LANGUAGE_LABELS[product.language]})`} />
-              <Chip icon={BookOpen} title={`${product.pages} पाने`} />
-              <Chip icon={Zap} title="Instant Download" />
-            </div>
+            {pct > 0 && (
+              <div className="ml-auto flex flex-col items-end gap-1.5">
+                <span className="font-deva animate-pulse rounded-lg border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 md:text-xs">
+                  {pct}% सवलत
+                </span>
+                <span className="font-deva inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                  <Flame className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  {copy.limitedOffer}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* notices */}
-          <div className="mt-4 space-y-2">
-            <Notice icon={Info}>
-              📄 हे केवळ Digital PDF E-Book आहे — कोणतीही Physical / Printed प्रत
-              पाठवली जात नाही.
-            </Notice>
-            <Notice icon={AlertCircle} tone="warn">
+          <div className="font-deva mb-3 space-y-1.5">
+            <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-medium text-blue-800">
+              📄 हे केवळ Digital PDF E-Book आहे — कोणतीही Physical / Printed प्रत पाठवली जात नाही.
+            </p>
+            <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-800">
               ⚠️ एकदा PDF डाउनलोड केल्यानंतर परतावा (Refund) शक्य नाही.
-            </Notice>
+            </p>
+          </div>
+
+          {/* buy */}
+          <div id="buy-now" className="mb-4 flex flex-col gap-2">
+            <BuyButton
+              product={product}
+              label={copy.downloadNow}
+              className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
+            />
+            <p className="font-deva flex items-center justify-center gap-1 text-center text-[10px] text-brand-500">
+              <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
+              सुरक्षित पेमेंट | UPI, Card, Netbanking · Login / Account ची गरज नाही
+            </p>
+          </div>
+
+          {/* chips */}
+          <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
+            <Chip icon={FileText} title={`PDF (${LANGUAGE_LABELS[product.language]})`} />
+            <Chip icon={BookOpen} title={`${product.pages} पाने`} />
+            <Chip icon={Zap} title="लगेच डाउनलोड" />
           </div>
 
           {/* mini how to buy */}
-          <div className="mt-6">
-            <h3 className="font-deva text-sm font-bold text-brand-800">
+          <div className="mb-4 rounded-2xl border border-brand-teal/10 bg-brand-teal/5 p-3 sm:p-4">
+            <h4 className="font-deva mb-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-brand-teal/60 sm:text-[10px]">
               खरेदी करण्याची पद्धत / How to Buy
-            </h3>
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {MINI_STEPS.map((s) => (
-                <div
-                  key={s.n}
-                  className="rounded-xl border border-brand-100 bg-white p-3 text-center"
-                >
-                  <span className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
-                    {s.n}
-                  </span>
-                  <p className="font-deva mt-2 text-xs font-semibold text-brand-800">
-                    {s.label}
-                  </p>
-                  <p className="text-[10px] text-brand-400">{s.en}</p>
+            </h4>
+            <div className="flex items-start justify-between gap-1 text-center">
+              {MINI_STEPS.map((s, i) => (
+                <div key={s.n} className="flex flex-1 items-center">
+                  <div className="flex flex-1 flex-col items-center gap-1">
+                    <span
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-black shadow-sm ${
+                        s.n === "✓" ? "border-green-200 bg-green-500 text-white" : "border-brand-teal/20 bg-white text-brand-teal"
+                      }`}
+                    >
+                      {s.n}
+                    </span>
+                    <span className="font-deva text-[9px] font-bold leading-tight text-gray-800 sm:text-[10px]">
+                      {s.label}
+                      <br />
+                      <span className="font-medium opacity-60">{s.en}</span>
+                    </span>
+                  </div>
+                  {i < MINI_STEPS.length - 1 && <div className="mb-4 h-px w-3 shrink-0 bg-brand-teal/20 sm:w-4" />}
                 </div>
               ))}
             </div>
@@ -299,37 +319,44 @@ export default function ProductDetail({
           )}
 
           {/* description */}
-          <div className="mt-8">
-            <h3 className="font-deva text-lg font-bold text-brand-900">
+          <div className="mt-6">
+            <h3 className="font-deva mb-1 text-sm font-bold text-brand-teal sm:text-base">
               वर्णन / Description
             </h3>
-            <div className="mt-3">
+            <div className="mt-2">
               <ExpandableText text={product.description} />
             </div>
           </div>
 
           {/* buy again + payment methods + share */}
-          <div className="mt-6 space-y-4 rounded-2xl border border-brand-100 bg-white p-4">
-            <BuyButton product={product} label={`${copy.downloadNow} (Download Now)`} />
-            <div>
-              <p className="font-deva flex items-center gap-1.5 text-xs font-bold text-brand-700">
-                <ShieldCheck className="h-4 w-4 text-green-600" /> सुरक्षित पेमेंट (Safe &amp; Secure Payment)
+          <div className="relative mt-6 w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-lg">
+            <div className="pointer-events-none absolute right-0 top-0 -mr-10 -mt-10 h-28 w-28 rounded-full bg-brand-gold/10 blur-2xl" />
+            <div className="relative z-10 flex flex-col gap-3">
+              <BuyButton
+                product={product}
+                label={`${copy.downloadNow} (Download Now)`}
+                className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
+              />
+              <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">
+                <ShieldCheck className="h-3.5 w-3.5 text-green-600" /> सुरक्षित पेमेंट (Safe &amp; Secure Payment)
               </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 {PAYMENT_METHODS.map((method) => (
-                  <span key={method} className="rounded-md border border-brand-100 bg-brand-50/60 px-2 py-1 text-[11px] font-bold text-brand-600">
+                  <span key={method} className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
                     {method}
                   </span>
                 ))}
               </div>
+              <div className="border-t border-gray-100 pt-3">
+                <ShareButton title={product.title} />
+              </div>
             </div>
-            <ShareButton title={product.title} />
           </div>
 
           {/* FAQ */}
           <div className="mt-8">
-            <h3 className="font-deva text-lg font-bold text-brand-900">
-              नेहमी विचारले जाणारे प्रश्न
+            <h3 className="font-deva flex items-center gap-2 text-base font-bold text-brand-teal sm:text-lg">
+              <ShieldCheck className="h-5 w-5" aria-hidden="true" /> नेहमी विचारले जाणारे प्रश्न
             </h3>
             <div className="mt-3 divide-y divide-brand-100 rounded-2xl border border-brand-100 bg-white">
               {PRODUCT_FAQ.map((item) => (
@@ -378,35 +405,10 @@ export default function ProductDetail({
 
 function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <div className="rounded-xl bg-white px-2 py-2.5 shadow-sm">
-      <Icon className="mx-auto h-4 w-4 text-brand-600" />
-      <p className="font-deva mt-1 text-[11px] font-semibold text-brand-700">
-        {title}
-      </p>
-    </div>
-  );
-}
-
-function Notice({
-  icon: Icon,
-  children,
-  tone = "info",
-}: {
-  icon: React.ElementType;
-  children: React.ReactNode;
-  tone?: "info" | "warn";
-}) {
-  const styles =
-    tone === "warn"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
-      : "border-brand-100 bg-brand-50/60 text-brand-700";
-  return (
-    <div
-      className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed ${styles}`}
-    >
-      <Icon className="mt-0.5 h-4 w-4 flex-shrink-0" />
-      <p className="font-deva">{children}</p>
-    </div>
+    <span className="inline-flex items-center gap-1 rounded-full border border-gray-100 bg-gray-50 px-2.5 py-1">
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {title}
+    </span>
   );
 }
 

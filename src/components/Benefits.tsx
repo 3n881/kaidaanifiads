@@ -38,28 +38,28 @@ const HEADINGS = { mr: "नागरिकांसाठी महत्त्�
 export default function Benefits() {
   const { locale } = useLanguage();
   return (
-    <section className="py-16">
-      <div className="container-x">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-deva text-2xl font-extrabold text-brand-900 sm:text-3xl">
-            {HEADINGS[locale]}
-          </h2>
-        </div>
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
+    <section className="bg-white py-12 md:py-20">
+      <div className="mx-auto max-w-6xl px-4 text-center">
+        <h2 className="font-deva relative mb-10 inline-block text-2xl font-bold text-brand-teal md:mb-16 md:text-4xl">
+          {HEADINGS[locale]}
+          <span className="absolute -bottom-3 left-1/2 h-1 w-16 -translate-x-1/2 rounded-full bg-brand-gold md:h-1.5 md:w-24" />
+        </h2>
+        <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
           {BENEFITS[locale].map((b, i) => (
             <div
               key={i}
-              className="rounded-2xl border border-brand-100 bg-white p-6 text-center shadow-[var(--shadow-card)]"
+              className="group relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl md:p-8"
             >
-              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                <b.icon className="h-7 w-7" />
-              </span>
-              <h3 className="font-deva mt-4 text-lg font-bold text-brand-900">
+              {i === 1 && (
+                <div className="absolute right-0 top-0 -mr-4 -mt-4 h-24 w-24 rounded-bl-full bg-brand-gold/10 transition-transform group-hover:scale-110" />
+              )}
+              <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-teal/5 text-brand-teal transition-colors duration-300 group-hover:bg-brand-gold/20 md:mb-6 md:h-20 md:w-20">
+                <b.icon className="h-8 w-8 md:h-9 md:w-9" aria-hidden="true" />
+              </div>
+              <h3 className="font-deva relative mb-3 text-xl font-bold text-brand-teal md:mb-4 md:text-2xl">
                 {b.title}
               </h3>
-              <p className="font-deva mt-2 text-sm leading-relaxed text-brand-500">
-                {b.desc}
-              </p>
+              <p className="font-deva relative text-base leading-relaxed text-brand-500 md:text-lg">{b.desc}</p>
             </div>
           ))}
         </div>

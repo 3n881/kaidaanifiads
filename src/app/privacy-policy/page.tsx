@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Privacy Policy" };
 export default function Page() {
   return (
     <PolicyPage
-      title="Privacy Policy (गोपनीयता धोरण)"
+      title="गोपनीयता धोरण (Privacy Policy)"
       intro="We respect your privacy. This policy explains what information we collect when you purchase our digital ebooks and how we use it."
       sections={[
         {

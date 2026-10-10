@@ -313,7 +313,7 @@ export const SITE = {
   address: "Floor No. 3, Amit Court Building, Civil Court, Shivaji Nagar, पुणे, महाराष्ट्र 411004",
   proprietor: "Shrutika Gochade",
   udyam: "UDYAM-MH-26-1024122",
-  instagram: "https://instagram.com",
+  instagram: "https://www.instagram.com/kaydyach_aani_faydyach/",
   stats: { readers: "1000+", rating: "4.8/5", trust: "10,000+" },
   popularTags: ["वारसा हक्क", "शेतकरी कायदा", "घर खरेदी"],
 } as const;

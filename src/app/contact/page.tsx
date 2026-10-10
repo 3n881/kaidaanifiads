@@ -7,67 +7,87 @@ export const metadata: Metadata = {
   description: "कायद्याचं आणि फायद्याचं — संपर्क माहिती, ईमेल, फोन आणि पत्ता.",
 };
 
-export default function ContactPage() {
-  const wa = SITE.whatsapp.replace(/\D/g, "");
+const digits = (phone: string) => phone.replace(/\D/g, "");
+
+function Card({
+  icon: Icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: React.ElementType;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="container-x max-w-4xl py-12">
-      <h1 className="font-deva text-3xl font-extrabold text-brand-900">
-        संपर्क (Contact Us)
-      </h1>
-      <p className="font-deva mt-2 text-brand-500">
-        काही अडचण किंवा प्रश्न? आम्ही मदतीसाठी तत्पर आहोत.
-      </p>
-
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <a
-          href={`mailto:${SITE.email}`}
-          className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)] transition hover:border-brand-300"
-        >
-          <Mail className="h-5 w-5 text-brand-600" />
-          <span>
-            <span className="block text-sm font-bold text-brand-900">Email</span>
-            <span className="break-all text-sm text-brand-500">{SITE.email}</span>
-          </span>
-        </a>
-        <a
-          href={`tel:${SITE.contactPhone.replace(/\s/g, "")}`}
-          className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)] transition hover:border-brand-300"
-        >
-          <Phone className="h-5 w-5 text-brand-600" />
-          <span>
-            <span className="block text-sm font-bold text-brand-900">Phone</span>
-            <span className="text-sm text-brand-500">{SITE.contactPhone}</span>
-          </span>
-        </a>
-        <a
-          href={`https://wa.me/${wa}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)] transition hover:border-brand-300"
-        >
-          <MessageCircle className="h-5 w-5 text-brand-600" />
-          <span>
-            <span className="block text-sm font-bold text-brand-900">WhatsApp</span>
-            <span className="text-sm text-brand-500">{SITE.whatsapp}</span>
-          </span>
-        </a>
-        <div className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]">
-          <MapPin className="h-5 w-5 text-brand-600" />
-          <span>
-            <span className="block text-sm font-bold text-brand-900">Location</span>
-            <span className="font-deva text-sm text-brand-500">{SITE.address}</span>
-          </span>
-        </div>
+    <div className="flex items-start gap-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+      <span className="shrink-0 rounded-full bg-white p-3 text-brand-teal shadow-sm">
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <h3 className="mb-1 font-semibold text-gray-900">{title}</h3>
+        {hint && <p className="mb-1 text-sm text-gray-500">{hint}</p>}
+        {children}
       </div>
+    </div>
+  );
+}
 
-      <div className="font-deva mt-8 rounded-2xl border border-brand-100 bg-brand-50/60 p-5 text-sm text-brand-600">
-        सपोर्टसाठी थेट व्हॉट्सॲप करा:{" "}
-        <a
-          href={`https://wa.me/${SITE.supportPhone.replace(/\D/g, "")}`}
-          className="font-semibold text-brand-700 hover:underline"
-        >
-          {SITE.supportPhone}
-        </a>
+/** Contact page — styling follows the original site. */
+export default function ContactPage() {
+  const link = "break-all text-lg font-medium text-brand-teal hover:underline";
+  return (
+    <div className="container-x">
+      <div className="mx-auto max-w-4xl py-12 md:py-16">
+        <h1 className="font-deva mb-8 bg-gradient-to-r from-brand-teal to-teal-600 bg-clip-text text-center text-3xl font-bold text-transparent md:text-4xl">
+          Contact Us / संपर्क करा
+        </h1>
+        <div className="mx-auto mb-8 max-w-2xl text-center">
+          <p className="font-deva text-lg text-gray-700">
+            ई-बुक्सबद्दल प्रश्न आहेत किंवा ऑर्डर सपोर्ट हवे आहे? आम्ही मदत करायला तत्पर आहोत.
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            (Questions about our digital ebooks or need order support? We&apos;re here to help.)
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card icon={Mail} title="Email Support" hint="For general inquiries and order support:">
+            <a href={`mailto:${SITE.email}`} className={link}>
+              {SITE.email}
+            </a>
+          </Card>
+          <Card icon={Phone} title="Call Us" hint="Mon – Sat, 9:00 AM – 6:00 PM IST">
+            <a href={`tel:+${digits(SITE.contactPhone)}`} className={link}>
+              {SITE.contactPhone}
+            </a>
+          </Card>
+          <Card icon={MessageCircle} title="WhatsApp Support" hint="Chat with us for quick help">
+            <a href={`https://wa.me/${digits(SITE.whatsapp)}`} target="_blank" rel="noopener noreferrer" className={link}>
+              {SITE.whatsapp}
+            </a>
+          </Card>
+          <Card icon={MapPin} title="Office Address">
+            <p className="font-deva text-gray-700">
+              <strong>Kaydyacha Ani Faydyacha</strong>
+              <br />
+              (Brand: कायद्याचं आणि फायद्याचं)
+              <br />
+              {SITE.address}
+            </p>
+          </Card>
+        </div>
+
+        <div className="font-deva mt-8 rounded-2xl bg-brand-teal/5 p-5 text-center text-sm text-gray-600">
+          ई-बुक डाउनलोडसाठी मदत हवी? थेट व्हॉट्सॲप करा:{" "}
+          <a
+            href={`https://wa.me/${digits(SITE.supportPhone)}`}
+            className="font-bold text-gray-900 hover:underline"
+          >
+            {SITE.supportPhone}
+          </a>
+        </div>
       </div>
     </div>
   );

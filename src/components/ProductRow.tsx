@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import Carousel from "./Carousel";
 import type { Locale } from "@/lib/i18n";
@@ -9,6 +8,7 @@ import { useLanguage } from "./LanguageProvider";
 
 type LocalizedText = string | Record<Locale, string>;
 
+/** Home-page book row — centred heading, swipe carousel, "view all" below (as on the original). */
 export default function ProductRow({
   eyebrow,
   title,
@@ -16,6 +16,7 @@ export default function ProductRow({
   products,
   viewAllHref,
   viewAllLabel,
+  tinted = false,
 }: {
   eyebrow?: string;
   title: LocalizedText;
@@ -23,39 +24,40 @@ export default function ProductRow({
   products: Product[];
   viewAllHref: string;
   viewAllLabel: LocalizedText;
+  /** Light navy background (combos) instead of light grey. */
+  tinted?: boolean;
 }) {
   const { locale } = useLanguage();
-  const text = (value: LocalizedText) => typeof value === "string" ? value : value[locale];
-  // Every title, as on the previous site; cards show each book's own edition.
-  const localizedProducts = products;
-  if (localizedProducts.length === 0) return null;
+  const text = (value: LocalizedText) => (typeof value === "string" ? value : value[locale]);
+  if (products.length === 0) return null;
   return (
-    <section className="py-14">
-      <div className="container-x">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            {eyebrow && (
-              <span className="font-deva inline-block rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
-                {eyebrow}
-              </span>
-            )}
-            <h2 className="font-deva mt-3 text-2xl font-extrabold text-brand-900 sm:text-3xl">
+    <section className={`overflow-hidden py-8 md:py-16 ${tinted ? "bg-brand-teal/5" : "bg-gray-50/50"}`}>
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="mb-8 space-y-3 text-center">
+          {eyebrow && (
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-gold/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-gold">
+              {eyebrow}
+            </div>
+          )}
+          <div>
+            <h2 className="font-deva relative inline-block text-xl font-extrabold text-brand-teal md:text-4xl">
               {text(title)}
             </h2>
-            {subtitle && (
-              <p className="font-deva mt-2 text-brand-500">{text(subtitle)}</p>
-            )}
           </div>
-          <Link
-            href={viewAllHref}
-            className="font-deva inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-brand-200 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-          >
-            {text(viewAllLabel)} <ArrowRight className="h-4 w-4" />
-          </Link>
+          {subtitle && (
+            <p className="font-deva mx-auto max-w-2xl text-sm text-brand-500 md:text-base">{text(subtitle)}</p>
+          )}
         </div>
 
-        <div className="mt-8">
-          <Carousel products={localizedProducts} />
+        <Carousel products={products} />
+
+        <div className="mt-12 text-center">
+          <Link
+            href={viewAllHref}
+            className="font-deva inline-flex h-10 items-center justify-center rounded-full border-2 border-brand-teal bg-white px-8 text-base font-bold text-brand-teal shadow-xs transition-colors hover:bg-brand-teal hover:text-white"
+          >
+            {text(viewAllLabel)}
+          </Link>
         </div>
       </div>
     </section>

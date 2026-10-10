@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Flame } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { discountPercent, localizeProduct } from "@/lib/catalog";
 import CoverImage from "./CoverImage";
-import PriceTag from "./PriceTag";
 import BuyButton from "./BuyButton";
 import { UI_COPY } from "@/lib/i18n";
 import { useLanguage } from "./LanguageProvider";
@@ -53,24 +53,40 @@ export default function ProductCard({ product }: { product: Product }) {
         </span>
       </Link>
 
-      <div className="flex flex-1 flex-col p-4">
-        <Link href={href}>
-          <h3 className="font-deva text-[15px] font-bold leading-snug text-brand-900 line-clamp-2 transition group-hover:text-brand-700">
+      <div className="flex flex-1 flex-col p-3">
+        <Link href={href} className="mb-1 min-h-11">
+          <h3 className="font-deva text-[15px] font-bold leading-tight text-brand-900 line-clamp-2 transition-colors group-hover:text-brand-700">
             {product.title}
           </h3>
         </Link>
-        <p className="mt-2 font-deva text-xs leading-relaxed text-brand-500 line-clamp-3">
+        <p className="mb-3 font-deva text-xs text-brand-500 line-clamp-2">
           {product.shortDescription}
         </p>
-
-        <div className="mt-auto pt-4">
-          <p className="mb-1 text-[11px] font-medium text-sale-600">
+        {pct > 0 && (
+          <p className="font-deva mb-3 inline-flex items-center gap-1.5 self-start rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold leading-tight text-red-600">
+            <Flame className="h-3 w-3 shrink-0" aria-hidden="true" />
             {copy.limitedOffer}
           </p>
-          <PriceTag product={product} />
-          <div className="mt-3">
-            <BuyButton product={product} />
+        )}
+
+        {/* Price (struck MRP above the price) + compact buy button, as on the original */}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-brand-50 pt-3">
+          <div className="flex flex-col">
+            {product.mrp > product.price && (
+              <span className="mb-1 text-xs font-bold leading-none text-brand-300 line-through decoration-red-400/50">
+                ₹{product.mrp}
+              </span>
+            )}
+            <span className="flex items-center gap-0.5 text-xl font-extrabold leading-none text-red-600">
+              <span className="text-sm">₹</span>
+              {product.price}
+            </span>
           </div>
+          <BuyButton
+            product={product}
+            showIcon={false}
+            className="font-deva flex min-h-8 max-w-[60%] items-center justify-center rounded-lg bg-brand-teal px-3 py-1 text-center text-[11px] font-bold leading-tight text-white shadow-sm transition-colors hover:bg-brand-teal/90 active:scale-[0.98]"
+          />
         </div>
       </div>
     </article>

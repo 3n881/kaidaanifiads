@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Data Deletion" };
 export default function Page() {
   return (
     <PolicyPage
-      title="Data Deletion Policy (माहिती हटवण्याचे धोरण)"
+      title="माहिती हटवण्याचे धोरण (Data Deletion Policy)"
       intro="You have the right to request deletion of the personal data we hold about you."
       sections={[
         {

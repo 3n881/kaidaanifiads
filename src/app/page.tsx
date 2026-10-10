@@ -17,7 +17,6 @@ export default async function Home() {
 
       <Reveal>
         <ProductRow
-          eyebrow="Bestsellers"
           title={{ mr: "सर्वाधिक विक्री होणारी पुस्तके", hi: "सबसे अधिक बिकने वाली किताबें", en: "Bestselling books" }}
           subtitle={{ mr: "तुमच्या कायदेशीर गरजांसाठी खास निवडलेली आणि तज्ञांनी लिहिलेली पुस्तके.", hi: "आपकी कानूनी जरूरतों के लिए विशेषज्ञों द्वारा तैयार किताबें।", en: "Expert-created books selected for your legal information needs." }}
           products={bestsellers}
@@ -26,11 +25,12 @@ export default async function Home() {
         />
       </Reveal>
 
-      <div className="bg-brand-50/40">
+      <div>
         <Reveal>
           <ProductRow
+            tinted
             eyebrow="Special Packages"
-            title={{ mr: "कायदेशीर कॉम्बो पॅक्स", hi: "कानूनी कॉम्बो पैक्स", en: "Legal combo packs" }}
+            title={{ mr: "कायदेशीर कॉम्बो पॅक्स (Combos)", hi: "कानूनी कॉम्बो पैक्स (Combos)", en: "Legal combo packs" }}
             subtitle={{ mr: "एकापेक्षा जास्त पुस्तकांचे संच आता आकर्षक सवलतीत उपलब्ध.", hi: "एक से अधिक किताबों के सेट आकर्षक छूट पर उपलब्ध हैं।", en: "Multi-book sets with useful savings, all in one place." }}
             products={combos}
             viewAllHref="/combos"

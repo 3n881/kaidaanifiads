@@ -108,9 +108,9 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
           <button
             onClick={() => setPaletteOpen(true)}
             aria-label="शोधा"
-            className="rounded-lg border border-brand-200 p-2 text-brand-500"
+            className="rounded-md p-2 text-brand-500 transition-colors hover:bg-gray-100 hover:text-brand-teal"
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-5 w-5" />
           </button>
           <button
             onClick={() => setMenuPath(menuOpen ? null : pathname)}

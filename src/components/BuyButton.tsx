@@ -76,10 +76,12 @@ export default function BuyButton({
   product,
   className = "",
   label,
+  showIcon = true,
 }: {
   product: Product;
   className?: string;
   label?: string;
+  showIcon?: boolean;
 }) {
   const { locale } = useLanguage();
   // The edition on sale can differ from the site language (Hindi-only book).
@@ -103,7 +105,7 @@ export default function BuyButton({
           "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.98]"
         }
       >
-        <Download className="h-4 w-4" aria-hidden="true" />
+        {showIcon && <Download className="h-4 w-4" aria-hidden="true" />}
         {label ?? copy.downloadPdf}
       </button>
       {open && (

@@ -233,8 +233,8 @@ The user wants our site to **look and behave like the original**. Done:
   hero has one "प्रकाशन पहा (View Books)" button; home has no FAQ block.
 - `/ebooks` lists every title (combos badged); home rows show all languages.
 - Old URLs redirect (`next.config.js` → `redirects()`): `/ebooks/<old cuid>` → our slug
-  (permanent for the 9, temporary for the 5 pending), `/ebooks/hindi`, `/ebooks/english`,
-  `/site-index`.
+  (permanent for the 9, temporary for the 5 pending), `/ebooks/hindi`, `/ebooks/english`.
+  `/site-index` is a real page (human-readable site map, 2026-10-10).
 - WhatsApp uses the **same approved templates and sender** as the original site.
 
 **Deliberate differences (keep them):** the original collects name + WhatsApp

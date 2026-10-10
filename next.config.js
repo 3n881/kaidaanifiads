@@ -70,7 +70,6 @@ const nextConfig = (() => {
         })),
         { source: "/ebooks/hindi", destination: "/ebooks?lang=Hindi", permanent: true },
         { source: "/ebooks/english", destination: "/ebooks", permanent: false },
-        { source: "/site-index", destination: "/ebooks", permanent: true },
       ];
     },
     async headers() {

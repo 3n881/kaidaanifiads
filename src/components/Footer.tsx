@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, Phone, MapPin, Camera } from "lucide-react";
+import { Mail, Phone, MapPin, MessageCircle } from "lucide-react";
 import { SITE } from "@/data/catalog";
 
 const QUICK = [
@@ -16,7 +16,7 @@ const SHOP = [
   { href: "/combos", label: "Combo Packs (कॉम्बो)" },
   { href: "/ebooks?lang=Hindi", label: "हिंदी ई-बुक्स" },
   { href: "/ebooks?lang=English", label: "English Ebooks" },
-  { href: "/sitemap.xml", label: "Sitemap (साइटमॅप)" },
+  { href: "/site-index", label: "Sitemap (साइटमॅप)" },
 ];
 
 const LEGAL = [
@@ -29,132 +29,155 @@ const LEGAL = [
   { href: "/shipping-policy", label: "Delivery" },
 ];
 
+const digits = (phone: string) => phone.replace(/\D/g, "");
+
+const CONTACT = [
+  { icon: Mail, label: "Email", value: SITE.email, href: `mailto:${SITE.email}` },
+  { icon: Phone, label: "Phone", value: SITE.contactPhone, href: `tel:+${digits(SITE.contactPhone)}` },
+  { icon: MessageCircle, label: "WhatsApp", value: SITE.whatsapp, href: `https://wa.me/${digits(SITE.whatsapp)}` },
+  { icon: MapPin, label: "Location", value: SITE.address },
+];
+
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function LinkColumn({ title, links }: { title: string; links: { href: string; label: string }[] }) {
+  return (
+    <div>
+      <h3 className="font-deva mb-8 text-lg font-bold text-brand-gold">{title}</h3>
+      <ul className="space-y-4">
+        {links.map((l) => (
+          <li key={l.href + l.label}>
+            <Link
+              href={l.href}
+              className="font-deva group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold" />
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Site footer — layout and styling follow the original site. */
 export default function Footer() {
   return (
-    <footer className="mt-16 border-t border-brand-100 bg-brand-900 text-brand-100">
-      <div className="container-x grid grid-cols-1 gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Brand */}
-        <div>
-          <div className="inline-flex rounded-xl bg-white/95 px-3 py-2">
-            <Image
-              src="/brand/logo.png"
-              alt="कायद्याचं आणि फायद्याचं"
-              width={253}
-              height={44}
-              className="h-11 w-auto object-contain"
-            />
-          </div>
-          <p className="font-deva mt-3 text-sm leading-relaxed text-brand-200">
-            कायद्याचे ज्ञान, सामाजिक भान. आम्ही तुमच्या हक्कासाठी नेहमीच तत्पर.
-          </p>
-          <a
-            href={SITE.instagram}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/20"
-          >
-            <Camera className="h-4 w-4" /> Follow on Instagram
-          </a>
-        </div>
+    <footer className="relative overflow-hidden bg-brand-teal pb-24 pt-20 text-white md:pb-10">
+      {/* soft gold glows */}
+      <div className="pointer-events-none absolute right-0 top-0 -mr-20 -mt-20 h-96 w-96 rounded-full bg-brand-gold/5 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-0 left-0 -mb-16 -ml-16 h-64 w-64 rounded-full bg-brand-gold/5 blur-3xl" />
 
-        {/* Quick links */}
-        <div>
-          <h4 className="font-deva text-sm font-bold text-white">
-            महत्वाचे दुवे (Quick Links)
-          </h4>
-          <ul className="mt-4 space-y-2 text-sm">
-            {QUICK.map((l) => (
-              <li key={l.href}>
-                <Link
-                  href={l.href}
-                  className="font-deva text-brand-200 transition hover:text-white"
-                >
-                  {l.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Shop */}
-        <div>
-          <h4 className="font-deva text-sm font-bold text-white">खरेदी (Shop)</h4>
-          <ul className="mt-4 space-y-2 text-sm">
-            {SHOP.map((l) => (
-              <li key={l.href}>
-                <Link
-                  href={l.href}
-                  className="font-deva text-brand-200 transition hover:text-white"
-                >
-                  {l.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Contact */}
-        <div>
-          <h4 className="font-deva text-sm font-bold text-white">
-            संपर्क (Contact Us)
-          </h4>
-          <ul className="mt-4 space-y-3 text-sm">
-            <li className="flex items-start gap-2">
-              <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-300" />
-              <a href={`mailto:${SITE.email}`} className="break-all hover:text-white">
-                {SITE.email}
+      <div className="relative z-10 mx-auto max-w-6xl px-4">
+        <div className="mb-16 grid gap-12 border-b border-white/10 pb-16 md:grid-cols-2 lg:grid-cols-5">
+          {/* Brand */}
+          <div className="space-y-6 md:col-span-2">
+            <Link href="/" className="group flex items-center gap-3">
+              <Image
+                src="/brand/logo.png"
+                alt="कायद्याचं आणि फायद्याचं"
+                width={276}
+                height={48}
+                className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+            </Link>
+            <h3 className="font-deva bg-gradient-to-r from-white to-gray-300 bg-clip-text text-3xl font-bold text-transparent">
+              कायद्याचं आणि फायद्याचं
+            </h3>
+            <p className="font-deva max-w-sm text-lg font-light leading-relaxed opacity-80">
+              कायद्याचे ज्ञान, सामाजिक भान.
+              <br />
+              आम्ही तुमच्या हक्कासाठी नेहमीच तत्पर.
+            </p>
+            <div className="pt-6">
+              <a
+                href={SITE.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 px-6 py-2.5 font-bold text-white shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-xl"
+              >
+                <InstagramIcon className="h-5 w-5" />
+                <span>Follow on Instagram</span>
               </a>
-            </li>
-            <li className="flex items-start gap-2">
-              <Phone className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-300" />
-              <span>{SITE.contactPhone}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-300" />
-              <span className="font-deva">{SITE.address}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {/* Legal row */}
-      <div className="border-t border-white/10">
-        <div className="container-x flex flex-col gap-4 py-6 text-xs text-brand-300 sm:flex-row sm:items-center sm:justify-between">
+          <LinkColumn title="महत्वाचे दुवे (Quick Links)" links={QUICK} />
+          <LinkColumn title="खरेदी (Shop)" links={SHOP} />
+
+          {/* Contact */}
           <div>
-            <p>© 2026 Kaydyacha Ani Faydyach. All rights reserved.</p>
-            <p className="mt-1">
-              Proprietor: {SITE.proprietor} | Udyam: {SITE.udyam}
+            <h3 className="font-deva mb-8 text-lg font-bold text-brand-gold">संपर्क (Contact Us)</h3>
+            <ul className="space-y-5">
+              {CONTACT.map(({ icon: Icon, label, value, href }) => (
+                <li key={label} className="group flex items-start gap-4 opacity-90 transition-colors hover:text-brand-gold">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 transition-colors group-hover:bg-brand-gold group-hover:text-brand-teal">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 text-sm">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider opacity-90">{label}</p>
+                    {href ? (
+                      <a
+                        href={href}
+                        className="break-all hover:underline"
+                        {...(href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      <span className="font-deva">{value}</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Copyright + business details + legal links */}
+        <div className="mt-8 flex flex-col items-center justify-between gap-6 border-t border-white/10 pt-8 md:flex-row">
+          <div className="flex flex-col items-center gap-2 md:items-start">
+            <p className="text-sm opacity-60">© 2026 Kaydyacha Ani Faydyach. All rights reserved.</p>
+            <div className="mt-4 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 backdrop-blur-sm transition-colors hover:border-brand-gold/30">
+              <p className="text-center text-[10px] font-bold uppercase tracking-widest text-gray-300 md:text-xs">
+                Kaydyacha Ani Faydyacha | Proprietor: {SITE.proprietor} | Udyam: {SITE.udyam}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-4 text-xs opacity-60 md:justify-end md:gap-6 md:text-sm">
+            {LEGAL.map((l) => (
+              <Link key={l.href + l.label} href={l.href} className="transition-colors hover:text-brand-gold">
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Disclaimer */}
+        <div className="border-t border-white/5 py-6 text-center">
+          <div className="mx-auto max-w-4xl space-y-3 text-[10px] font-medium leading-relaxed text-gray-400 opacity-60 md:text-xs">
+            <p>
+              <strong>DISCLAIMER:</strong> The information provided on this website and in our
+              digital products is for educational and informational purposes only. It does not
+              constitute legal advice or professional legal services. No attorney-client
+              relationship is created by your use of this site. Please consult with a qualified
+              advocate for advice on your specific legal issues.
+            </p>
+            <p className="font-deva font-light">
+              <strong>अस्वीकरण:</strong> या वेबसाइटवर आणि आमच्या डिजिटल उत्पादनांमध्ये दिलेली
+              माहिती केवळ शैक्षणिक आणि माहितीच्या उद्देशाने आहे. हा कायदेशीर सल्ला किंवा व्यावसायिक
+              कायदेशीर सेवा नाही. विशिष्ट कायदेशीर समस्येसाठी पात्र वकिलाचा सल्ला घ्या.
             </p>
           </div>
-          <ul className="flex flex-wrap gap-x-4 gap-y-2">
-            {LEGAL.map((l) => (
-              <li key={l.href + l.label}>
-                <Link href={l.href} className="transition hover:text-white">
-                  {l.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Disclaimer */}
-      <div className="bg-black/20">
-        <div className="container-x space-y-2 py-5 text-[11px] leading-relaxed text-brand-300">
-          <p>
-            <b className="text-brand-200">DISCLAIMER:</b> The information provided
-            on this website and in our digital products is for educational and
-            informational purposes only. It does not constitute legal advice or
-            professional legal services. No attorney-client relationship is created
-            by your use of this site. Please consult with a qualified advocate for
-            advice on your specific legal issues.
-          </p>
-          <p className="font-deva">
-            <b className="text-brand-200">अस्वीकरण:</b> या वेबसाइटवर आणि आमच्या
-            डिजिटल उत्पादनांमध्ये दिलेली माहिती केवळ शैक्षणिक आणि माहितीच्या
-            उद्देशाने आहे. हा कायदेशीर सल्ला किंवा व्यावसायिक कायदेशीर सेवा नाही.
-            विशिष्ट कायदेशीर समस्येसाठी पात्र वकिलाचा सल्ला घ्या.
-          </p>
         </div>
       </div>
     </footer>

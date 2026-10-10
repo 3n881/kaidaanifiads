@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Catalog from "@/components/Catalog";
 import DisclaimerBanner from "@/components/DisclaimerBanner";
+import ListBanner from "@/components/ListBanner";
 import { getAllProducts } from "@/lib/products";
 
 export const revalidate = 300;
@@ -17,19 +18,18 @@ export default async function EbooksPage() {
   // site; /combos stays a combos-only view.
   const ebooks = await getAllProducts();
   return (
-    <div className="container-x py-10">
-      <header className="mb-6">
-        <h1 className="font-deva text-2xl font-extrabold text-brand-teal md:text-4xl">
-          Legal Knowledge Simplified /{" "}
-          <span className="text-brand-600">ज्ञान हीच शक्ती</span>
-        </h1>
-        <p className="mt-2 text-sm text-brand-500 md:text-base">
-          Digital PDF Ebooks · Instant Delivery · Inclusive of all taxes
-        </p>
-      </header>
-      <DisclaimerBanner className="mb-8 max-w-2xl" />
+    <div className="min-h-screen bg-white">
+      <ListBanner
+        title={
+          <>
+            Legal Knowledge Simplified /{" "}
+            <span className="text-brand-gold">ज्ञान हीच शक्ती</span>
+          </>
+        }
+        subtitle="Digital PDF Ebooks · Instant Delivery · Inclusive of all taxes"
+      />
       <Suspense fallback={<div className="py-16 text-center text-brand-400">लोड होत आहे…</div>}>
-        <Catalog products={ebooks} />
+        <Catalog products={ebooks} notice={<DisclaimerBanner className="max-w-2xl" />} />
       </Suspense>
     </div>
   );
