@@ -45,6 +45,7 @@
 | 11 | 10-09 | **Gap in the existing deploy:** the firewall allowed SSH only from the admin's IP, but GitHub's deploy logs in over SSH from GitHub's machines — every automatic deploy would have been blocked. | `deploy.yml` now opens SSH for the runner's own IP only while it deploys and always closes it (EC2 security group, IAM user limited to that one group: `deploy/github-deploy-iam-policy.json`). New EC2 firewall script `deploy/ec2-firewall.sh`. |
 | 12 | 10-09 | "Which server is fastest?" | EC2 Mumbai: Supabase Mumbai runs on AWS `ap-south-1`, so DB calls are ~1 ms (vs ~15–20 ms from DigitalOcean Bangalore). Page/image speed is decided by Cloudflare's India edge (~99 % of requests never reach the server). |
 | 14 | 10-10 | Lightsail needs the same "SSH only while deploying" as EC2 (problem 11). | `deploy.yml` also handles Lightsail: with variable `DEPLOY_LIGHTSAIL_INSTANCE=kaf-a` it reads the instance's firewall, adds the runner's IP to port 22, deploys, then restores the exact previous rules (IAM policy `deploy/github-deploy-iam-policy-lightsail.json`; rule logic tested with jq). |
+| 15 | 10-10 | Replov never had `ORDER_ACCESS_SECRET` (it fell back to the Razorpay key secret for signing order links). | A new 64-char `ORDER_ACCESS_SECRET` was generated for the server (`/opt/kaf/app.env`, local copy `C:\Users\shivr\kaf-keys\app.env`). No real sales yet, so nothing breaks; only old Replov test-order links won't open on the new server. **Never change it after real sales.** |
 | 13 | 10-09 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` is passed by `deploy.yml` as a build secret, but the Dockerfile doesn't read it (legacy builder, no BuildKit secrets). | Harmless: one image is built per release and runs on every container, so Server Action keys already match. Leave the secret unset. |
 
 ### AWS Support case text (for problem 8)
@@ -137,7 +138,7 @@ that risk expensive.
 |---|---|---|
 | 0. Repo prep | Claude | ✅ done 2026-10-04 |
 | 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, AWS ✅, GitHub variables ⏳ |
-| 2. Server (one Lightsail) | you + Claude | instance ✅ created 10-10 → firewall, deploy access, setup: `docs/setup-steps-lightsail.md` |
+| 2. Server (one Lightsail) | you + Claude | ✅ 10-10: instance, firewall, GitHub deploy access, server setup (`docs/setup-steps-lightsail.md` Steps 3–6) |
 | 3. First deploy on staging | you | |
 | 4. Functional tests on staging | you (phone) + Claude (database) | |
 | 5. Speed + load tests | you + Claude | |
@@ -296,8 +297,8 @@ already points at Mumbai.
 - [ ] `/opt/kaf/app.env` for staging (`chmod 600`):
   - Supabase: **Mumbai** values (from `.env.mumbai`).
   - Razorpay **test** key ID + secret; a **new** webhook secret for the staging webhook.
-  - `ORDER_ACCESS_SECRET`, `CRON_SECRET`: **reuse Replov's values** (test-order links keep
-    working). `ORDER_ACCESS_SECRET` must never change after real sales.
+  - `ORDER_ACCESS_SECRET`: generated new 2026-10-10 (Replov had none) — never change after
+    real sales. `CRON_SECRET`: same as Replov.
   - Interakt + `ADMIN_EMAILS`: same as on Replov. Cloudflare `CLOUDFLARE_ZONE_ID` /
     `CLOUDFLARE_API_TOKEN` from `.env.mumbai`.
   - `NEXT_PUBLIC_SITE_URL=https://new.kaydyachaanifayddyacha.com`

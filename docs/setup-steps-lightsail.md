@@ -110,26 +110,31 @@ policy isn't attached to `github-deploy`.
 
 ---
 
-## Step 6 — Set up the server (together with Claude, ~30 min)
+## Step 6 — Set up the server ✅ (done by Claude 2026-10-10 from the admin laptop)
+
+> Done: Docker 29.9 + Compose, 1 GB swap, automatic updates, `/opt/kaf` files, Origin
+> certificate (valid to 2041, key matches), `app.env` (all required values, `chmod 600`), GHCR
+> login. Local copies used: `C:\Users\shivr\kaf-keys` (key, certs, `app.env`, `ghcr-token.txt`).
+> `ORDER_ACCESS_SECRET` was **generated new** (Replov had none) — never change it after real sales.
 
 Windows **PowerShell**, in the folder with `kaf-key.pem`, `origin.pem`, `origin.key`.
 
-- [ ] **6.1 Lock the key file:**
+- [x] **6.1 Lock the key file:**
       ```powershell
       icacls .\kaf-key.pem /inheritance:r
       icacls .\kaf-key.pem /grant:r "$($env:USERNAME):(R)"
       ```
-- [ ] **6.2 Connect:** `ssh -i .\kaf-key.pem ubuntu@STATIC_IP` → type `yes` the first time →
+- [x] **6.2 Connect:** `ssh -i .\kaf-key.pem ubuntu@STATIC_IP` → type `yes` the first time →
       prompt `ubuntu@ip-…:~$`.
-- [ ] **6.3 Install** (on the server), then reconnect (6.2):
+- [x] **6.3 Install** (on the server), then reconnect (6.2):
       ```bash
       curl -fsSL https://raw.githubusercontent.com/3n881/kaidaanifiads/main/deploy/setup-server.sh | bash
       exit
       ```
-- [ ] **6.4 Origin certificate** (laptop):
+- [x] **6.4 Origin certificate** (laptop):
       `scp -i .\kaf-key.pem .\origin.pem .\origin.key ubuntu@STATIC_IP:/opt/kaf/certs/`
       then on the server: `chmod 600 /opt/kaf/certs/origin.key`
-- [ ] **6.5 Settings:** on the server `nano /opt/kaf/app.env` (Ctrl+O, Enter, Ctrl+X) →
+- [x] **6.5 Settings:** on the server `nano /opt/kaf/app.env` (Ctrl+O, Enter, Ctrl+X) →
       `chmod 600 /opt/kaf/app.env`
 
       | Setting | Value / where from |
@@ -138,13 +143,14 @@ Windows **PowerShell**, in the folder with `kaf-key.pem`, `origin.pem`, `origin.
       | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Mumbai values from `.env.mumbai` (`NEW_…`) |
       | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test** keys (as on Replov) |
       | `RAZORPAY_WEBHOOK_SECRET` | a **new** secret, also entered in Razorpay's test webhook (Step 7) |
-      | `ORDER_ACCESS_SECRET`, `CRON_SECRET` | **same as on Replov** |
+      | `ORDER_ACCESS_SECRET` | **generated new 2026-10-10** (Replov had none) — never change after real sales |
+      | `CRON_SECRET` | same as on Replov |
       | `INTERAKT_*`, `AUTO_WHATSAPP_ON_PAYMENT`, `PAYMENT_REMINDER_DELAY_MINUTES` | same as on Replov (template names pre-filled) |
       | `ADMIN_EMAILS` | same as on Replov |
       | `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | from `.env.mumbai` |
       | `CHECKOUT_DEMO_MODE` | `false` |
 
-- [ ] **6.6 Image login** (paste the `read:packages` token as the password; nothing shows):
+- [x] **6.6 Image login** (paste the `read:packages` token as the password; nothing shows):
       `docker login ghcr.io -u 3n881` → `Login Succeeded`.
 
 **If it fails:**
