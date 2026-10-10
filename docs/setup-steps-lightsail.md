@@ -162,22 +162,26 @@ Windows **PowerShell**, in the folder with `kaf-key.pem`, `origin.pem`, `origin.
 - `docker: permission denied` → reconnect after 6.3.
 - `docker login … unauthorized` → token lacks `read:packages` or username typo.
 
-## Step 7 — First deploy on the main domain (together with Claude)
+## Step 7 — First deploy on the main domain (together with Claude) — ✅ live 2026-10-10
+
+> Live check 10-10: health ✅, 9 books + covers ✅, sitemap uses the real domain ✅, `/media` cached by
+> Cloudflare (MISS → HIT, 1-year immutable) ✅, `www` + `http→https` ✅, origin not reachable directly ✅.
+> Pages 0.1–0.4 s through Cloudflare Mumbai. Took 4 deploy runs — see go-live plan problems 16–18.
 
 > **No staging address** (decision 2026-10-10): nothing is live on the domain yet, so the site is
 > deployed straight to `kaydyachaanifayddyacha.com` and tested there with Razorpay **test** keys
 > **before** anyone is told about it. Going public = switching to live keys (go-live plan Stage 6).
 
-- [ ] GitHub variable **`NEXT_PUBLIC_SITE_URL`** = `https://kaydyachaanifayddyacha.com` (change it if
+- [x] GitHub variable **`NEXT_PUBLIC_SITE_URL`** = `https://kaydyachaanifayddyacha.com` (change it if
       it still says `new.`). The server's `app.env` already has it.
-- [ ] Cloudflare → **DNS → Records**: **delete** the Hostinger parking records for `@` / `www`
+- [x] Cloudflare → **DNS → Records**: **delete** the Hostinger parking records for `@` / `www`
       (any `A`, `AAAA` or `CNAME` on the root or `www`), then **Add record**:
       - Type `A`, Name `@`, IPv4 = the static IP of `kaf-a-ip` (Lightsail → Networking), **Proxied** → Save
       - Type `CNAME`, Name `www`, Target `kaydyachaanifayddyacha.com`, **Proxied** → Save
-- [ ] GitHub variable **`DEPLOY_ENABLED`** = `true` → **Actions → Deploy → Run workflow** (`main`).
+- [x] GitHub variable **`DEPLOY_ENABLED`** = `true` → **Actions → Deploy → Run workflow** (`main`).
       Steps should go green: build → "Open SSH for this runner only (Lightsail firewall)" →
       "Roll out" → "Close SSH again (Lightsail)".
-- [ ] Claude checks `https://kaydyachaanifayddyacha.com/api/health`, pages, `/media` images, `www`
+- [x] Claude checks `https://kaydyachaanifayddyacha.com/api/health`, pages, `/media` images, `www`
       redirect/serving, and that the server can't be reached directly.
 - [ ] Rest of go-live-plan **Stage 3** (Cloudflare cache/WAF rules incl. `media`, Razorpay **test**
       webhook `https://kaydyachaanifayddyacha.com/api/razorpay/webhook` with the

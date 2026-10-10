@@ -15,7 +15,7 @@
 | Replov (old test host) | Stays on **Tokyo** on purpose (user decision 2026-10-04). Treat it as a test site only: **no book edits / uploads on Replov's dashboard** — they would land in Tokyo, not Mumbai. If anything must change before go-live, change it in Mumbai (local scripts / the new server) or ask Claude to copy it. |
 | **Server** | ✅ **Lightsail `$12` created 2026-10-10** — AWS lifted the plan limit. Instance **`kaf-a`** (Mumbai `ap-south-1a`, Ubuntu 24.04, 2 GB / 2 vCPU, dual-stack), key pair `kaf-key`, static IP `kaf-a-ip`, automatic snapshots. (EC2 `t3.small` was the planned fallback — guide kept in `docs/setup-steps-ec2.md`, not used.) Server ≈ ₹1,000/month → total ≈ ₹3,300 incl. Supabase Pro. |
 | GitHub variables (Stage 1D) | Not confirmed yet. |
-| Next action | Follow **`docs/setup-steps-lightsail.md`** — Steps 1, 2, 4, 5 (GitHub settings, Supabase URLs, firewall, GitHub deploy access), then 6–7 with Claude (server setup, first deploy). Each step has an "If it fails" list. |
+| Next action | Site is **live on `kaydyachaanifayddyacha.com`** (Razorpay **test** keys, not announced). Finish Stage 3: Cloudflare cache rules + `media` rule + WAF, Razorpay test webhook, cron-job.org URL, UptimeRobot → then Stage 4 tests. |
 
 ### Where the secrets and key files are (never commit, never paste in chat)
 
@@ -142,7 +142,7 @@ that risk expensive.
 | 0. Repo prep | Claude | ✅ done 2026-10-04 |
 | 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, AWS ✅, GitHub variables ⏳ |
 | 2. Server (one Lightsail) | you + Claude | ✅ 10-10: instance, firewall, GitHub deploy access, server setup (`docs/setup-steps-lightsail.md` Steps 3–6) |
-| 3. First deploy on the main domain | you + Claude | ⏳ next |
+| 3. First deploy on the main domain | you + Claude | ✅ site live 10-10 (problems 16–18 fixed) → next: Cloudflare cache/WAF rules, Razorpay test webhook, cron URL, UptimeRobot |
 | 4. Functional tests on staging | you (phone) + Claude (database) | |
 | 5. Speed + load tests | you + Claude | |
 | 6. Go-live day | you + client | |
