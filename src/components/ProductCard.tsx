@@ -9,7 +9,22 @@ import BuyButton from "./BuyButton";
 import { UI_COPY } from "@/lib/i18n";
 import { useLanguage } from "./LanguageProvider";
 
-export default function ProductCard({ product }: { product: Product }) {
+const BADGES = {
+  mr: { off: "सवलत", bestseller: "बेस्टसेलर" },
+  hi: { off: "छूट", bestseller: "बेस्टसेलर" },
+  en: { off: "OFF", bestseller: "Bestseller" },
+} as const;
+
+export default function ProductCard({
+  product,
+  priority = false,
+  sizes,
+}: {
+  product: Product;
+  /** The first card of the home page row is the phone LCP image — load it at once. */
+  priority?: boolean;
+  sizes?: string;
+}) {
   const { locale } = useLanguage();
   product = localizeProduct(product, locale);
   const copy = UI_COPY[locale];
@@ -17,12 +32,15 @@ export default function ProductCard({ product }: { product: Product }) {
     ? `/combos/${product.slug}`
     : `/ebooks/${product.slug}`;
   const pct = discountPercent(product);
+  const badge = BADGES[locale];
 
   return (
     <article className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-brand-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-cardhover)]">
       <Link href={href} className="relative block overflow-hidden">
         <CoverImage
           product={product}
+          priority={priority}
+          sizes={sizes}
           className="aspect-[3/4] w-full transition-transform duration-500 group-hover:scale-105"
         />
         {/* ID badge (top-left, navy, notched corner) */}
@@ -33,7 +51,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1.5">
           {pct > 0 && (
             <span className="badge-sale flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-lg">
-              {pct}% सवलत
+              {pct}% {badge.off}
             </span>
           )}
           {product.isCombo && (
@@ -43,7 +61,7 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
           {product.featured && (
             <span className="flex items-center gap-1 rounded-lg bg-brand-gold px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-brand-teal shadow">
-              ★ बेस्टसेलर
+              ★ {badge.bestseller}
             </span>
           )}
         </div>
@@ -63,7 +81,7 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.shortDescription}
         </p>
         {pct > 0 && (
-          <p className="font-deva mb-3 inline-flex items-center gap-1.5 self-start rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold leading-tight text-red-600">
+          <p className="font-deva mb-3 inline-flex items-center gap-1.5 self-start rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold leading-tight text-red-700">
             <Flame className="h-3 w-3 shrink-0" aria-hidden="true" />
             {copy.limitedOffer}
           </p>
@@ -73,7 +91,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-brand-50 pt-3">
           <div className="flex flex-col">
             {product.mrp > product.price && (
-              <span className="mb-1 text-xs font-bold leading-none text-brand-300 line-through decoration-red-400/50">
+              <span className="mb-1 text-xs font-bold leading-none text-brand-500 line-through decoration-red-400/60">
                 ₹{product.mrp}
               </span>
             )}

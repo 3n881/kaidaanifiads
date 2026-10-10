@@ -7,20 +7,26 @@ import type { Product } from "@/data/catalog";
 import { coverSrc, coverSrcSet, mediaUrl } from "@/lib/covers";
 import { PREVIEW_PAGES } from "@/lib/previews";
 import CoverImage from "./CoverImage";
+import { GALLERY_COPY, type GalleryCopy } from "@/lib/product-copy";
+import type { Locale } from "@/lib/i18n";
 
 /**
  * Book preview viewer, laid out like the previous site: page counter and
- * PREVIEW badge on the image, arrows / swipe, मागील–पुढील buttons, the
+ * PREVIEW badge on the image, arrows / swipe, previous–next buttons, the
  * "first pages free" bar, a full-screen reader and a link to the free
  * first-pages PDF (`previewUrl`, when the edition has one).
  */
 export default function ProductGallery({
   product,
   previewUrl,
+  labelsLocale = "mr",
 }: {
   product: Product;
   previewUrl?: string | null;
+  /** Language of the labels (the edition on show). */
+  labelsLocale?: Locale;
 }) {
+  const g = GALLERY_COPY[labelsLocale];
   const images = product.coverImage
     ? [product.coverImage, ...(product.galleryImages ?? []).slice(0, 5)]
     : [];
@@ -38,7 +44,7 @@ export default function ProductGallery({
         <div className="overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
           <CoverImage product={product} className="aspect-[3/4] w-full" priority sizes="(max-width: 768px) 90vw, 400px" />
         </div>
-        <PreviewActions previewPages={previewPages} previewUrl={previewUrl} />
+        <PreviewActions g={g} previewPages={previewPages} previewUrl={previewUrl} />
       </div>
     );
   }
@@ -55,7 +61,7 @@ export default function ProductGallery({
             src={coverSrc(active)}
             srcSet={activeSrcSet ?? undefined}
             sizes="(max-width: 768px) 90vw, 400px"
-            alt={selected === 0 ? product.title : `${product.title} — पान ${selected + 1}`}
+            alt={selected === 0 ? product.title : `${product.title} — ${g.page} ${selected + 1}`}
             width={800}
             height={1067}
             loading={selected === 0 ? "eager" : "lazy"}
@@ -64,20 +70,20 @@ export default function ProductGallery({
             onClick={() => setFullscreen(true)}
           />
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white">
-            पान {selected + 1} / {total}
+            {g.page} {selected + 1} / {total}
           </span>
           <span className="pointer-events-none absolute right-2 top-2 rounded-md bg-brand-teal px-2 py-1 text-[10px] font-black tracking-wider text-brand-gold">
             PREVIEW
           </span>
           {selected > 0 && (
-            <ArrowButton side="left" onClick={() => go(-1)} label="मागील पान" />
+            <ArrowButton side="left" onClick={() => go(-1)} label={g.prevPage} />
           )}
           {selected < total - 1 && (
-            <ArrowButton side="right" onClick={() => go(1)} label="पुढील पान" />
+            <ArrowButton side="right" onClick={() => go(1)} label={g.nextPage} />
           )}
           {selected === 0 && total > 1 && (
             <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-white md:hidden">
-              स्वाईप करा ›
+              {g.swipe}
             </span>
           )}
         </div>
@@ -86,18 +92,19 @@ export default function ProductGallery({
       {total > 1 && (
         <div className="mt-3 flex items-center justify-between gap-2">
           <PagerButton disabled={selected === 0} onClick={() => go(-1)}>
-            <ChevronLeft className="h-4 w-4" /> मागील
+            <ChevronLeft className="h-4 w-4" /> {g.prev}
           </PagerButton>
           <span className="rounded-full border border-brand-100 bg-white px-3 py-1.5 text-xs font-bold text-brand-700">
-            पान {selected + 1} / {total}
+            {g.page} {selected + 1} / {total}
           </span>
           <PagerButton disabled={selected === total - 1} onClick={() => go(1)}>
-            पुढील <ChevronRight className="h-4 w-4" />
+            {g.next} <ChevronRight className="h-4 w-4" />
           </PagerButton>
         </div>
       )}
 
       <PreviewActions
+        g={g}
         previewPages={previewPages}
         previewUrl={previewUrl}
         onOpenLarge={() => setFullscreen(true)}
@@ -110,14 +117,14 @@ export default function ProductGallery({
               key={image}
               type="button"
               onClick={() => setSelected(index)}
-              aria-label={index === 0 ? "कव्हर" : `पान ${index + 1}`}
+              aria-label={index === 0 ? g.cover : `${g.page} ${index + 1}`}
               aria-pressed={selected === index}
               className={`shrink-0 overflow-hidden rounded-lg border-2 bg-white text-center ${selected === index ? "border-brand-teal" : "border-brand-100"}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- tiny pre-sized storage thumbnail. */}
               <img src={coverSrc(image)} alt="" width={48} height={64} loading="lazy" className="h-16 w-12 object-cover" />
               <span className="block py-0.5 text-[10px] font-bold text-brand-600">
-                {index === 0 ? "कव्हर" : index + 1}
+                {index === 0 ? g.cover : index + 1}
               </span>
             </button>
           ))}
@@ -126,6 +133,7 @@ export default function ProductGallery({
 
       {fullscreen && (
         <Lightbox
+          g={g}
           images={images}
           index={selected}
           title={product.title}
@@ -139,10 +147,12 @@ export default function ProductGallery({
 }
 
 function PreviewActions({
+  g,
   previewPages,
   previewUrl,
   onOpenLarge,
 }: {
+  g: GalleryCopy;
   previewPages: number;
   previewUrl?: string | null;
   onOpenLarge?: () => void;
@@ -158,7 +168,7 @@ function PreviewActions({
           className="font-deva flex items-center justify-center gap-2 rounded-xl border border-gold-500/40 bg-gold-500/10 px-3 py-2.5 text-sm font-bold text-brand-800 transition hover:bg-gold-500/20"
         >
           <BookOpen className="h-4 w-4 text-gold-600" />
-          पहिली {previewPages} पाने मोफत वाचा (Preview)
+          {g.freePreview(previewPages)}
           <Sparkles className="h-4 w-4 text-gold-600" />
         </a>
       )}
@@ -169,7 +179,7 @@ function PreviewActions({
             onClick={onOpenLarge}
             className="font-deva inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-50"
           >
-            <Maximize2 className="h-3.5 w-3.5" /> मोठ्या आकारात वाचा
+            <Maximize2 className="h-3.5 w-3.5" /> {g.readLarge}
           </button>
         )}
         {previewUrl && (
@@ -188,6 +198,7 @@ function PreviewActions({
 }
 
 function Lightbox({
+  g,
   images,
   index,
   title,
@@ -195,6 +206,7 @@ function Lightbox({
   onChange,
   onClose,
 }: {
+  g: GalleryCopy;
   images: string[];
   index: number;
   title: string;
@@ -231,23 +243,23 @@ function Lightbox({
       aria-label={`${title} — preview`}
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
-        <span className="text-sm font-bold">पान {index + 1} / {total}</span>
+        <span className="text-sm font-bold">{g.page} {index + 1} / {total}</span>
         <div className="flex items-center gap-2">
           {previewUrl && (
             <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20">
               <FileText className="h-3.5 w-3.5" /> PDF Preview
             </a>
           )}
-          <button type="button" onClick={onClose} aria-label="बंद करा" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+          <button type="button" onClick={onClose} aria-label={g.close} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
             <X className="h-5 w-5" />
           </button>
         </div>
       </div>
       <div className="relative min-h-0 flex-1" {...swipe}>
         {/* eslint-disable-next-line @next/next/no-img-element -- full-size storage image. */}
-        <img src={mediaUrl(images[index])} alt={`${title} — पान ${index + 1}`} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />
-        {index > 0 && <ArrowButton side="left" onClick={() => go(-1)} label="मागील पान" />}
-        {index < total - 1 && <ArrowButton side="right" onClick={() => go(1)} label="पुढील पान" />}
+        <img src={mediaUrl(images[index])} alt={`${title} — ${g.page} ${index + 1}`} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />
+        {index > 0 && <ArrowButton side="left" onClick={() => go(-1)} label={g.prevPage} />}
+        {index < total - 1 && <ArrowButton side="right" onClick={() => go(1)} label={g.nextPage} />}
       </div>
     </div>,
     document.body,

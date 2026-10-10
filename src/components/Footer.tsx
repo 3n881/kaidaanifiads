@@ -2,21 +2,24 @@ import Link from "next/link";
 import Image from "next/image";
 import { Mail, Phone, MapPin, MessageCircle } from "lucide-react";
 import { SITE } from "@/data/catalog";
+import { Tr, type Localized } from "@/components/LanguageProvider";
 
-const QUICK = [
-  { href: "/", label: "मुख्यपृष्ठ" },
-  { href: "/ebooks", label: "ई-बुक्स" },
-  { href: "/about", label: "आमच्याबद्दल (About)" },
-  { href: "/contact", label: "संपर्क (Contact)" },
-  { href: "/dashboard", label: "Admin Login" },
+type FooterLink = { href: string; label: Localized };
+
+const QUICK: FooterLink[] = [
+  { href: "/", label: { mr: "मुख्यपृष्ठ", hi: "होम", en: "Home" } },
+  { href: "/ebooks", label: { mr: "ई-बुक्स", hi: "ई-बुक्स", en: "E-books" } },
+  { href: "/about", label: { mr: "आमच्याबद्दल (About)", hi: "हमारे बारे में (About)", en: "About us" } },
+  { href: "/contact", label: { mr: "संपर्क (Contact)", hi: "संपर्क (Contact)", en: "Contact" } },
+  { href: "/dashboard", label: { mr: "Admin Login", hi: "Admin Login", en: "Admin Login" } },
 ];
 
-const SHOP = [
-  { href: "/ebooks", label: "All Ebooks (सर्व ई-बुक्स)" },
-  { href: "/combos", label: "Combo Packs (कॉम्बो)" },
-  { href: "/ebooks?lang=Hindi", label: "हिंदी ई-बुक्स" },
-  { href: "/ebooks?lang=English", label: "English Ebooks" },
-  { href: "/site-index", label: "Sitemap (साइटमॅप)" },
+const SHOP: FooterLink[] = [
+  { href: "/ebooks", label: { mr: "All Ebooks (सर्व ई-बुक्स)", hi: "All Ebooks (सभी ई-बुक्स)", en: "All ebooks" } },
+  { href: "/combos", label: { mr: "Combo Packs (कॉम्बो)", hi: "Combo Packs (कॉम्बो)", en: "Combo packs" } },
+  { href: "/ebooks?lang=Hindi", label: { mr: "हिंदी ई-बुक्स", hi: "हिंदी ई-बुक्स", en: "Hindi ebooks" } },
+  { href: "/ebooks?lang=English", label: { mr: "English Ebooks", hi: "English Ebooks", en: "English ebooks" } },
+  { href: "/site-index", label: { mr: "Sitemap (साइटमॅप)", hi: "Sitemap (साइटमैप)", en: "Sitemap" } },
 ];
 
 const LEGAL = [
@@ -48,19 +51,21 @@ function InstagramIcon({ className }: { className?: string }) {
   );
 }
 
-function LinkColumn({ title, links }: { title: string; links: { href: string; label: string }[] }) {
+function LinkColumn({ title, links }: { title: Localized; links: FooterLink[] }) {
   return (
     <div>
-      <h3 className="font-deva mb-8 text-lg font-bold text-brand-gold">{title}</h3>
+      <h3 className="font-deva mb-8 text-lg font-bold text-brand-gold">
+        <Tr {...title} />
+      </h3>
       <ul className="space-y-4">
         {links.map((l) => (
-          <li key={l.href + l.label}>
+          <li key={l.href + l.label.en}>
             <Link
               href={l.href}
               className="font-deva group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold" />
-              {l.label}
+              <Tr {...l.label} />
             </Link>
           </li>
         ))}
@@ -94,9 +99,9 @@ export default function Footer() {
               कायद्याचं आणि फायद्याचं
             </h3>
             <p className="font-deva max-w-sm text-lg font-light leading-relaxed opacity-80">
-              कायद्याचे ज्ञान, सामाजिक भान.
+              <Tr mr="कायद्याचे ज्ञान, सामाजिक भान." hi="कानून का ज्ञान, सामाजिक जागरूकता।" en="Legal knowledge, social awareness." />
               <br />
-              आम्ही तुमच्या हक्कासाठी नेहमीच तत्पर.
+              <Tr mr="आम्ही तुमच्या हक्कासाठी नेहमीच तत्पर." hi="हम आपके अधिकारों के लिए हमेशा तत्पर।" en="Always here for your rights." />
             </p>
             <div className="pt-6">
               <a
@@ -111,12 +116,14 @@ export default function Footer() {
             </div>
           </div>
 
-          <LinkColumn title="महत्वाचे दुवे (Quick Links)" links={QUICK} />
-          <LinkColumn title="खरेदी (Shop)" links={SHOP} />
+          <LinkColumn title={{ mr: "महत्वाचे दुवे (Quick Links)", hi: "महत्वपूर्ण लिंक (Quick Links)", en: "Quick links" }} links={QUICK} />
+          <LinkColumn title={{ mr: "खरेदी (Shop)", hi: "खरीदारी (Shop)", en: "Shop" }} links={SHOP} />
 
           {/* Contact */}
           <div>
-            <h3 className="font-deva mb-8 text-lg font-bold text-brand-gold">संपर्क (Contact Us)</h3>
+            <h3 className="font-deva mb-8 text-lg font-bold text-brand-gold">
+              <Tr mr="संपर्क (Contact Us)" hi="संपर्क (Contact Us)" en="Contact us" />
+            </h3>
             <ul className="space-y-5">
               {CONTACT.map(({ icon: Icon, label, value, href }) => (
                 <li key={label} className="group flex items-start gap-4 opacity-90 transition-colors hover:text-brand-gold">
@@ -164,7 +171,7 @@ export default function Footer() {
 
         {/* Disclaimer */}
         <div className="border-t border-white/5 py-6 text-center">
-          <div className="mx-auto max-w-4xl space-y-3 text-[10px] font-medium leading-relaxed text-gray-400 opacity-60 md:text-xs">
+          <div className="mx-auto max-w-4xl space-y-3 text-[10px] font-medium leading-relaxed text-gray-300 opacity-90 md:text-xs">
             <p>
               <strong>DISCLAIMER:</strong> The information provided on this website and in our
               digital products is for educational and informational purposes only. It does not
@@ -173,9 +180,11 @@ export default function Footer() {
               advocate for advice on your specific legal issues.
             </p>
             <p className="font-deva font-light">
-              <strong>अस्वीकरण:</strong> या वेबसाइटवर आणि आमच्या डिजिटल उत्पादनांमध्ये दिलेली
-              माहिती केवळ शैक्षणिक आणि माहितीच्या उद्देशाने आहे. हा कायदेशीर सल्ला किंवा व्यावसायिक
-              कायदेशीर सेवा नाही. विशिष्ट कायदेशीर समस्येसाठी पात्र वकिलाचा सल्ला घ्या.
+              <Tr
+                mr="अस्वीकरण: या वेबसाइटवर आणि आमच्या डिजिटल उत्पादनांमध्ये दिलेली माहिती केवळ शैक्षणिक आणि माहितीच्या उद्देशाने आहे. हा कायदेशीर सल्ला किंवा व्यावसायिक कायदेशीर सेवा नाही. विशिष्ट कायदेशीर समस्येसाठी पात्र वकिलाचा सल्ला घ्या."
+                hi="अस्वीकरण: इस वेबसाइट और हमारे डिजिटल उत्पादों में दी गई जानकारी केवल शैक्षणिक और जानकारी के उद्देश्य से है। यह कानूनी सलाह या पेशेवर कानूनी सेवा नहीं है। किसी विशेष कानूनी समस्या के लिए योग्य वकील की सलाह लें।"
+                en=""
+              />
             </p>
           </div>
         </div>

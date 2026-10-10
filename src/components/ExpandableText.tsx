@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useT } from "./LanguageProvider";
 
 export default function ExpandableText({
   text,
@@ -11,6 +12,7 @@ export default function ExpandableText({
   clampChars?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useT();
   const needsToggle = text.length > clampChars;
   const shown = open || !needsToggle ? text : text.slice(0, clampChars) + "…";
 
@@ -26,11 +28,11 @@ export default function ExpandableText({
         >
           {open ? (
             <>
-              कमी करा (Show Less) <ChevronUp className="h-4 w-4" />
+              {t({ mr: "कमी करा (Show Less)", hi: "कम करें (Show Less)", en: "Show less" })} <ChevronUp className="h-4 w-4" />
             </>
           ) : (
             <>
-              अधिक वाचा (Show More) <ChevronDown className="h-4 w-4" />
+              {t({ mr: "अधिक वाचा (Show More)", hi: "और पढ़ें (Show More)", en: "Show more" })} <ChevronDown className="h-4 w-4" />
             </>
           )}
         </button>

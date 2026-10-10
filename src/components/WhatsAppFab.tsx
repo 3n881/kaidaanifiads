@@ -1,4 +1,5 @@
 import { SITE } from "@/data/catalog";
+import { Tr } from "@/components/LanguageProvider";
 
 /** Floating WhatsApp support button (bottom-right). Hidden on book pages, where
  *  the sticky buy bar is shown (as on the original site). */
@@ -13,7 +14,7 @@ export default function WhatsAppFab() {
       className="group fixed bottom-20 right-4 z-40 flex items-center gap-2 md:bottom-8 md:right-8 in-data-[buybar=on]:hidden"
     >
       <span className="font-deva hidden max-w-0 items-center overflow-hidden whitespace-nowrap rounded-full bg-brand-teal px-0 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-all duration-300 group-hover:max-w-xs group-hover:px-4 group-hover:opacity-100 sm:flex">
-        काही अडचण असल्यास येथे संपर्क साधा
+        <Tr mr="काही अडचण असल्यास येथे संपर्क साधा" hi="कोई परेशानी हो तो यहाँ संपर्क करें" en="Need help? Chat with us" />
       </span>
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-[#25D366]/30 transition hover:scale-105">
         <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor" aria-hidden>

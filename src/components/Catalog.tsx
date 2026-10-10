@@ -22,6 +22,8 @@ import ProductCard from "./ProductCard";
 import { LOCALE_TO_PRODUCT_LANGUAGE, UI_COPY } from "@/lib/i18n";
 import { useLanguage } from "./LanguageProvider";
 
+const ALL_TAB = { mr: "All / सर्व", hi: "All / सभी", en: "All" } as const;
+
 const CATEGORY_ICONS: Record<Category | "All", typeof Home> = {
   All: Home,
   "Property Law": Home,
@@ -100,7 +102,7 @@ export default function Catalog({
                   lang === l ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
                 }`}
               >
-                {l === "All" ? "All / सर्व" : LANGUAGE_LABELS[l]}
+                {l === "All" ? ALL_TAB[locale] : LANGUAGE_LABELS[l]}
               </button>
             ))}
           </div>

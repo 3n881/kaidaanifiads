@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Catalog from "@/components/Catalog";
 import DisclaimerBanner from "@/components/DisclaimerBanner";
 import ListBanner from "@/components/ListBanner";
+import { Tr } from "@/components/LanguageProvider";
 import { getAllProducts } from "@/lib/products";
 
 export const revalidate = 300;
@@ -23,7 +24,9 @@ export default async function EbooksPage() {
         title={
           <>
             Legal Knowledge Simplified /{" "}
-            <span className="text-brand-gold">ज्ञान हीच शक्ती</span>
+            <span className="text-brand-gold">
+              <Tr mr="ज्ञान हीच शक्ती" hi="ज्ञान ही शक्ति है" en="Knowledge is power" />
+            </span>
           </>
         }
         subtitle="Digital PDF Ebooks · Instant Delivery · Inclusive of all taxes"

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Cancellation Policy" };
 export default function Page() {
   return (
     <PolicyPage
-      title="रद्द करण्याचे धोरण (Cancellation Policy)"
+      title={{ mr: "रद्द करण्याचे धोरण (Cancellation Policy)", hi: "रद्दीकरण नीति (Cancellation Policy)", en: "Cancellation Policy" }}
       intro="This policy explains when an order can be cancelled."
       sections={[
         {

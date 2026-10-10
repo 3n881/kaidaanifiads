@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Delivery Policy" };
 export default function Page() {
   return (
     <PolicyPage
-      title="वितरण धोरण (Delivery / Shipping Policy)"
+      title={{ mr: "वितरण धोरण (Delivery / Shipping Policy)", hi: "डिलीवरी नीति (Delivery / Shipping Policy)", en: "Delivery / Shipping Policy" }}
       intro="All products on this website are digital. There is no physical shipping."
       sections={[
         {

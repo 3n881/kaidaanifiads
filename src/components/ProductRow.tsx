@@ -17,6 +17,7 @@ export default function ProductRow({
   viewAllHref,
   viewAllLabel,
   tinted = false,
+  priorityFirst = false,
 }: {
   eyebrow?: string;
   title: LocalizedText;
@@ -26,6 +27,7 @@ export default function ProductRow({
   viewAllLabel: LocalizedText;
   /** Light navy background (combos) instead of light grey. */
   tinted?: boolean;
+  priorityFirst?: boolean;
 }) {
   const { locale } = useLanguage();
   const text = (value: LocalizedText) => (typeof value === "string" ? value : value[locale]);
@@ -49,7 +51,7 @@ export default function ProductRow({
           )}
         </div>
 
-        <Carousel products={products} />
+        <Carousel products={products} priorityFirst={priorityFirst} />
 
         <div className="mt-12 text-center">
           <Link

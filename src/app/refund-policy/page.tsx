@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Refund Policy" };
 export default function Page() {
   return (
     <PolicyPage
-      title="परतावा धोरण (Refund Policy)"
+      title={{ mr: "परतावा धोरण (Refund Policy)", hi: "रिफंड नीति (Refund Policy)", en: "Refund Policy" }}
       intro="Please read this policy carefully before purchasing, as our products are digital."
       sections={[
         {

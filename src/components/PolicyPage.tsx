@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import { SITE } from "@/data/catalog";
 import { SITE_URL } from "@/lib/supabase/config";
+import { Tr, type Localized } from "@/components/LanguageProvider";
 
 export interface PolicySection {
   heading: string;
@@ -26,7 +27,7 @@ export default function PolicyPage({
   intro,
   sections,
 }: {
-  title: string;
+  title: Localized;
   intro?: string;
   sections: PolicySection[];
 }) {
@@ -34,7 +35,7 @@ export default function PolicyPage({
     <div className="container-x">
       <div className="mx-auto max-w-4xl py-12 md:py-16">
         <h1 className="font-deva mb-8 bg-gradient-to-r from-brand-teal to-teal-600 bg-clip-text text-center text-3xl font-bold text-transparent md:text-4xl">
-          {title}
+          <Tr {...title} />
         </h1>
 
         {/* Official info */}
@@ -44,15 +45,14 @@ export default function PolicyPage({
           </span>
           <div className="space-y-1">
             <p className="font-deva text-xs font-bold uppercase tracking-wider text-brand-teal">
-              अधिकृत प्लॅटफॉर्म माहिती (Official Info)
+              <Tr mr="अधिकृत प्लॅटफॉर्म माहिती (Official Info)" hi="आधिकारिक प्लेटफ़ॉर्म जानकारी (Official Info)" en="Official info" />
             </p>
             <p className="font-deva text-sm font-medium leading-relaxed text-gray-700 md:text-base">
-              हे डिजिटल प्लॅटफॉर्म <span className="font-bold text-gray-900">Kaydyacha Ani Faydyacha</span>{" "}
-              द्वारे मालकीचे आणि चालवले जाते — “कायद्याचं आणि फायद्याचं” ({HOST}) या ब्रँड नावाखाली.
-              <span className="mt-1 block text-xs font-normal text-gray-500">
-                (This platform is owned and operated by Kaydyacha Ani Faydyacha under the brand “Kaydyach ani
-                Faydyach”.)
-              </span>
+              <Tr
+                mr={`हे डिजिटल प्लॅटफॉर्म Kaydyacha Ani Faydyacha द्वारे मालकीचे आणि चालवले जाते — “कायद्याचं आणि फायद्याचं” (${HOST}) या ब्रँड नावाखाली.`}
+                hi={`यह डिजिटल प्लेटफ़ॉर्म Kaydyacha Ani Faydyacha के स्वामित्व और संचालन में है — “कायद्याचं आणि फायद्याचं” (${HOST}) ब्रांड नाम के तहत।`}
+                en={`This platform is owned and operated by Kaydyacha Ani Faydyacha under the brand “Kaydyach ani Faydyach” (${HOST}).`}
+              />
             </p>
           </div>
         </div>
@@ -63,7 +63,9 @@ export default function PolicyPage({
           </p>
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 text-sm">
-            <p className="font-deva mb-1 font-semibold text-gray-800">Business Details / व्यवसाय तपशील</p>
+            <p className="font-deva mb-1 font-semibold text-gray-800">
+              <Tr mr="Business Details / व्यवसाय तपशील" hi="Business Details / व्यवसाय विवरण" en="Business details" />
+            </p>
             {BUSINESS.map(([k, v]) => (
               <p key={k} className="font-deva break-words">
                 <strong>{k}:</strong> {v}
@@ -85,7 +87,9 @@ export default function PolicyPage({
           ))}
 
           <section className="rounded-2xl border border-brand-teal/20 bg-brand-teal/5 p-5 text-sm text-gray-700">
-            <h2 className="font-deva text-base font-bold text-brand-teal">Contact / संपर्क</h2>
+            <h2 className="font-deva text-base font-bold text-brand-teal">
+              <Tr mr="Contact / संपर्क" hi="Contact / संपर्क" en="Contact" />
+            </h2>
             <p className="mt-2">Email: {SITE.email}</p>
             <p>Phone / WhatsApp: {SITE.contactPhone}</p>
           </section>

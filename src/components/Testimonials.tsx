@@ -1,5 +1,6 @@
 import { Quote, Star } from "lucide-react";
 import { testimonials } from "@/data/catalog";
+import { Tr } from "@/components/LanguageProvider";
 
 function initials(name: string) {
   return name
@@ -15,9 +16,15 @@ export default function Testimonials() {
     <section className="overflow-hidden bg-white py-12 md:py-24">
       <div className="mx-auto max-w-6xl px-4">
         <div className="mb-10 space-y-3 text-center md:mb-16">
-          <h2 className="font-deva text-2xl font-extrabold text-brand-teal md:text-5xl">आमचे समाधानी ग्राहक</h2>
+          <h2 className="font-deva text-2xl font-extrabold text-brand-teal md:text-5xl">
+            <Tr mr="आमचे समाधानी ग्राहक" hi="हमारे संतुष्ट ग्राहक" en="Happy readers" />
+          </h2>
           <p className="font-deva mx-auto max-w-2xl text-base text-brand-500 md:text-lg">
-            हजारो नागरिकांनी आमच्या सेवेवर विश्वास दाखवला आहे. त्यांचे अनुभव वाचा.
+            <Tr
+              mr="हजारो नागरिकांनी आमच्या सेवेवर विश्वास दाखवला आहे. त्यांचे अनुभव वाचा."
+              hi="हज़ारों नागरिकों ने हमारी सेवा पर भरोसा किया है। उनके अनुभव पढ़ें।"
+              en="Thousands of readers trust us. Read what they say."
+            />
           </p>
         </div>
 
@@ -28,7 +35,7 @@ export default function Testimonials() {
               className="relative flex min-w-0 shrink-0 basis-[85%] snap-center flex-col rounded-3xl border border-gray-100 bg-gray-50 p-6 shadow-sm transition-shadow hover:shadow-md md:basis-[45%] md:p-8 lg:basis-[32%]"
             >
               <Quote className="absolute right-6 top-6 h-10 w-10 text-gray-200" aria-hidden="true" />
-              <div className="mb-6 flex gap-1" aria-label="5/5">
+              <div className="mb-6 flex gap-1" role="img" aria-label="5/5">
                 {[0, 1, 2, 3, 4].map((n) => (
                   <Star key={n} className="h-5 w-5 fill-brand-gold text-brand-gold" aria-hidden="true" />
                 ))}

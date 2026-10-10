@@ -23,7 +23,7 @@ Status: ⬜ to do · 🟡 in progress · ✔️ done (commit) · ⏸ waiting for
 
 | # | Original | Ours | Decision | Status | Notes |
 |---|---|---|---|---|---|
-| 5 | English text in Geist; Marathi/Hindi in the phone's own font | Lato + Noto Sans Devanagari | ⚠️ | ⏸ | Same Marathi look on Android either way |
+| 5 | English text in Geist; Marathi/Hindi in the phone's own font | Lato + Noto Sans Devanagari | ✅ | ✔️ 10-10 | Geist (self-hosted, 1 variable file 29 KB) replaces Lato (3 files 69 KB) |
 | 6 | Footer: gold-gradient title, big tagline, pink→yellow Instagram button, gold headings + dot bullets, icon-box contact rows with labels, proprietor/Udyam pill, decorative glow | Plain, compact | ✅ | ✔️ 10-10 | Rebuilt from the original markup; Instagram link set to the real account |
 | 7 | Footer "Sitemap" → HTML page `/site-index` | → raw `/sitemap.xml` | ✅ | ✔️ 10-10 | New `/site-index` page (+ in sitemap.xml); old redirect `/site-index → /ebooks` removed |
 | 8 | Bottom nav: "कॉम्बो"; active = light bg + navy icon | "कॉम्बो पॅक्स"; solid navy + white icon | ✅ | ✔️ 10-10 |  |
@@ -58,7 +58,7 @@ Status: ⬜ to do · 🟡 in progress · ✔️ done (commit) · ⏸ waiting for
 
 | # | Original | Ours | Decision | Status | Notes |
 |---|---|---|---|---|---|
-| 25 | Hindi book → Hindi UI labels | Always Marathi labels | ⚠️ | ⏸ | |
+| 25 | Hindi book → Hindi UI labels | Always Marathi labels | ✅ | ✔️ 10-10 | Book-page labels follow the edition on show (PRODUCT_COPY / GALLERY_COPY in src/lib/product-copy.ts) |
 | 26 | Price box light green, "छूट"/offer pills, yellow buy button | White box, navy button | ✅ | ✔️ 10-10 | Yellow buy buttons (top + lower card) |
 | 27 | 5 gold stars, green "✓ तुरंत डिजिटल डिलीवरी" | 1 star, English "Instant Digital Delivery" | ✅ | ✔️ 10-10 |  |
 | 28 | Yellow notice "no refund after PDF download" | Not shown | — | ✔️ already | Our book page already shows "⚠️ एकदा PDF डाउनलोड केल्यानंतर परतावा (Refund) शक्य नाही." (missed in the first comparison) |
@@ -77,6 +77,17 @@ Status: ⬜ to do · 🟡 in progress · ✔️ done (commit) · ⏸ waiting for
 
 | # | Item | Decision | Status | Notes |
 |---|---|---|---|---|
-| 34 | Original Contact page has a "Send us a Message" form (name, email, subject, message) | ⚠️ | ⏸ | New feature: needs e-mail sending + spam protection |
-| 35 | Original Contact page promises "Response time: 48 hours \| Resolution: within 7 working days" | ⚠️ | ⏸ | Business promise — only show if the client commits to it |
-| 36 | Book pages tell Google "4.8 stars from 128 ratings" (structured data) and the home page shows testimonials copied from the original | ⚠️ | ⏸ | Fine if real; if not, Google can penalise made-up review data — confirm with the client |
+| 34 | Original Contact page has a "Send us a Message" form (name, email, subject, message) | ✅ | ✔️ 10-10 | Form saves to table `contact_messages` (migration 006, applied to Mumbai DB 10-10); inbox at /dashboard/messages with Mark as done; honeypot + 5/hour per IP (IP stored only as SHA-256) |
+| 35 | Original Contact page promises "Response time: 48 hours \| Resolution: within 7 working days" | ✅ | ✔️ 10-10 | Shown on /contact in all 3 languages |
+| 36 | Book pages tell Google "4.8 stars from 128 ratings" (structured data) and the home page shows testimonials copied from the original | ✅ | ✔️ 10-10 | Removed the invented "128 ratings" from book-page structured data. Visible testimonials / 4.8 stars kept — still confirm with the client that they are real |
+
+## Owner requests 2026-10-10 (second batch)
+
+| # | Item | Status | Notes |
+|---|---|---|---|
+| 37 | First-visit language popup (मराठी / हिंदी / English) on every device | ✔️ 10-10 | Bottom sheet on phones, centred card on tablet/desktop; not on /dashboard or /order. Shown until a language is chosen; phone header has a language button (म / हि / EN) that reopens it; desktop/laptop header dropdown from 1024 px |
+| 38 | Whole site in Marathi, Hindi and English | ✔️ 10-10 | Header, footer, home, lists, book page, preview viewer, About, Contact, policy chrome, My Books, order page, 404. Policy body text stays English (legal text); customer quotes stay in their original language |
+| 39 | Buying in Hindi gives the Hindi book | ✔️ verified | Hindi mode → checkout request `locale: "hi"` (tested by intercepting the request); order + download + WhatsApp use the order's edition. Books without a Hindi edition sell the edition they have |
+| 40 | After payment: tell buyers where the PDF was downloaded | ✔️ 10-10 | Order page box with steps for Android / iPhone / computer + the file name; order page text follows the visitor's language (cookie `kaf_locale`) |
+| 41 | Header logo too small | ✔️ 10-10 | 32→36 px phones, 40→44 px tablet, 28→40 px laptop, 44 px large screens |
+| 42 | PageSpeed report 10-10 (mobile LCP 3.8 s) | ✔️ 10-10 | First home carousel cover loads eagerly with high priority + correct sizes (it was the lazy LCP image); contrast fixes; stars `role="img"`. Optional for owner: turn off Cloudflare Web Analytics auto-beacon if unused (it is in the critical chain) |

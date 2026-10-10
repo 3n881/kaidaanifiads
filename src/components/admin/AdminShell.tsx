@@ -1,14 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, ClipboardCheck, ExternalLink, LayoutDashboard, LogOut, Settings, ShoppingBag } from "lucide-react";
+import { BookOpen, ClipboardCheck, ExternalLink, Inbox, LayoutDashboard, LogOut, Settings, ShoppingBag } from "lucide-react";
 import { signOutAction } from "@/app/dashboard/actions";
 
-export type AdminSection = "overview" | "products" | "orders" | "setup" | "launch";
+export type AdminSection = "overview" | "products" | "orders" | "messages" | "setup" | "launch";
 
 const navigation = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Overview", key: "overview" },
   { href: "/dashboard/products", icon: BookOpen, label: "Products", key: "products" },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Orders", key: "orders" },
+  { href: "/dashboard/messages", icon: Inbox, label: "Messages", key: "messages" },
   { href: "/dashboard/setup", icon: Settings, label: "Setup", key: "setup" },
   { href: "/dashboard/launch", icon: ClipboardCheck, label: "Launch", key: "launch" },
 ] as const;

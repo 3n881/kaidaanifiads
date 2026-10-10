@@ -516,3 +516,14 @@ Paid → auto-download → order page ✅ · webhook 200 + phone saved + PDF on 
 without popup ✅ · popup fallback while webhook was failing (no 404) ✅ · failed
 payment → one reminder ~36 min later, none for paid orders ✅ · unknown book URL →
 404 ✅ · My Books Interakt check ✅. Not yet tested: Purchase pixel event, live mode.
+
+
+## 2026-10-10 additions
+
+- **Languages:** first-visit picker (`src/components/LanguagePicker.tsx`); the choice is stored in
+  `localStorage["kaf-locale"]` and cookie `kaf_locale` (read by the order page). Translations live
+  next to the components (`useT` / `<Tr mr hi en />` in `LanguageProvider.tsx`) and in
+  `src/lib/product-copy.ts` (book page) and `src/lib/order-copy.ts` (order page).
+- **Contact form:** table `public.contact_messages` (migration `006_contact_messages.sql`, applied to
+  the Mumbai DB on 2026-10-10). Inbox: `/dashboard/messages`.
+- UI tracker with every decision: `docs/ui-match-original.md`.

@@ -13,6 +13,13 @@ const COPY = {
   en: { title1: "Law in plain", title2: "language -", accent: "for your rights", body: "Reliable information about land, inheritance, and everyday rights for farmers, citizens, and women.", search: "Search books...", searchShort: "Search...", popular: "Popular:", books: "View Books", readers: "Readers", rating: "Rating", authentic: "100% authentic", info: "Legal information" },
 } as const;
 
+// Popular topics under the search box (same three topics in every language).
+const TAGS = {
+  mr: SITE.popularTags,
+  hi: ["विरासत अधिकार", "किसान कानून", "घर खरीद"],
+  en: ["Inheritance", "Farmer law", "Buying a home"],
+} as const;
+
 export default function Hero() {
   const { locale } = useLanguage();
   const copy = COPY[locale];
@@ -43,7 +50,7 @@ export default function Hero() {
                 {copy.body}
               </p>
               <p
-                className="animate-fade-in-up mx-auto max-w-md text-[11px] font-medium text-brand-gold/70 md:max-w-xl md:text-xs lg:mx-0"
+                className="animate-fade-in-up mx-auto max-w-md text-[11px] font-medium text-brand-gold md:max-w-xl md:text-xs lg:mx-0"
                 style={{ animationDelay: "0.3s" }}
               >
                 📘 Digital PDF Ebooks · Educational Reference Material · Not Legal Advice or Consultancy
@@ -69,10 +76,10 @@ export default function Hero() {
 
               {/* popular tags */}
               <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0">
-                <span className="font-deva shrink-0 text-[10px] font-bold uppercase tracking-wider text-brand-gold/50">
+                <span className="font-deva shrink-0 text-[10px] font-bold uppercase tracking-wider text-brand-gold/90">
                   {copy.popular}
                 </span>
-                {SITE.popularTags.map((tag) => (
+                {TAGS[locale].map((tag) => (
                   <Link
                     key={tag}
                     href="/ebooks"

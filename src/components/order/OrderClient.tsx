@@ -38,7 +38,15 @@ export function OrderMemory({
 }
 
 /** Re-checks a pending order every few seconds while the webhook/confirm lands. */
-export function PendingRefresh({ maxTries = 20, intervalMs = 3000 }) {
+export function PendingRefresh({
+  maxTries = 20,
+  intervalMs = 3000,
+  gaveUpText,
+}: {
+  maxTries?: number;
+  intervalMs?: number;
+  gaveUpText: string;
+}) {
   const router = useRouter();
   const tries = useRef(0);
   const [gaveUp, setGaveUp] = useState(false);
@@ -58,10 +66,7 @@ export function PendingRefresh({ maxTries = 20, intervalMs = 3000 }) {
 
   if (gaveUp) {
     return (
-      <p className="font-deva mt-3 text-xs text-amber-700">
-        अजूनही पुष्टी झाली नाही. पैसे कापले गेले असल्यास हे पान नंतर पुन्हा उघडा किंवा
-        WhatsApp सपोर्टशी संपर्क करा.
-      </p>
+      <p className="font-deva mt-3 text-xs text-amber-700">{gaveUpText}</p>
     );
   }
   return (
@@ -83,12 +88,16 @@ export function WhatsAppOptIn({
   orderId,
   token,
   locale,
+  copyLocale,
   delivered,
   waitForAutoMs = 0,
 }: {
   orderId: string;
   token: string;
+  /** The order's edition — sent to the server; decides which PDF is delivered. */
   locale: Locale;
+  /** Language of the on-screen text (the visitor's choice); defaults to `locale`. */
+  copyLocale?: Locale;
   delivered: boolean;
   waitForAutoMs?: number;
 }) {
@@ -98,7 +107,8 @@ export function WhatsAppOptIn({
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<ContactState>("idle");
   const [message, setMessage] = useState("");
-  const copy = ORDER_COPY[locale];
+  const textLocale = copyLocale ?? locale;
+  const copy = ORDER_COPY[textLocale];
 
   useEffect(() => {
     if (delivered) return;
@@ -144,7 +154,7 @@ export function WhatsAppOptIn({
       );
     } catch {
       setState("error");
-      setMessage(locale === "en" ? "Number could not be saved. Please try again." : copy.invalidPhone);
+      setMessage(textLocale === "en" ? "Number could not be saved. Please try again." : copy.invalidPhone);
     }
   };
 
@@ -209,7 +219,7 @@ export function WhatsAppOptIn({
           {state === "sent" ? (
             <div className="mt-5">
               <p className="font-deva rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{message}</p>
-              <button type="button" onClick={() => dialogRef.current?.close()} className="mt-3 w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white">{UI_CLOSE[locale]}</button>
+              <button type="button" onClick={() => dialogRef.current?.close()} className="mt-3 w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white">{UI_CLOSE[textLocale]}</button>
             </div>
           ) : (
             <div role="group" aria-describedby="whatsapp-dialog-description" className="mt-5 space-y-3">

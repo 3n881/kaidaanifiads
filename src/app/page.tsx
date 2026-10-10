@@ -17,6 +17,7 @@ export default async function Home() {
 
       <Reveal>
         <ProductRow
+          priorityFirst
           title={{ mr: "सर्वाधिक विक्री होणारी पुस्तके", hi: "सबसे अधिक बिकने वाली किताबें", en: "Bestselling books" }}
           subtitle={{ mr: "तुमच्या कायदेशीर गरजांसाठी खास निवडलेली आणि तज्ञांनी लिहिलेली पुस्तके.", hi: "आपकी कानूनी जरूरतों के लिए विशेषज्ञों द्वारा तैयार किताबें।", en: "Expert-created books selected for your legal information needs." }}
           products={bestsellers}

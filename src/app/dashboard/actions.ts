@@ -335,6 +335,14 @@ export async function toggleActive(id: number, active: boolean) {
   await revalidatePublic();
 }
 
+/** Marks a contact-page message as handled (or back to open). */
+export async function setMessageHandled(id: string, handled: boolean) {
+  await requireAdmin();
+  const { error } = await getSupabaseAdmin().from("contact_messages").update({ handled }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/messages");
+}
+
 const SETTINGS_SCOPES = ["business", "content", "integrations", "launch"] as const;
 
 /** Saves approved public content and checklist states. Secrets are rejected. */

@@ -34,49 +34,9 @@ import Carousel from "./Carousel";
 import ProductGallery from "./ProductGallery";
 import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
-
-// Our checkout: Buy opens the payment window directly, the PDF downloads right
-// after payment, and the order stays in "माझी पुस्तके" on the device.
-const MINI_STEPS = [
-  { n: "1", label: "बटन दाबा", en: "Click" },
-  { n: "2", label: "पेमेंट करा", en: "Pay" },
-  { n: "3", label: "PDF मिळवा", en: "Download" },
-  { n: "✓", label: "माझी पुस्तके", en: "My Books" },
-];
+import { PRODUCT_COPY } from "@/lib/product-copy";
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
-
-// Same questions as the previous site; answers describe how this site delivers.
-const PRODUCT_FAQ = [
-  {
-    q: "हे पुस्तक मला कसे मिळेल?",
-    a: "पेमेंट यशस्वी झाल्यानंतर तुम्हाला लगेच Download Button दिसेल आणि PDF डाउनलोड होईल. पेमेंट करताना दिलेल्या मोबाईल नंबरवर पुस्तक PDF स्वरूपात WhatsApp वरही पाठवले जाते. ही लिंक याच मोबाईलवर ‘माझी पुस्तके’ मध्ये जतन राहते, त्यामुळे नंतरही पुन्हा डाउनलोड करता येते.",
-  },
-  {
-    q: "पेमेंट सुरक्षित आहे का?",
-    a: "हो, Razorpay 100% सुरक्षित आहे. GooglePay, PhonePe, Paytm किंवा कार्डद्वारे पेमेंट करा.",
-  },
-  {
-    q: "मोबाईलवर वाचता येते का?",
-    a: "हो! PDF फाइल कोणत्याही मोबाईल, लॅपटॉप किंवा टॅब्लेटवर वाचता येते.",
-  },
-  {
-    q: "हे Physical पुस्तक आहे का?",
-    a: "नाही. हे पूर्णपणे Digital PDF E-Book आहे. कोणतीही Printed / Hard Copy पाठवली जात नाही.",
-  },
-  {
-    q: "किती डिव्हाइसवर वाचता येईल?",
-    a: "PDF वर कोणतेही बंधन नाही — तुम्ही तुमच्या Mobile, Tablet, Laptop, Desktop — कोणत्याही डिव्हाइसवर वाचू शकता.",
-  },
-  {
-    q: "भविष्यात Update मिळेल का?",
-    a: "कायद्यात महत्त्वाचे बदल झाल्यास आम्ही Updated Edition प्रकाशित करतो. Current Version ची माहिती Product Page वर दिली आहे.",
-  },
-  {
-    q: "हे पुस्तक कायदेशीर सल्ला देते का?",
-    a: "नाही. हे पुस्तक केवळ संदर्भ आणि शैक्षणिक उद्देशाने आहे. हा कोणत्याही प्रकारचा कायदेशीर सल्ला (Legal Advice) नाही. तुमच्या विशिष्ट कायदेशीर समस्येसाठी नेहमी तज्ञ वकिलाचा सल्ला घ्या.",
-  },
-];
 
 export default function ProductDetail({
   product: sourceProduct,
@@ -95,7 +55,9 @@ export default function ProductDetail({
   const previewUrl = sourceProduct.availableLocales?.includes(editionLocale)
     ? previewPdfUrl(product.slug, editionLocale)
     : null;
-  const copy = UI_COPY[locale];
+  // Labels follow the edition on show (a Hindi-only book reads in Hindi).
+  const copy = UI_COPY[editionLocale];
+  const t = PRODUCT_COPY[editionLocale];
   const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
@@ -111,7 +73,7 @@ export default function ProductDetail({
   }
   const pct = discountPercent(product);
   const backHref = product.isCombo ? "/combos" : "/ebooks";
-  const backLabel = product.isCombo ? "कॉम्बो पॅक्स" : "ई-बुक्स";
+  const backLabel = product.isCombo ? t.combos : t.ebooks;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -129,12 +91,6 @@ export default function ProductDetail({
         product.isCombo ? "combos" : "ebooks"
       }/${product.slug}`,
     },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: product.rating,
-      bestRating: 5,
-      ratingCount: 128,
-    },
   };
 
   return (
@@ -148,7 +104,7 @@ export default function ProductDetail({
       {/* Breadcrumb */}
       <nav className="mb-4 flex items-center gap-1 text-xs text-brand-400 lg:mb-6">
         <Link href="/" className="hover:text-brand-700">
-          मुख्यपृष्ठ
+          {t.home}
         </Link>
         <ChevronRight className="h-3 w-3" />
         <Link href={backHref} className="hover:text-brand-700">
@@ -162,7 +118,7 @@ export default function ProductDetail({
         {/* Preview viewer — full width on phones; the sticky bar keeps price
             and Buy on screen (as on the previous site). */}
         <div className="mx-auto w-full max-w-md lg:sticky lg:top-24 lg:max-w-none lg:self-start">
-          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} />
+          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} />
         </div>
 
         {/* Info — styling follows the original site's book page */}
@@ -194,10 +150,10 @@ export default function ProductDetail({
             </span>
             <span className="text-gray-300">|</span>
             <span>
-              📦 <strong className="text-gray-700">{SITE.stats.trust}</strong> वाचकांचा विश्वास
+              📦 <strong className="text-gray-700">{SITE.stats.trust}</strong> {t.readersTrust}
             </span>
             <span className="text-gray-300">|</span>
-            <span className="font-medium text-green-600">✓ लगेच डिजिटल डिलिव्हरी</span>
+            <span className="font-medium text-green-600">{t.instantDelivery}</span>
           </div>
 
           {/* price */}
@@ -212,16 +168,16 @@ export default function ProductDetail({
                 <span className="text-3xl font-black tracking-tight text-green-600 sm:text-4xl md:text-5xl">
                   ₹{product.price}
                 </span>
-                <span className="font-deva text-[10px] font-bold text-gray-500 sm:text-xs">फक्त</span>
+                <span className="font-deva text-[10px] font-bold text-gray-500 sm:text-xs">{t.only}</span>
               </div>
               <span className="font-deva mt-0.5 text-[10px] font-semibold text-gray-500">
-                सर्व कर समाविष्ट (Inclusive of all taxes)
+                {t.taxes}
               </span>
             </div>
             {pct > 0 && (
               <div className="ml-auto flex flex-col items-end gap-1.5">
                 <span className="font-deva animate-pulse rounded-lg border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 md:text-xs">
-                  {pct}% सवलत
+                  {pct}% {t.off}
                 </span>
                 <span className="font-deva inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
                   <Flame className="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -234,10 +190,10 @@ export default function ProductDetail({
           {/* notices */}
           <div className="font-deva mb-3 space-y-1.5">
             <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-medium text-blue-800">
-              📄 हे केवळ Digital PDF E-Book आहे — कोणतीही Physical / Printed प्रत पाठवली जात नाही.
+              {t.digitalOnly}
             </p>
             <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-800">
-              ⚠️ एकदा PDF डाउनलोड केल्यानंतर परतावा (Refund) शक्य नाही.
+              {t.noRefund}
             </p>
           </div>
 
@@ -250,40 +206,44 @@ export default function ProductDetail({
             />
             <p className="font-deva flex items-center justify-center gap-1 text-center text-[10px] text-brand-500">
               <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
-              सुरक्षित पेमेंट | UPI, Card, Netbanking · Login / Account ची गरज नाही
+              {t.buyNote}
             </p>
           </div>
 
           {/* chips */}
           <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
             <Chip icon={FileText} title={`PDF (${LANGUAGE_LABELS[product.language]})`} />
-            <Chip icon={BookOpen} title={`${product.pages} पाने`} />
-            <Chip icon={Zap} title="लगेच डाउनलोड" />
+            <Chip icon={BookOpen} title={`${product.pages} ${t.pages}`} />
+            <Chip icon={Zap} title={t.instantDownload} />
           </div>
 
           {/* mini how to buy */}
           <div className="mb-4 rounded-2xl border border-brand-teal/10 bg-brand-teal/5 p-3 sm:p-4">
             <h4 className="font-deva mb-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-brand-teal/60 sm:text-[10px]">
-              खरेदी करण्याची पद्धत / How to Buy
+              {t.howToBuy}
             </h4>
             <div className="flex items-start justify-between gap-1 text-center">
-              {MINI_STEPS.map((s, i) => (
-                <div key={s.n} className="flex flex-1 items-center">
+              {t.steps.map((s, i) => (
+                <div key={s.label} className="flex flex-1 items-center">
                   <div className="flex flex-1 flex-col items-center gap-1">
                     <span
                       className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-black shadow-sm ${
-                        s.n === "✓" ? "border-green-200 bg-green-500 text-white" : "border-brand-teal/20 bg-white text-brand-teal"
+                        i === t.steps.length - 1 ? "border-green-200 bg-green-500 text-white" : "border-brand-teal/20 bg-white text-brand-teal"
                       }`}
                     >
-                      {s.n}
+                      {i === t.steps.length - 1 ? "✓" : i + 1}
                     </span>
                     <span className="font-deva text-[9px] font-bold leading-tight text-gray-800 sm:text-[10px]">
                       {s.label}
-                      <br />
-                      <span className="font-medium opacity-60">{s.en}</span>
+                      {s.en && (
+                        <>
+                          <br />
+                          <span className="font-medium opacity-60">{s.en}</span>
+                        </>
+                      )}
                     </span>
                   </div>
-                  {i < MINI_STEPS.length - 1 && <div className="mb-4 h-px w-3 shrink-0 bg-brand-teal/20 sm:w-4" />}
+                  {i < t.steps.length - 1 && <div className="mb-4 h-px w-3 shrink-0 bg-brand-teal/20 sm:w-4" />}
                 </div>
               ))}
             </div>
@@ -293,7 +253,7 @@ export default function ProductDetail({
           {product.isCombo && comboBooks.length > 0 && (
             <div className="mt-8">
               <h3 className="font-deva text-lg font-bold text-brand-900">
-                या कॉम्बोमध्ये समाविष्ट पुस्तके ({comboBooks.length})
+                {t.comboIncludes} ({comboBooks.length})
               </h3>
               <ul className="mt-3 space-y-2">
                 {comboBooks.map((b) => (
@@ -309,7 +269,7 @@ export default function ProductDetail({
                         {b.title}
                       </span>
                       <span className="text-xs text-brand-400">
-                        {b.pages} पाने
+                        {b.pages} {t.pages}
                       </span>
                     </Link>
                   </li>
@@ -321,7 +281,7 @@ export default function ProductDetail({
           {/* description */}
           <div className="mt-6">
             <h3 className="font-deva mb-1 text-sm font-bold text-brand-teal sm:text-base">
-              वर्णन / Description
+              {t.description}
             </h3>
             <div className="mt-2">
               <ExpandableText text={product.description} />
@@ -338,7 +298,7 @@ export default function ProductDetail({
                 className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
               />
               <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">
-                <ShieldCheck className="h-3.5 w-3.5 text-green-600" /> सुरक्षित पेमेंट (Safe &amp; Secure Payment)
+                <ShieldCheck className="h-3.5 w-3.5 text-green-600" /> {t.securePayment}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {PAYMENT_METHODS.map((method) => (
@@ -348,7 +308,7 @@ export default function ProductDetail({
                 ))}
               </div>
               <div className="border-t border-gray-100 pt-3">
-                <ShareButton title={product.title} />
+                <ShareButton title={product.title} label={t.share} copied={t.copied} />
               </div>
             </div>
           </div>
@@ -356,10 +316,10 @@ export default function ProductDetail({
           {/* FAQ */}
           <div className="mt-8">
             <h3 className="font-deva flex items-center gap-2 text-base font-bold text-brand-teal sm:text-lg">
-              <ShieldCheck className="h-5 w-5" aria-hidden="true" /> नेहमी विचारले जाणारे प्रश्न
+              <ShieldCheck className="h-5 w-5" aria-hidden="true" /> {t.faqTitle}
             </h3>
             <div className="mt-3 divide-y divide-brand-100 rounded-2xl border border-brand-100 bg-white">
-              {PRODUCT_FAQ.map((item) => (
+              {t.faq.map((item) => (
                 <details key={item.q} className="group px-4 py-3">
                   <summary className="font-deva flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-brand-800">
                     {item.q}
@@ -381,17 +341,17 @@ export default function ProductDetail({
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <h2 className="font-deva text-xl font-extrabold text-brand-900 sm:text-2xl">
-                तुम्हाला हे देखील आवडेल
+                {t.relatedTitle}
               </h2>
               <p className="font-deva mt-1 text-sm text-brand-500">
-                आमची इतर काही महत्वाची पुस्तके पहा
+                {t.relatedBody}
               </p>
             </div>
             <Link
               href="/ebooks"
               className="font-deva flex-shrink-0 text-sm font-semibold text-brand-teal hover:underline"
             >
-              सर्व पहा
+              {t.viewAll}
             </Link>
           </div>
           <Carousel products={related} />
@@ -413,7 +373,7 @@ function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string })
 }
 
 /** Native share sheet on phones; copies the link elsewhere. */
-function ShareButton({ title }: { title: string }) {
+function ShareButton({ title, label, copied }: { title: string; label: string; copied: string }) {
   const share = async () => {
     const url = window.location.href.split("#")[0];
     try {
@@ -422,7 +382,7 @@ function ShareButton({ title }: { title: string }) {
         return;
       }
       await navigator.clipboard.writeText(url);
-      window.alert("लिंक कॉपी झाली! / Link copied");
+      window.alert(copied);
     } catch {
       // Share sheet dismissed — nothing to do.
     }
@@ -433,7 +393,7 @@ function ShareButton({ title }: { title: string }) {
       onClick={share}
       className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-bold text-brand-700 transition hover:bg-brand-50"
     >
-      <Share2 className="h-4 w-4" /> मित्रांना शेअर करा (SHARE LINK)
+      <Share2 className="h-4 w-4" /> {label}
     </button>
   );
 }

@@ -9,19 +9,19 @@ import BackToTop from "@/components/BackToTop";
 import AdminChromeGate from "@/components/AdminChromeGate";
 import MetaPixel from "@/components/MetaPixel";
 import LanguageProvider from "@/components/LanguageProvider";
+import LanguagePicker from "@/components/LanguagePicker";
+import { Tr } from "@/components/LanguageProvider";
 import { getAllProducts } from "@/lib/products";
 import type { SearchItem } from "@/data/catalog";
 import { SITE_URL } from "@/lib/supabase/config";
 
 // Fonts are stored in the repo (Google Fonts files) so builds never download
 // them — Turbopack's Google-font fetch broke a production build (go-live problem 18).
-const lato = localFont({
-  variable: "--font-lato",
-  src: [
-    { path: "./fonts/Lato-400-latin.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/Lato-700-latin.woff2", weight: "700", style: "normal" },
-    { path: "./fonts/Lato-900-latin.woff2", weight: "900", style: "normal" },
-  ],
+// English text uses Geist, as on the original site (one variable file, 400–900).
+const geist = localFont({
+  variable: "--font-geist",
+  src: "./fonts/Geist-latin.woff2",
+  weight: "400 900",
   display: "swap",
 });
 
@@ -72,12 +72,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="mr"
-      className={`${lato.variable} ${devanagari.variable} h-full antialiased`}
+      className={`${geist.variable} ${devanagari.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white text-brand-900 pb-14 md:pb-0">
         <LanguageProvider>
           <a href="#main" className="skip-link font-deva">
-            मुख्य मजकुरावर जा / Skip to content
+            <Tr mr="मुख्य मजकुरावर जा / Skip to content" hi="मुख्य सामग्री पर जाएं / Skip to content" en="Skip to content" />
           </a>
           <AdminChromeGate>
             <MetaPixel />
@@ -92,6 +92,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <BackToTop />
             <BottomNav />
           </AdminChromeGate>
+          <LanguagePicker />
         </LanguageProvider>
       </body>
     </html>

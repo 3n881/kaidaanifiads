@@ -93,7 +93,7 @@ export default function CommandPalette({
         <div className="max-h-[50vh] overflow-y-auto p-2">
           {results.length === 0 && (
             <p className="px-3 py-6 text-center text-sm text-brand-400">
-              काही सापडले नाही.
+              {locale === "hi" ? "कुछ नहीं मिला।" : locale === "en" ? "Nothing found." : "काही सापडले नाही."}
             </p>
           )}
           {results.map((p) => (
@@ -116,7 +116,7 @@ export default function CommandPalette({
                   {p.title}
                 </span>
                 <span className="text-xs text-brand-400">
-                  {p.language} · {p.pages} पाने · ₹{p.price}
+                  {p.language} · {p.pages} {UI_COPY[locale].pages} · ₹{p.price}
                 </span>
               </span>
             </button>

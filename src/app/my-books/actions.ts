@@ -5,6 +5,13 @@ import { hasServiceRole } from "@/lib/supabase/config";
 import { isInteraktConfigured } from "@/lib/interakt";
 import { normalizePhone } from "@/lib/orders";
 import { sendOrderOnWhatsApp } from "@/lib/delivery";
+import { normalizeLocale } from "@/lib/i18n";
+
+const ERRORS = {
+  mr: { invalid: "कृपया वैध १० अंकी व्हॉट्सॲप नंबर भरा.", unavailable: "ही सुविधा सध्या उपलब्ध नाही. कृपया WhatsApp सपोर्टशी संपर्क करा.", failed: "लुकअप अयशस्वी. कृपया पुन्हा प्रयत्न करा." },
+  hi: { invalid: "कृपया सही 10 अंकों का व्हॉट्सऐप नंबर भरें।", unavailable: "यह सुविधा अभी उपलब्ध नहीं है। कृपया WhatsApp सपोर्ट से संपर्क करें।", failed: "खोज नहीं हो सकी। कृपया फिर से कोशिश करें।" },
+  en: { invalid: "Please enter a valid 10-digit WhatsApp number.", unavailable: "This service is not available right now. Please contact WhatsApp support.", failed: "Lookup failed. Please try again." },
+} as const;
 
 // Max orders re-sent per request (bounds cost if someone owns many orders).
 const MAX_ORDERS_PER_REQUEST = 10;
@@ -18,11 +25,13 @@ const MAX_ORDERS_PER_REQUEST = 10;
  */
 export async function sendMyBooks(
   whatsapp: string,
+  locale?: string,
 ): Promise<{ error?: string; ok?: boolean }> {
+  const e = ERRORS[normalizeLocale(locale)];
   const phone = normalizePhone(whatsapp);
-  if (!phone) return { error: "कृपया वैध १० अंकी व्हॉट्सॲप नंबर भरा." };
+  if (!phone) return { error: e.invalid };
   if (!hasServiceRole || !isInteraktConfigured) {
-    return { error: "ही सुविधा सध्या उपलब्ध नाही. कृपया WhatsApp सपोर्टशी संपर्क करा." };
+    return { error: e.unavailable };
   }
 
   const admin = getSupabaseAdmin();
@@ -36,7 +45,7 @@ export async function sendMyBooks(
 
   if (error) {
     console.error("[my-books] lookup failed", error.message);
-    return { error: "लुकअप अयशस्वी. कृपया पुन्हा प्रयत्न करा." };
+    return { error: e.failed };
   }
 
   for (const order of data ?? []) {

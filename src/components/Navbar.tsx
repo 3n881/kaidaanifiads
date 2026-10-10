@@ -18,8 +18,11 @@ const LINKS = [
   { href: "/my-books" },
 ];
 
+// Compact language code for the phone header (full names in the picker).
+const SHORT_LABEL = { mr: "म", hi: "हि", en: "EN" } as const;
+
 export default function Navbar({ products }: { products: SearchItem[] }) {
-  const { locale, setLocale } = useLanguage();
+  const { locale, setLocale, openPicker } = useLanguage();
   const copy = UI_COPY[locale];
   const pathname = usePathname();
   // The menu belongs to the page it was opened on, so it closes on navigation.
@@ -49,10 +52,10 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
           <Image
             src="/brand/logo.png"
             alt="कायद्याचं आणि फायद्याचं"
-            width={230}
-            height={40}
+            width={276}
+            height={48}
             loading="eager"
-            className="h-8 w-auto object-contain transition-transform group-hover:scale-105 sm:h-10 lg:h-7 2xl:h-10"
+            className="h-9 w-auto object-contain transition-transform group-hover:scale-105 sm:h-11 lg:h-10 xl:h-11"
           />
         </Link>
 
@@ -93,7 +96,7 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
           ))}
         </div>
 
-        <LanguageSelect className="hidden xl:flex" />
+        <LanguageSelect className="hidden lg:flex" />
 
         {/* Buy button (gold) */}
         <Link
@@ -104,18 +107,27 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
         </Link>
 
         {/* Mobile actions */}
-        <div className="ml-auto flex items-center gap-2 lg:hidden">
+        <div className="ml-auto flex items-center gap-1 lg:hidden">
+          <button
+            type="button"
+            onClick={openPicker}
+            aria-label={copy.language}
+            className="font-deva flex items-center gap-1 rounded-md px-1.5 py-2 text-xs font-bold text-brand-600 transition-colors hover:bg-gray-100 hover:text-brand-teal"
+          >
+            <Languages className="h-4 w-4" aria-hidden="true" />
+            {SHORT_LABEL[locale]}
+          </button>
           <button
             onClick={() => setPaletteOpen(true)}
-            aria-label="शोधा"
-            className="rounded-md p-2 text-brand-500 transition-colors hover:bg-gray-100 hover:text-brand-teal"
+            aria-label={copy.search}
+            className="rounded-md p-1.5 text-brand-500 transition-colors hover:bg-gray-100 hover:text-brand-teal"
           >
             <Search className="h-5 w-5" />
           </button>
           <button
             onClick={() => setMenuPath(menuOpen ? null : pathname)}
-            aria-label="मेनू"
-            className="rounded-lg p-2 text-brand-teal"
+            aria-label="Menu"
+            className="rounded-lg p-1.5 text-brand-teal"
           >
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>

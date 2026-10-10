@@ -37,8 +37,8 @@
   /* WhatsApp */
   --color-whatsapp: #25d366;
 
-  --font-sans: var(--font-lato), var(--font-devanagari), system-ui, sans-serif;
-  --font-deva: var(--font-devanagari), var(--font-lato), system-ui, sans-serif;
+  --font-sans: var(--font-geist), var(--font-devanagari), system-ui, sans-serif;
+  --font-deva: var(--font-devanagari), var(--font-geist), system-ui, sans-serif;
 
   --radius: 0.65rem;
 

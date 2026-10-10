@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { Tr } from "@/components/LanguageProvider";
 
 export default function DisclaimerBanner({
   className = "",
@@ -11,8 +12,11 @@ export default function DisclaimerBanner({
     >
       <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
       <p className="font-deva">
-        केवळ शैक्षणिक व माहितीच्या उद्देशाने. हा कायदेशीर सल्ला नाही
-        (Educational reference only, not legal advice).
+        <Tr
+          mr="केवळ शैक्षणिक व माहितीच्या उद्देशाने. हा कायदेशीर सल्ला नाही (Educational reference only, not legal advice)."
+          hi="केवल शैक्षणिक और जानकारी के उद्देश्य से। यह कानूनी सलाह नहीं है (Educational reference only, not legal advice)."
+          en="Educational reference only — this is not legal advice."
+        />
       </p>
     </div>
   );

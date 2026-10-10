@@ -168,3 +168,27 @@ export async function getAdminOrders(): Promise<AdminOrder[]> {
   if (error) throw error;
   return (data as AdminOrder[]) ?? [];
 }
+
+export interface ContactMessage {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  subject: string | null;
+  message: string;
+  locale: string;
+  handled: boolean;
+}
+
+/** Contact-page messages, newest first (admin inbox). */
+export async function getContactMessages(limit = 200): Promise<ContactMessage[]> {
+  await requireAdmin();
+  const { data, error } = await getSupabaseAdmin()
+    .from("contact_messages")
+    .select("id, created_at, name, email, phone, subject, message, locale, handled")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ContactMessage[];
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { CheckCircle2, Clock, Download, MessageCircle, XCircle } from "lucide-react";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
@@ -11,7 +12,9 @@ import { autoWhatsAppEnabled } from "@/lib/delivery";
 import { SITE } from "@/data/catalog";
 import { OrderMemory, PendingRefresh, WhatsAppOptIn } from "@/components/order/OrderClient";
 import InAppBrowserHint from "@/components/order/InAppBrowserHint";
-import { localizedTitle, normalizeLocale, ORDER_COPY } from "@/lib/i18n";
+import DownloadWhere from "@/components/order/DownloadWhere";
+import { ORDER_EXTRA } from "@/lib/order-copy";
+import { isLocale, localizedTitle, normalizeLocale, ORDER_COPY, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +47,15 @@ export default async function OrderPage({
   const query = await searchParams;
   const token = typeof query.t === "string" ? query.t : "";
 
+  // Text follows the visitor's chosen site language (cookie set by the language
+  // picker); the order keeps its own edition language for the PDF itself.
+  const chosen = (await cookies()).get("kaf_locale")?.value;
+  const uiLocale: Locale | null = isLocale(chosen) ? chosen : null;
+
   if (!hasServiceRole) notFound();
   // A link without (or with a broken) ?t= token: never say "not found" to a
   // buyer — their order is saved in My Books on the phone they paid on.
-  if (!verifyOrderAccessToken(orderId, token)) return <IncompleteLink />;
+  if (!verifyOrderAccessToken(orderId, token)) return <IncompleteLink locale={uiLocale ?? "mr"} />;
 
   const admin = getSupabaseAdmin();
   const loadOrder = () =>
@@ -59,7 +67,7 @@ export default async function OrderPage({
   let { data: order, error: orderError } = await loadOrder();
   // Supabase down/slow: the token proves this is a real order, so never 404 —
   // reassure the buyer and keep checking until the database is back.
-  if (orderError) return <SystemBusy orderId={orderId} token={token} />;
+  if (orderError) return <SystemBusy orderId={orderId} token={token} locale={uiLocale ?? "mr"} />;
   if (!order) notFound();
 
   // Still unpaid here? Ask Razorpay directly — covers payments whose confirm
@@ -70,7 +78,7 @@ export default async function OrderPage({
     } catch (error) {
       if (!(error instanceof DatabaseUnavailableError)) throw error;
     }
-    if (orderError) return <SystemBusy orderId={orderId} token={token} />;
+    if (orderError) return <SystemBusy orderId={orderId} token={token} locale={uiLocale ?? "mr"} />;
     if (!order) notFound();
   }
 
@@ -78,8 +86,10 @@ export default async function OrderPage({
     | { title: string; title_mr?: string | null; title_hi?: string | null; title_en?: string | null; slug: string; is_combo: boolean }
     | null;
   const locale = normalizeLocale(order.locale);
-  const title = localizedTitle(product, locale) || "पुस्तक";
-  const copy = ORDER_COPY[locale];
+  const textLocale = uiLocale ?? locale;
+  const copy = ORDER_COPY[textLocale];
+  const extra = ORDER_EXTRA[textLocale];
+  const title = localizedTitle(product, locale) || extra.book;
   const supportHref = `https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
     `Order ${orderId.slice(0, 8)} — download help`,
   )}`;
@@ -110,10 +120,10 @@ export default async function OrderPage({
             </Link>
           )
         ) : (
-          <PendingRefresh />
+          <PendingRefresh gaveUpText={extra.gaveUp} />
         )}
         <a href={supportHref} className="font-deva mt-6 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline">
-          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> मदत हवी आहे? WhatsApp करा
+          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {extra.needHelp}
         </a>
       </div>
     );
@@ -124,7 +134,7 @@ export default async function OrderPage({
     items = await getDeliverableItems(order.product_id, locale);
   } catch (error) {
     if (error instanceof DatabaseUnavailableError) {
-      return <SystemBusy orderId={orderId} token={token} title={title} />;
+      return <SystemBusy orderId={orderId} token={token} title={title} locale={textLocale} />;
     }
     throw error;
   }
@@ -161,10 +171,10 @@ export default async function OrderPage({
       </div>
 
       <div className="mt-6 space-y-3">
-        <InAppBrowserHint />
+        <InAppBrowserHint locale={textLocale} />
         {items.length === 0 && (
           <p className="font-deva rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            पेमेंट मिळाले आहे. फाइल तयार होत आहे — कृपया WhatsApp सपोर्टशी संपर्क करा.
+            {extra.preparing}
           </p>
         )}
         {items.map((item) => (
@@ -178,6 +188,9 @@ export default async function OrderPage({
             <span className="text-xs font-semibold text-white/80">PDF</span>
           </a>
         ))}
+        {items.length > 0 && (
+          <DownloadWhere locale={textLocale} fileNames={items.map((item) => `${item.slug}-${locale}.pdf`)} />
+        )}
         <p className="font-deva text-center text-[11px] text-brand-500">
           {copy.bookmark}
         </p>
@@ -185,6 +198,7 @@ export default async function OrderPage({
           orderId={orderId}
           token={token}
           locale={locale}
+          copyLocale={textLocale}
           delivered={Boolean(order.delivered || order.whatsapp_number)}
           waitForAutoMs={waitForAutoMs}
         />
@@ -196,31 +210,24 @@ export default async function OrderPage({
   );
 }
 
-function IncompleteLink() {
+function IncompleteLink({ locale }: { locale: Locale }) {
+  const extra = ORDER_EXTRA[locale];
   return (
     <div className="container-x max-w-md py-12 text-center">
       <XCircle className="mx-auto h-12 w-12 text-amber-500" aria-hidden="true" />
-      <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">
-        ही लिंक अपूर्ण आहे
-      </h1>
-      <p className="font-deva mt-2 text-sm text-brand-600">
-        काळजी करू नका — तुमची खरेदी सुरक्षित आहे. ज्या मोबाईलवर पेमेंट केले, त्यावर
-        ‘माझी पुस्तके’ मध्ये तुमची पुस्तके आहेत.
-      </p>
-      <p className="mt-1 text-xs text-brand-500">
-        This link is incomplete. Your purchase is safe — open My Books on the phone you paid on.
-      </p>
+      <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">{extra.incompleteTitle}</h1>
+      <p className="font-deva mt-2 text-sm text-brand-600">{extra.incompleteBody}</p>
       <Link
         href="/my-books"
         className="font-deva mt-6 inline-block rounded-xl bg-brand-teal px-6 py-3 text-sm font-bold text-white"
       >
-        माझी पुस्तके उघडा (My Books)
+        {extra.openMyBooks}
       </Link>
       <a
         href={`https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}`}
         className="font-deva mt-6 flex items-center justify-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline"
       >
-        <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> मदत हवी आहे? WhatsApp करा
+        <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {extra.needHelp}
       </a>
     </div>
   );
@@ -229,27 +236,22 @@ function IncompleteLink() {
 function SystemBusy({
   orderId,
   token,
-  title = "तुमची ऑर्डर",
+  title,
+  locale,
 }: {
   orderId: string;
   token: string;
   title?: string;
+  locale: Locale;
 }) {
+  const extra = ORDER_EXTRA[locale];
   return (
     <div className="container-x max-w-md py-12 text-center">
-      <OrderMemory orderId={orderId} token={token} title={title} />
+      <OrderMemory orderId={orderId} token={token} title={title ?? extra.yourOrder} />
       <Clock className="mx-auto h-12 w-12 text-brand-teal" aria-hidden="true" />
-      <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">
-        सिस्टम सध्या व्यस्त आहे
-      </h1>
-      <p className="font-deva mt-2 text-sm text-brand-600">
-        तुमचे पेमेंट सुरक्षित आहे. हे पान आपोआप अपडेट होईल आणि पुस्तक डाउनलोड होईल —
-        कृपया हे पान बंद करू नका. (हे पान “माझी पुस्तके” मध्येही सेव्ह झाले आहे.)
-      </p>
-      <p className="mt-1 text-xs text-brand-500">
-        Your payment is safe. This page will update by itself in a few minutes.
-      </p>
-      <PendingRefresh maxTries={60} intervalMs={10000} />
+      <h1 className="font-deva mt-3 text-xl font-extrabold text-brand-900">{extra.busyTitle}</h1>
+      <p className="font-deva mt-2 text-sm text-brand-600">{extra.busyBody}</p>
+      <PendingRefresh maxTries={60} intervalMs={10000} gaveUpText={extra.gaveUp} />
     </div>
   );
 }

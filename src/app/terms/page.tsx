@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Terms & Conditions" };
 export default function Page() {
   return (
     <PolicyPage
-      title="नियम आणि अटी (Terms & Conditions)"
+      title={{ mr: "नियम आणि अटी (Terms & Conditions)", hi: "नियम और शर्तें (Terms & Conditions)", en: "Terms & Conditions" }}
       intro="By purchasing or using our digital products, you agree to the following terms."
       sections={[
         {

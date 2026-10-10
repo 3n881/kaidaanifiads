@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { Product } from "@/data/catalog";
 import { UI_COPY } from "@/lib/i18n";
+import { editionLocaleFor } from "@/lib/catalog";
 import BuyButton from "./BuyButton";
 import { useLanguage } from "./LanguageProvider";
 
@@ -36,7 +37,7 @@ export default function StickyBuyBar({ product }: { product: Product }) {
         <div className="min-w-0 flex-1">
           <BuyButton
             product={product}
-            label={UI_COPY[locale].downloadNow}
+            label={UI_COPY[editionLocaleFor(product, locale)].downloadNow}
             className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
           />
         </div>
