@@ -1,5 +1,8 @@
 # EC2 setup — step by step (with fixes for common errors)
 
+> ⚠️ **Not used — we went with Lightsail (2026-10-10): see `docs/setup-steps-lightsail.md`.** Kept as a
+> fallback if Lightsail ever has to be replaced.
+>
 > Written 2026-10-09. The exact clicks and commands to put the site on one AWS EC2
 > `t3.small` server in Mumbai behind Cloudflare. Tick each box as you go. If a step
 > fails, look at **"If it fails"** under that step, then tell Claude the step number and

@@ -6,11 +6,14 @@
 # (Settings → Secrets and variables → Actions → Variables). Setup:
 # docs/go-live-plan.md (Stage 1D / 2), docs/deploy-lightsail.md.
 #
-# Servers only accept SSH from the admin's IP. On EC2, set the variable
-# DEPLOY_SG_ID (security group) and the secrets AWS_DEPLOY_ACCESS_KEY_ID /
-# AWS_DEPLOY_SECRET_ACCESS_KEY (IAM user limited by
-# deploy/github-deploy-iam-policy.json): the job then opens SSH for this
-# runner's IP only while it deploys, and always closes it again.
+# Servers only accept SSH from the admin's IP. The job opens SSH for this
+# runner's IP only while it deploys, and always closes it again:
+#   EC2:       variable DEPLOY_SG_ID (security group);
+#              IAM policy deploy/github-deploy-iam-policy.json
+#   Lightsail: variable DEPLOY_LIGHTSAIL_INSTANCE (instance name, e.g. kaf-a);
+#              IAM policy deploy/github-deploy-iam-policy-lightsail.json
+# Both need the secrets AWS_DEPLOY_ACCESS_KEY_ID / AWS_DEPLOY_SECRET_ACCESS_KEY
+# of an IAM user that has only that policy.
 name: Deploy
 
 on:
@@ -78,6 +81,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEPLOY_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ vars.DEPLOY_AWS_REGION || 'ap-south-1' }}
       DEPLOY_SG_ID: ${{ vars.DEPLOY_SG_ID }}
+      DEPLOY_LIGHTSAIL_INSTANCE: ${{ vars.DEPLOY_LIGHTSAIL_INSTANCE }}
     steps:
       - name: Open SSH for this runner only (EC2 security group)
         if: vars.DEPLOY_SG_ID != ''
@@ -87,6 +91,27 @@ jobs:
           echo "RUNNER_CIDR=${ip}/32" >> "$GITHUB_ENV"
           aws ec2 authorize-security-group-ingress --group-id "$DEPLOY_SG_ID" \
             --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${ip}/32,Description=github-deploy}]"
+
+      - name: Open SSH for this runner only (Lightsail firewall)
+        if: vars.DEPLOY_LIGHTSAIL_INSTANCE != ''
+        run: |
+          set -euo pipefail
+          ip="$(curl -fsS --max-time 10 https://checkip.amazonaws.com | tr -d '[:space:]')"
+          # Current rules → the exact list to restore afterwards.
+          aws lightsail get-instance-port-states --instance-name "$DEPLOY_LIGHTSAIL_INSTANCE" \
+            --query 'portStates' --output json \
+            | jq -c '[.[] | {fromPort, toPort, protocol, cidrs, ipv6Cidrs, cidrListAliases}
+                       | with_entries(select(.value != null and .value != []))]' > "$RUNNER_TEMP/ports-restore.json"
+          # Same rules + this runner's IP on port 22.
+          jq -c --arg c "${ip}/32" '
+            if any(.[]; .fromPort == 22 and .toPort == 22 and .protocol == "tcp")
+            then map(if .fromPort == 22 and .toPort == 22 and .protocol == "tcp"
+                     then .cidrs = ((.cidrs // []) + [$c]) else . end)
+            else . + [{fromPort: 22, toPort: 22, protocol: "tcp", cidrs: [$c]}] end' \
+            "$RUNNER_TEMP/ports-restore.json" > "$RUNNER_TEMP/ports-open.json"
+          aws lightsail put-instance-public-ports --instance-name "$DEPLOY_LIGHTSAIL_INSTANCE" \
+            --port-infos "file://$RUNNER_TEMP/ports-open.json" > /dev/null
+          echo "LIGHTSAIL_OPENED=1" >> "$GITHUB_ENV"
 
       - name: Roll out to each server in turn
         env:
@@ -112,3 +137,9 @@ jobs:
         run: |
           aws ec2 revoke-security-group-ingress --group-id "$DEPLOY_SG_ID" \
             --protocol tcp --port 22 --cidr "$RUNNER_CIDR"
+
+      - name: Close SSH again (Lightsail)
+        if: always() && vars.DEPLOY_LIGHTSAIL_INSTANCE != '' && env.LIGHTSAIL_OPENED == '1'
+        run: |
+          aws lightsail put-instance-public-ports --instance-name "$DEPLOY_LIGHTSAIL_INSTANCE" \
+            --port-infos "file://$RUNNER_TEMP/ports-restore.json" > /dev/null
