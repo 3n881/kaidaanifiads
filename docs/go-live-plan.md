@@ -45,6 +45,7 @@
 | 11 | 10-09 | **Gap in the existing deploy:** the firewall allowed SSH only from the admin's IP, but GitHub's deploy logs in over SSH from GitHub's machines — every automatic deploy would have been blocked. | `deploy.yml` now opens SSH for the runner's own IP only while it deploys and always closes it (EC2 security group, IAM user limited to that one group: `deploy/github-deploy-iam-policy.json`). New EC2 firewall script `deploy/ec2-firewall.sh`. |
 | 12 | 10-09 | "Which server is fastest?" | EC2 Mumbai: Supabase Mumbai runs on AWS `ap-south-1`, so DB calls are ~1 ms (vs ~15–20 ms from DigitalOcean Bangalore). Page/image speed is decided by Cloudflare's India edge (~99 % of requests never reach the server). |
 | 14 | 10-10 | Lightsail needs the same "SSH only while deploying" as EC2 (problem 11). | `deploy.yml` also handles Lightsail: with variable `DEPLOY_LIGHTSAIL_INSTANCE=kaf-a` it reads the instance's firewall, adds the runner's IP to port 22, deploys, then restores the exact previous rules (IAM policy `deploy/github-deploy-iam-policy-lightsail.json`; rule logic tested with jq). |
+| 16 | 10-10 | First Deploy run: build ✅, "Roll out" ❌ — app1 started fine but stayed **unhealthy**: `deploy/docker-compose.yml` health check called `wget`, which the `node:22-slim` image doesn't have ("exec: \"wget\": executable file not found"). | Health check now uses `node -e "fetch(...)"` (same as the Dockerfile). Copied the fixed file to `/opt/kaf/docker-compose.yml` (deploy.sh does **not** copy it — any change to `deploy/docker-compose.yml` or `deploy/Caddyfile` must be copied to the server by hand), then re-ran Deploy. |
 | 15 | 10-10 | Replov never had `ORDER_ACCESS_SECRET` (it fell back to the Razorpay key secret for signing order links). | A new 64-char `ORDER_ACCESS_SECRET` was generated for the server (`/opt/kaf/app.env`, local copy `C:\Users\shivr\kaf-keys\app.env`). No real sales yet, so nothing breaks; only old Replov test-order links won't open on the new server. **Never change it after real sales.** |
 | 13 | 10-09 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` is passed by `deploy.yml` as a build secret, but the Dockerfile doesn't read it (legacy builder, no BuildKit secrets). | Harmless: one image is built per release and runs on every container, so Server Action keys already match. Leave the secret unset. |
 
@@ -101,7 +102,7 @@ Cloudflare, GitHub auto-deploy — works as-is):
 | | Decision |
 |---|---|
 | Domain | **`kaydyachaanifayddyacha.com`** — registered at **Hostinger** on 2026-10-03 (we have access). Note the spelling: `fay`**`dd`**`yach`**`a`**. The original site stays on `kaydyachaanifaydyach.com` (GoDaddy → Vercel) and is **not touched**. |
-| Staging hostname | `new.kaydyachaanifayddyacha.com` |
+| Staging hostname | **None** (user decision 2026-10-10): deploy straight to `kaydyachaanifayddyacha.com` and test there with Razorpay test keys before announcing. (Caddy still answers `new.`, unused.) |
 | Supabase | moved from **Tokyo** to a new **Mumbai** project `ntqwvfksdqdyoyknkprh` — ✅ done 2026-10-04 (Stage 1B) |
 | Servers | **ONE AWS Lightsail `$12`** (2 vCPU / 2 GB, Mumbai `ap-south-1a`, instance `kaf-a`) behind Cloudflare — no Load Balancing. Measure under real traffic; add a second server + Load Balancing later only if needed ("Later: second server" below). |
 | Payment-check cron | stays on **cron-job.org** (GitHub `RECONCILE_ENABLED` stays unset) |
@@ -129,17 +130,17 @@ that risk expensive.
 ## How we switch without risk
 
 1. Nothing is live on the new domain yet, so there is no old site to replace on it.
-2. Build the server, test everything on **`new.kaydyachaanifayddyacha.com`** with
-   **Razorpay test keys**.
-3. When every test passes: live Razorpay keys, then point the apex + `www` of the new
-   domain at the server in Cloudflare DNS. Replov keeps running until we're sure.
+2. Point `kaydyachaanifayddyacha.com` + `www` at the server right away and test everything
+   **on the main domain** with **Razorpay test keys** — nobody knows the address yet.
+3. When every test passes: switch to live Razorpay keys and announce (bio, Reels). Replov
+   keeps running until we're sure.
 
 | Stage | Who | Status |
 |---|---|---|
 | 0. Repo prep | Claude | ✅ done 2026-10-04 |
 | 1. Accounts (Cloudflare, Supabase Mumbai, AWS, GitHub) | you + Claude | Cloudflare ✅, Supabase Mumbai ✅, AWS ✅, GitHub variables ⏳ |
 | 2. Server (one Lightsail) | you + Claude | ✅ 10-10: instance, firewall, GitHub deploy access, server setup (`docs/setup-steps-lightsail.md` Steps 3–6) |
-| 3. First deploy on staging | you | |
+| 3. First deploy on the main domain | you + Claude | ⏳ next |
 | 4. Functional tests on staging | you (phone) + Claude (database) | |
 | 5. Speed + load tests | you + Claude | |
 | 6. Go-live day | you + client | |
@@ -194,7 +195,7 @@ You:
       with a password (tick *auto confirm*). Same e-mail as `ADMIN_EMAILS`.
 - [ ] **Authentication → URL Configuration** *(not confirmed yet — check)*: Site URL
       `https://kaydyachaanifayddyacha.com`; Redirect URLs:
-      `https://kaydyachaanifayddyacha.com/**`, `https://new.kaydyachaanifayddyacha.com/**`,
+      `https://kaydyachaanifayddyacha.com/**`, `https://www.kaydyachaanifayddyacha.com/**`,
       `https://kaidyachaanifaidyacha-28da.replov.com/**`.
 - [x] Create a file **`.env.mumbai`** in the project folder (it is git-ignored) with:
       ```
@@ -232,7 +233,7 @@ already points at Mumbai.
 
 ### 1D. GitHub (you) — repo → Settings → Secrets and variables → Actions
 - [ ] Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (**Mumbai**
-      values from 1B), `NEXT_PUBLIC_SITE_URL=https://new.kaydyachaanifayddyacha.com`,
+      values from 1B), `NEXT_PUBLIC_SITE_URL=https://kaydyachaanifayddyacha.com`,
       `NEXT_PUBLIC_META_PIXEL_IDS` (empty until the client confirms),
       **`NEXT_PUBLIC_MEDIA_PROXY=true`** (images + previews via `/media`, cached by Cloudflare).
       **`DEPLOY_ENABLED` last** (Stage 3).
@@ -301,35 +302,35 @@ already points at Mumbai.
     real sales. `CRON_SECRET`: same as Replov.
   - Interakt + `ADMIN_EMAILS`: same as on Replov. Cloudflare `CLOUDFLARE_ZONE_ID` /
     `CLOUDFLARE_API_TOKEN` from `.env.mumbai`.
-  - `NEXT_PUBLIC_SITE_URL=https://new.kaydyachaanifayddyacha.com`
+  - `NEXT_PUBLIC_SITE_URL=https://kaydyachaanifayddyacha.com`
 - [ ] `docker login ghcr.io -u 3n881` with the `read:packages` token (Stage 1D).
 
-## Stage 3 — First deploy on staging (you)
+## Stage 3 — First deploy on the main domain (you + Claude)
 
 - [ ] GitHub variable `DEPLOY_ENABLED=true` → Actions → **Deploy** → Run workflow.
       Builds one image and rolls it out to the server (two containers, one at a time).
-- [ ] Cloudflare **DNS → Add record**: type `A`, name `new`, IPv4 = server's static IP,
-      **Proxied (orange cloud)**.
-- [ ] UptimeRobot (free): HTTPS monitor on `https://new.kaydyachaanifayddyacha.com/api/health`,
+- [ ] Cloudflare **DNS**: delete the Hostinger parking records on `@`/`www`; add `A @ → static IP`
+      and `CNAME www → kaydyachaanifayddyacha.com`, both **Proxied**.
+- [ ] UptimeRobot (free): HTTPS monitor on `https://kaydyachaanifayddyacha.com/api/health`,
       every 5 min, alert to your phone/e-mail.
 - [ ] Cloudflare **Cache Rules** 1–5 and **WAF** rules (`viral-launch-plan.md` §Phase 5),
       plus rule **`media`**: path starts with `/media/` → *Eligible for cache*, Edge TTL
       *respect origin* (1 year for images, 1 hour for preview PDFs).
       Smart Tiered Cache on; Rocket Loader, Email obfuscation, Bot Fight Mode **off**.
 - [ ] Razorpay **Test Mode** → Webhooks → add
-      `https://new.kaydyachaanifayddyacha.com/api/razorpay/webhook` (events
+      `https://kaydyachaanifayddyacha.com/api/razorpay/webhook` (events
       `payment.captured`, `order.paid`, `payment.failed`; staging secret).
-- [ ] cron-job.org → change the URL to `https://new.kaydyachaanifayddyacha.com/api/cron/reconcile`.
+- [ ] cron-job.org → change the URL to `https://kaydyachaanifayddyacha.com/api/cron/reconcile`.
 
 **Check (Claude can run these):**
 ```bash
-curl -s https://new.kaydyachaanifayddyacha.com/api/health        # {"ok":true,"deployment":"<sha>"}
-curl -sI "https://new.kaydyachaanifayddyacha.com/ebooks/<slug>?igsh=a" | grep -i cf-cache-status   # 2nd time: HIT
-curl -sI "https://new.kaydyachaanifayddyacha.com/media/<any cover>-400.webp" | grep -i cf-cache-status   # 2nd time: HIT
+curl -s https://kaydyachaanifayddyacha.com/api/health        # {"ok":true,"deployment":"<sha>"}
+curl -sI "https://kaydyachaanifayddyacha.com/ebooks/<slug>?igsh=a" | grep -i cf-cache-status   # 2nd time: HIT
+curl -sI "https://kaydyachaanifayddyacha.com/media/<any cover>-400.webp" | grep -i cf-cache-status   # 2nd time: HIT
 curl -sk --max-time 5 https://<ip-A>/ ; echo "exit=$?"            # must time out (firewall)
 ```
 
-## Stage 4 — Functional tests on staging (Razorpay test mode)
+## Stage 4 — Functional tests on the main domain (Razorpay test mode, before announcing)
 
 Claude checks the database after each.
 
@@ -344,7 +345,7 @@ Claude checks the database after each.
 | 7 | Unknown book URL | 404 page |
 | 8 | Close the tab right after paying | webhook marks it paid; WhatsApp still arrives |
 
-## Stage 5 — Speed + load tests (staging)
+## Stage 5 — Speed + load tests (before announcing)
 
 **A. Page speed (phones are what matter)**
 
@@ -383,12 +384,10 @@ add things for the new domain.
      (Razorpay may review the new site's policy pages — they exist at `/terms`,
      `/refund-policy`, `/privacy-policy`, `/shipping-policy`, `/cancellation-policy`,
      `/contact`).
-2. `app.env` on the server: live Razorpay keys + live webhook secret,
-   `NEXT_PUBLIC_SITE_URL=https://kaydyachaanifayddyacha.com`. GitHub variable
-   `NEXT_PUBLIC_SITE_URL` → same (+ pixel IDs if ready) → **Deploy** workflow.
-3. Cloudflare **DNS**: replace the Hostinger parking record — `A` record for `@`
-   (the apex) = server's static IP, **Proxied**; `CNAME www → kaydyachaanifayddyacha.com`,
-   **Proxied**. Traffic arrives within seconds.
+2. `app.env` on the server: live Razorpay keys + live webhook secret (site URL is already
+   the main domain) → restart: `cd /opt/kaf && docker compose up -d --force-recreate app1 app2`
+   (or run the Deploy workflow; + pixel IDs in GitHub variables if ready).
+3. DNS: already pointing at the server since Stage 3 (no staging address). Nothing to change.
 4. cron-job.org URL → `https://kaydyachaanifayddyacha.com/api/cron/reconcile`.
 5. **Warm the cache**: open every book page once; check `cf-cache-status: HIT`.
 6. **Real purchase**: ₹99 on Android from Instagram + one on iPhone → download,

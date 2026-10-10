@@ -38,7 +38,7 @@ GitHub repo → **Settings → Secrets and variables → Actions → Variables �
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `NEW_SUPABASE_URL` from `.env.mumbai` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `NEW_SUPABASE_ANON_KEY` from `.env.mumbai` |
-| `NEXT_PUBLIC_SITE_URL` | `https://new.kaydyachaanifayddyacha.com` |
+| `NEXT_PUBLIC_SITE_URL` | `https://kaydyachaanifayddyacha.com` (the main domain — no staging address) |
 | `NEXT_PUBLIC_MEDIA_PROXY` | `true` |
 
 - [ ] 4 variables added (**not** `DEPLOY_ENABLED` yet — Step 7).
@@ -54,7 +54,7 @@ Mumbai project → **Authentication → URL Configuration**:
 
 - [ ] **Site URL**: `https://kaydyachaanifayddyacha.com`
 - [ ] **Redirect URLs** (all three): `https://kaydyachaanifayddyacha.com/**`,
-      `https://new.kaydyachaanifayddyacha.com/**`, `https://kaidyachaanifaidyacha-28da.replov.com/**`
+      `https://www.kaydyachaanifayddyacha.com/**`, `https://kaidyachaanifaidyacha-28da.replov.com/**`
 
 ## Step 3 — Server ✅ (created 2026-10-10)
 
@@ -139,7 +139,7 @@ Windows **PowerShell**, in the folder with `kaf-key.pem`, `origin.pem`, `origin.
 
       | Setting | Value / where from |
       |---|---|
-      | `NEXT_PUBLIC_SITE_URL` | `https://new.kaydyachaanifayddyacha.com` (staging) |
+      | `NEXT_PUBLIC_SITE_URL` | `https://kaydyachaanifayddyacha.com` |
       | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Mumbai values from `.env.mumbai` (`NEW_…`) |
       | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test** keys (as on Replov) |
       | `RAZORPAY_WEBHOOK_SECRET` | a **new** secret, also entered in Razorpay's test webhook (Step 7) |
@@ -162,17 +162,26 @@ Windows **PowerShell**, in the folder with `kaf-key.pem`, `origin.pem`, `origin.
 - `docker: permission denied` → reconnect after 6.3.
 - `docker login … unauthorized` → token lacks `read:packages` or username typo.
 
-## Step 7 — First deploy on staging (together with Claude)
+## Step 7 — First deploy on the main domain (together with Claude)
 
+> **No staging address** (decision 2026-10-10): nothing is live on the domain yet, so the site is
+> deployed straight to `kaydyachaanifayddyacha.com` and tested there with Razorpay **test** keys
+> **before** anyone is told about it. Going public = switching to live keys (go-live plan Stage 6).
+
+- [ ] GitHub variable **`NEXT_PUBLIC_SITE_URL`** = `https://kaydyachaanifayddyacha.com` (change it if
+      it still says `new.`). The server's `app.env` already has it.
+- [ ] Cloudflare → **DNS → Records**: **delete** the Hostinger parking records for `@` / `www`
+      (any `A`, `AAAA` or `CNAME` on the root or `www`), then **Add record**:
+      - Type `A`, Name `@`, IPv4 = the static IP of `kaf-a-ip` (Lightsail → Networking), **Proxied** → Save
+      - Type `CNAME`, Name `www`, Target `kaydyachaanifayddyacha.com`, **Proxied** → Save
 - [ ] GitHub variable **`DEPLOY_ENABLED`** = `true` → **Actions → Deploy → Run workflow** (`main`).
       Steps should go green: build → "Open SSH for this runner only (Lightsail firewall)" →
       "Roll out" → "Close SSH again (Lightsail)".
-- [ ] Cloudflare → **DNS → Add record**: `A`, name `new`, IPv4 = static IP, **Proxied** → Save.
-- [ ] Claude checks `https://new.kaydyachaanifayddyacha.com/api/health`, pages, `/media` images,
-      and that the server can't be reached directly.
+- [ ] Claude checks `https://kaydyachaanifayddyacha.com/api/health`, pages, `/media` images, `www`
+      redirect/serving, and that the server can't be reached directly.
 - [ ] Rest of go-live-plan **Stage 3** (Cloudflare cache/WAF rules incl. `media`, Razorpay **test**
-      webhook `https://new.kaydyachaanifayddyacha.com/api/razorpay/webhook`, cron-job.org URL,
-      UptimeRobot) → **Stage 4** tests.
+      webhook `https://kaydyachaanifayddyacha.com/api/razorpay/webhook` with the
+      `RAZORPAY_WEBHOOK_SECRET` from `app.env`, cron-job.org URL, UptimeRobot) → **Stage 4** tests.
 
 **If it fails:**
 - *Open SSH … AccessDenied* → Step 5.2 policy not attached.
