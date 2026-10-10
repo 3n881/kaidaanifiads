@@ -91,7 +91,7 @@ export default function Catalog({
       {/* Language tabs under the banner (original: All / हिंदी / English) */}
       {availableLangs.length > 2 && (
         <div className="border-b border-gray-100 bg-white">
-          <div className="container-x no-scrollbar flex gap-1 overflow-x-auto py-2">
+          <div className="container-x no-scrollbar flex gap-1 overflow-x-auto pb-3 pt-4">
             {availableLangs.map((l) => (
               <button
                 key={l}

@@ -8,10 +8,13 @@ import ProductCard from "./ProductCard";
 /**
  * Swipeable book row (as on the original site): one ¾-width card on phones
  * with the next one peeking, 2 on tablets, 4 on desktop. Snaps card by card.
- * On desktop it also advances by one card every few seconds (pauses on hover,
- * wraps to the start); respects prefers-reduced-motion.
+ * It also moves by itself, one card every few seconds, on every screen size
+ * (as on the original site): pauses while hovered or touched (resumes a few
+ * seconds after the last touch), while off-screen and in background tabs;
+ * wraps to the start; respects prefers-reduced-motion.
  */
-const AUTO_ADVANCE_MS = 4000;
+const AUTO_ADVANCE_MS = 3500;
+const RESUME_AFTER_TOUCH_MS = 5000;
 
 // Card widths: ¾ of the screen on phones, ½ on tablets, ¼ of the 72rem row.
 const ROW_SIZES = "(max-width: 640px) 75vw, (max-width: 1024px) 50vw, 270px";
@@ -26,6 +29,8 @@ export default function Carousel({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
+  const touchedUntil = useRef(0);
+  const visibleRef = useRef(false);
 
   const nudge = (dir: 1 | -1) => {
     const el = trackRef.current;
@@ -40,18 +45,29 @@ export default function Carousel({
     const el = trackRef.current;
     if (!el) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // Auto-advance on wide screens only — on a phone it would fight the thumb.
-    if (!window.matchMedia("(min-width: 1024px)").matches) return;
-    if (el.scrollWidth <= el.clientWidth + 4) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      visibleRef.current = entry.isIntersecting;
+    }, { threshold: 0.3 });
+    observer.observe(el);
     const id = window.setInterval(() => {
-      if (pausedRef.current || document.hidden) return;
+      if (pausedRef.current || document.hidden || !visibleRef.current) return;
+      if (Date.now() < touchedUntil.current) return;
+      if (el.scrollWidth <= el.clientWidth + 4) return;
       const cardW = el.firstElementChild?.getBoundingClientRect().width ?? 280;
       const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
       if (atEnd) el.scrollTo({ left: 0, behavior: "smooth" });
       else el.scrollBy({ left: cardW, behavior: "smooth" });
     }, AUTO_ADVANCE_MS);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      observer.disconnect();
+    };
   }, [products.length]);
+
+  // A thumb on the row (or a swipe) pauses the auto-move for a few seconds.
+  const holdForTouch = () => {
+    touchedUntil.current = Date.now() + RESUME_AFTER_TOUCH_MS;
+  };
 
   return (
     <div className="relative mx-auto max-w-6xl">
@@ -59,7 +75,10 @@ export default function Carousel({
         ref={trackRef}
         onMouseEnter={() => (pausedRef.current = true)}
         onMouseLeave={() => (pausedRef.current = false)}
-        onTouchStart={() => (pausedRef.current = true)}
+        onTouchStart={holdForTouch}
+        onTouchMove={holdForTouch}
+        onTouchEnd={holdForTouch}
+        onWheel={holdForTouch}
         className="no-scrollbar -ml-4 flex snap-x snap-mandatory overflow-x-auto pb-2"
       >
         {products.map((p, i) => (

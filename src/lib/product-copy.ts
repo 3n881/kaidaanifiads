@@ -130,9 +130,9 @@ export const PRODUCT_COPY = {
 
 /** Preview viewer labels — same language rule as PRODUCT_COPY. */
 export const GALLERY_COPY = {
-  mr: { page: "पान", prev: "मागील", next: "पुढील", prevPage: "मागील पान", nextPage: "पुढील पान", swipe: "स्वाईप करा ›", cover: "कव्हर", freePreview: (n: number) => `पहिली ${n} पाने मोफत वाचा (Preview)`, readLarge: "मोठ्या आकारात वाचा", close: "बंद करा" },
-  hi: { page: "पृष्ठ", prev: "पिछला", next: "अगला", prevPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", swipe: "स्वाइप करें ›", cover: "कवर", freePreview: (n: number) => `पहले ${n} पृष्ठ मुफ्त पढ़ें (Preview)`, readLarge: "बड़े आकार में पढ़ें", close: "बंद करें" },
-  en: { page: "Page", prev: "Previous", next: "Next", prevPage: "Previous page", nextPage: "Next page", swipe: "Swipe ›", cover: "Cover", freePreview: (n: number) => `Read the first ${n} pages free`, readLarge: "Read full screen", close: "Close" },
+  mr: { page: "पान", prev: "मागील", next: "पुढील", prevPage: "मागील पान", nextPage: "पुढील पान", swipe: "स्वाईप करा ›", cover: "कव्हर", freePreview: (n: number) => `पहिली ${n} पाने मोफत वाचा (Preview)`, readLarge: "मोठ्या आकारात वाचा", close: "बंद करा", reader: "नमुना प्रत वाचक", buy: "खरेदी करा", buyFull: "संपूर्ण पुस्तक खरेदी करा", loading: "पाने उघडत आहेत…", failed: "नमुना पाने उघडता आली नाहीत. कृपया पुन्हा प्रयत्न करा.", zoomIn: "मोठे करा", zoomOut: "लहान करा", rotate: "फिरवा" },
+  hi: { page: "पृष्ठ", prev: "पिछला", next: "अगला", prevPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", swipe: "स्वाइप करें ›", cover: "कवर", freePreview: (n: number) => `पहले ${n} पृष्ठ मुफ्त पढ़ें (Preview)`, readLarge: "बड़े आकार में पढ़ें", close: "बंद करें", reader: "नमूना प्रति रीडर", buy: "खरीदें", buyFull: "पूरी किताब खरीदें", loading: "पृष्ठ खुल रहे हैं…", failed: "नमूना पृष्ठ नहीं खुल सके। कृपया फिर से कोशिश करें।", zoomIn: "बड़ा करें", zoomOut: "छोटा करें", rotate: "घुमाएँ" },
+  en: { page: "Page", prev: "Previous", next: "Next", prevPage: "Previous page", nextPage: "Next page", swipe: "Swipe ›", cover: "Cover", freePreview: (n: number) => `Read the first ${n} pages free`, readLarge: "Read full screen", close: "Close", reader: "Sample reader", buy: "Buy", buyFull: "Buy the full book", loading: "Opening pages…", failed: "Could not open the sample pages. Please try again.", zoomIn: "Zoom in", zoomOut: "Zoom out", rotate: "Rotate" },
 } satisfies Record<Locale, unknown>;
 
 export type GalleryCopy = (typeof GALLERY_COPY)[Locale];

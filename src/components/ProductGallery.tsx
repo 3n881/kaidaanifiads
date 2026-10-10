@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { BookOpen, ChevronLeft, ChevronRight, FileText, Maximize2, Sparkles, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { BookOpen, ChevronLeft, ChevronRight, Maximize2, Sparkles } from "lucide-react";
 import type { Product } from "@/data/catalog";
-import { coverSrc, coverSrcSet, mediaUrl } from "@/lib/covers";
+import { coverSrc, coverSrcSet } from "@/lib/covers";
 import { PREVIEW_PAGES } from "@/lib/previews";
 import CoverImage from "./CoverImage";
+import SampleReader from "./SampleReader";
 import { GALLERY_COPY, type GalleryCopy } from "@/lib/product-copy";
 import type { Locale } from "@/lib/i18n";
 
 /**
  * Book preview viewer, laid out like the previous site: page counter and
  * PREVIEW badge on the image, arrows / swipe, previous–next buttons, the
- * "first pages free" bar, a full-screen reader and a link to the free
- * first-pages PDF (`previewUrl`, when the edition has one).
+ * "first pages free" bar and an in-page sample reader that shows the free
+ * first pages of the book's own PDF (`previewUrl`) — never a new tab.
  */
 export default function ProductGallery({
   product,
@@ -31,7 +31,7 @@ export default function ProductGallery({
     ? [product.coverImage, ...(product.galleryImages ?? []).slice(0, 5)]
     : [];
   const [selected, setSelected] = useState(0);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [readerAt, setReaderAt] = useState<number | null>(null);
   const total = images.length;
   const previewPages = Math.min(PREVIEW_PAGES, product.pages || PREVIEW_PAGES);
   const go = (step: number) =>
@@ -44,7 +44,10 @@ export default function ProductGallery({
         <div className="overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
           <CoverImage product={product} className="aspect-[3/4] w-full" priority sizes="(max-width: 768px) 90vw, 400px" />
         </div>
-        <PreviewActions g={g} previewPages={previewPages} previewUrl={previewUrl} />
+        <PreviewActions g={g} previewPages={previewPages} previewUrl={previewUrl} onOpen={() => setReaderAt(0)} />
+        {readerAt !== null && (
+          <SampleReader product={product} previewUrl={previewUrl} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
+        )}
       </div>
     );
   }
@@ -67,7 +70,7 @@ export default function ProductGallery({
             loading={selected === 0 ? "eager" : "lazy"}
             fetchPriority={selected === 0 ? "high" : "auto"}
             className="absolute inset-0 h-full w-full cursor-zoom-in object-contain"
-            onClick={() => setFullscreen(true)}
+            onClick={() => setReaderAt(previewUrl ? 0 : selected)}
           />
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white">
             {g.page} {selected + 1} / {total}
@@ -107,7 +110,7 @@ export default function ProductGallery({
         g={g}
         previewPages={previewPages}
         previewUrl={previewUrl}
-        onOpenLarge={() => setFullscreen(true)}
+        onOpen={() => setReaderAt(previewUrl ? 0 : selected)}
       />
 
       {total > 1 && (
@@ -131,16 +134,8 @@ export default function ProductGallery({
         </div>
       )}
 
-      {fullscreen && (
-        <Lightbox
-          g={g}
-          images={images}
-          index={selected}
-          title={product.title}
-          previewUrl={previewUrl}
-          onChange={setSelected}
-          onClose={() => setFullscreen(false)}
-        />
+      {readerAt !== null && (
+        <SampleReader product={product} previewUrl={previewUrl} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
       )}
     </div>
   );
@@ -150,119 +145,34 @@ function PreviewActions({
   g,
   previewPages,
   previewUrl,
-  onOpenLarge,
+  onOpen,
 }: {
   g: GalleryCopy;
   previewPages: number;
   previewUrl?: string | null;
-  onOpenLarge?: () => void;
+  onOpen: () => void;
 }) {
-  if (!previewUrl && !onOpenLarge) return null;
   return (
     <div className="mt-3 space-y-2">
       {previewUrl && (
-        <a
-          href={previewUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-deva flex items-center justify-center gap-2 rounded-xl border border-gold-500/40 bg-gold-500/10 px-3 py-2.5 text-sm font-bold text-brand-800 transition hover:bg-gold-500/20"
+        <button
+          type="button"
+          onClick={onOpen}
+          className="font-deva flex w-full items-center justify-center gap-2 rounded-xl border border-gold-500/40 bg-gold-500/10 px-3 py-2.5 text-sm font-bold text-brand-800 transition hover:bg-gold-500/20"
         >
           <BookOpen className="h-4 w-4 text-gold-600" />
           {g.freePreview(previewPages)}
           <Sparkles className="h-4 w-4 text-gold-600" />
-        </a>
+        </button>
       )}
-      <div className={`grid gap-2 ${onOpenLarge && previewUrl ? "grid-cols-2" : "grid-cols-1"}`}>
-        {onOpenLarge && (
-          <button
-            type="button"
-            onClick={onOpenLarge}
-            className="font-deva inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-50"
-          >
-            <Maximize2 className="h-3.5 w-3.5" /> {g.readLarge}
-          </button>
-        )}
-        {previewUrl && (
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-50"
-          >
-            <FileText className="h-3.5 w-3.5" /> PDF Preview
-          </a>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="font-deva inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-50"
+      >
+        <Maximize2 className="h-3.5 w-3.5" /> {g.readLarge}
+      </button>
     </div>
-  );
-}
-
-function Lightbox({
-  g,
-  images,
-  index,
-  title,
-  previewUrl,
-  onChange,
-  onClose,
-}: {
-  g: GalleryCopy;
-  images: string[];
-  index: number;
-  title: string;
-  previewUrl?: string | null;
-  onChange: (index: number) => void;
-  onClose: () => void;
-}) {
-  const total = images.length;
-  const go = (step: number) => onChange(Math.min(Math.max(index + step, 0), total - 1));
-  const swipe = useSwipe(go);
-
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-      const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-      if (step) onChange(Math.min(Math.max(index + step, 0), total - 1));
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [index, total, onChange, onClose]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[110] flex flex-col bg-black/95"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${title} — preview`}
-    >
-      <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
-        <span className="text-sm font-bold">{g.page} {index + 1} / {total}</span>
-        <div className="flex items-center gap-2">
-          {previewUrl && (
-            <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20">
-              <FileText className="h-3.5 w-3.5" /> PDF Preview
-            </a>
-          )}
-          <button type="button" onClick={onClose} aria-label={g.close} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-      <div className="relative min-h-0 flex-1" {...swipe}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- full-size storage image. */}
-        <img src={mediaUrl(images[index])} alt={`${title} — ${g.page} ${index + 1}`} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />
-        {index > 0 && <ArrowButton side="left" onClick={() => go(-1)} label={g.prevPage} />}
-        {index < total - 1 && <ArrowButton side="right" onClick={() => go(1)} label={g.nextPage} />}
-      </div>
-    </div>,
-    document.body,
   );
 }
 

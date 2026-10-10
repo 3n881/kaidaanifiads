@@ -32,7 +32,7 @@ export default async function EbooksPage() {
         subtitle="Digital PDF Ebooks · Instant Delivery · Inclusive of all taxes"
       />
       <Suspense fallback={<div className="py-16 text-center text-brand-400">लोड होत आहे…</div>}>
-        <Catalog products={ebooks} notice={<DisclaimerBanner className="max-w-2xl" />} />
+        <Catalog products={ebooks} notice={<DisclaimerBanner key="ebooks-notice" className="max-w-2xl" />} />
       </Suspense>
     </div>
   );
