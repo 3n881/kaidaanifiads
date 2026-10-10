@@ -14,15 +14,17 @@ const PDFJS_BASE = "/vendor/pdfjs-6.3.289";
 const ZOOMS = [0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 
 /**
- * In-page sample reader (as on the original site): the free preview pages of
- * the book's own PDF, rendered on the page — no new tab, no download. Zoom,
- * rotate, arrows / swipe, page thumbnails and Buy buttons. Falls back to the
- * uploaded preview images when an edition has no preview PDF (or it fails).
- * PDF.js is only downloaded when the reader opens.
+ * In-page sample reader (as on the original site): the free first pages of
+ * the book's own PDF, shown on the page — no new tab, no download. Zoom,
+ * rotate, arrows / swipe, page thumbnails and Buy buttons.
+ * Sources, fastest first: `pages` (page images made from the PDF at upload,
+ * ~100 KB each) → the preview PDF rendered with PDF.js (only downloaded
+ * when needed) → the owner's preview images.
  */
 export default function SampleReader({
   product,
   previewUrl,
+  pages = [],
   images,
   startPage = 0,
   g,
@@ -30,13 +32,17 @@ export default function SampleReader({
 }: {
   product: Product;
   previewUrl?: string | null;
+  /** Page images made from the PDF (800 px URLs; 1600 px derived). */
+  pages?: string[];
   images: string[];
   startPage?: number;
   g: GalleryCopy;
   onClose: () => void;
 }) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
-  const [mode, setMode] = useState<"loading" | "pdf" | "images">(previewUrl ? "loading" : "images");
+  const usePages = pages.length > 0;
+  const shown = usePages ? pages : images;
+  const [mode, setMode] = useState<"loading" | "pdf" | "images">(!usePages && previewUrl ? "loading" : "images");
   const [page, setPage] = useState(startPage);
   const [zoomIndex, setZoomIndex] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -47,18 +53,25 @@ export default function SampleReader({
   const zoom = ZOOMS[zoomIndex];
   // Stage size, so pages fit the screen and re-fit on rotate / resize.
   const [stage, setStage] = useState({ w: 0, h: 0 });
+  // width / height of the page image on show (fit to both stage dimensions).
+  const [ratio, setRatio] = useState(0.75);
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setStage({ w: Math.round(width), h: Math.round(height) });
-    });
+    const measure = () => setStage({ w: el.clientWidth, h: el.clientHeight });
+    // Measure right away too: ResizeObserver only reports on the next paint.
+    const id = window.setTimeout(measure, 0);
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", measure);
+    return () => {
+      window.clearTimeout(id);
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, []);
 
-  const total = mode === "pdf" && doc ? doc.numPages : images.length;
+  const total = mode === "pdf" && doc ? doc.numPages : shown.length;
   const go = (step: number) => setPage((p) => Math.min(Math.max(p + step, 0), Math.max(total - 1, 0)));
 
   // Lock page scroll; keyboard: Esc closes, arrows turn pages.
@@ -79,7 +92,7 @@ export default function SampleReader({
 
   // Load PDF.js and the preview PDF.
   useEffect(() => {
-    if (!previewUrl) return;
+    if (!previewUrl || usePages) return;
     let cancelled = false;
     let task: { destroy: () => Promise<void> } | null = null;
     (async () => {
@@ -102,14 +115,14 @@ export default function SampleReader({
         console.error("[reader] preview PDF failed", err);
         if (cancelled) return;
         setMode("images");
-        if (images.length === 0) setError(true);
+        if (shown.length === 0) setError(true);
       }
     })();
     return () => {
       cancelled = true;
       void task?.destroy();
     };
-  }, [previewUrl, images.length]);
+  }, [previewUrl, usePages, shown.length]);
 
   // Small page thumbnails for the strip.
   useEffect(() => {
@@ -182,6 +195,12 @@ export default function SampleReader({
     },
   };
 
+  // Sharp enough for the screen: the 1600 px page when 800 px would be blurry.
+  const pageSrc = (url: string) => {
+    const dpr = typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+    const needed = Math.max(stage.w, 320) * dpr * zoom;
+    return mediaUrl(needed > 850 && url.endsWith("-800.webp") ? url.replace(/-800\.webp$/, "-1600.webp") : url);
+  };
   const buyLabel = `${g.buy} (₹${product.price})`;
   const buyClass =
     "font-deva flex items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-extrabold text-brand-teal shadow-lg transition hover:bg-yellow-400 active:scale-[0.98]";
@@ -242,27 +261,35 @@ export default function SampleReader({
         {/* page */}
         <div className="relative min-h-0 flex-1 bg-[#071a33]">
           <div ref={stageRef} className="absolute inset-0 overflow-auto" {...swipe}>
-            <div className="flex min-h-full min-w-full items-center justify-center p-4">
+            {/* auto margins (not justify-center) keep a zoomed page scrollable to every edge */}
+            <div className="flex min-h-full min-w-full w-max p-4">
               {mode === "loading" && (
-                <p className="font-deva flex items-center gap-2 text-sm text-white/80">
+                <p className="font-deva m-auto flex items-center gap-2 text-sm text-white/80">
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> {g.loading}
                 </p>
               )}
-              {mode === "pdf" && <canvas ref={canvasRef} className="block bg-white shadow-2xl" />}
-              {mode === "images" && images.length > 0 && (
+              {mode === "pdf" && <canvas ref={canvasRef} className="m-auto block bg-white shadow-2xl" />}
+              {mode === "images" && shown.length > 0 && (
                 // eslint-disable-next-line @next/next/no-img-element -- pre-sized storage images.
                 <img
-                  src={mediaUrl(images[Math.min(page, images.length - 1)])}
+                  key={page}
+                  src={pageSrc(shown[Math.min(page, shown.length - 1)])}
                   alt={`${product.title} — ${g.page} ${page + 1}`}
-                  className="block max-w-none bg-white shadow-2xl"
+                  className="m-auto block max-w-none bg-white shadow-2xl"
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalWidth && img.naturalHeight) setRatio(img.naturalWidth / img.naturalHeight);
+                  }}
                   style={{
-                    height: stage.h ? Math.max(stage.h - 32, 100) * zoom : undefined,
+                    height: stage.h
+                      ? Math.max(Math.min(stage.h - 32, (stage.w - 32) / ratio), 100) * zoom
+                      : undefined,
                     width: "auto",
                     transform: `rotate(${rotation}deg)`,
                   }}
                 />
               )}
-              {error && <p className="font-deva text-center text-sm text-white/80">{g.failed}</p>}
+              {error && <p className="font-deva m-auto text-center text-sm text-white/80">{g.failed}</p>}
             </div>
           </div>
           {total > 1 && page > 0 && (
@@ -286,7 +313,7 @@ export default function SampleReader({
         <div className="flex flex-col gap-3 border-t border-white/10 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
           <div className="no-scrollbar flex min-w-0 flex-1 gap-2 overflow-x-auto">
             {Array.from({ length: total }, (_, i) => {
-              const src = mode === "pdf" ? thumbs[i] : images[i] ? coverSrc(images[i]) : "";
+              const src = mode === "pdf" ? thumbs[i] : shown[i] ? coverSrc(shown[i]) : "";
               return (
                 <button
                   key={i}

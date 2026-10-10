@@ -15,6 +15,8 @@ import {
 // Public catalog columns only — never pdf_path (private storage paths stay
 // server-side; the pages are cached and shipped to every visitor).
 const PUBLIC_COLUMNS =
+  "id, slug, title, short_description, description, mrp, price, pages, language, is_combo, set_size, rating, category, cover_image, gallery_images, available_locales, featured, active, title_mr, title_hi, title_en, short_description_mr, short_description_hi, short_description_en, description_mr, description_hi, description_en, pages_mr, pages_hi, pages_en, cover_image_mr, cover_image_hi, cover_image_en, gallery_images_mr, gallery_images_hi, gallery_images_en, reader_pages_mr, reader_pages_hi, reader_pages_en";
+const V4_PUBLIC_COLUMNS =
   "id, slug, title, short_description, description, mrp, price, pages, language, is_combo, set_size, rating, category, cover_image, gallery_images, available_locales, featured, active, title_mr, title_hi, title_en, short_description_mr, short_description_hi, short_description_en, description_mr, description_hi, description_en, pages_mr, pages_hi, pages_en, cover_image_mr, cover_image_hi, cover_image_en, gallery_images_mr, gallery_images_hi, gallery_images_en";
 const V3_PUBLIC_COLUMNS =
   "id, slug, title, short_description, description, mrp, price, pages, language, is_combo, set_size, rating, category, cover_image, gallery_images, available_locales, featured, active";
@@ -56,6 +58,9 @@ interface ProductRow {
   gallery_images_mr?: string[] | null;
   gallery_images_hi?: string[] | null;
   gallery_images_en?: string[] | null;
+  reader_pages_mr?: string[] | null;
+  reader_pages_hi?: string[] | null;
+  reader_pages_en?: string[] | null;
   featured: boolean | null;
   active: boolean | null;
 }
@@ -68,6 +73,8 @@ function rowToProduct(r: ProductRow): Product {
     pages: r.pages_mr ?? r.pages ?? 0,
     coverImage: r.cover_image_mr ?? r.cover_image ?? undefined,
     galleryImages: r.gallery_images_mr ?? r.gallery_images ?? [],
+    // Reader pages belong to one edition only — never borrowed from another.
+    readerPages: r.reader_pages_mr ?? [],
   };
   const edition = (locale: "hi" | "en") => ({
     title: r[`title_${locale}`] || marathi.title,
@@ -77,6 +84,7 @@ function rowToProduct(r: ProductRow): Product {
     pages: r[`pages_${locale}`] ?? marathi.pages,
     coverImage: r[`cover_image_${locale}`] ?? marathi.coverImage,
     galleryImages: r[`gallery_images_${locale}`] ?? marathi.galleryImages,
+    readerPages: r[`reader_pages_${locale}`] ?? [],
   });
   return {
     id: r.id,
@@ -119,8 +127,17 @@ const loadFromSupabase = cache(async (): Promise<Product[]> => {
     .eq("active", true)
     .order("sort_order", { ascending: true })
     .order("id", { ascending: false });
-  // Keep the catalogue online while migrations 003/004 are being applied.
+  // Keep the catalogue online while migrations 003/004/007 are being applied.
   if (current.error?.code === "42703") {
+    const v4 = await supabase
+      .from("products")
+      .select(V4_PUBLIC_COLUMNS)
+      .eq("active", true)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: false });
+    if (!v4.error) {
+      return (v4.data as unknown as ProductRow[]).map(rowToProduct);
+    }
     const v3 = await supabase
       .from("products")
       .select(V3_PUBLIC_COLUMNS)

@@ -12,6 +12,7 @@ import { COVER_WIDTHS, coverVariantPath } from "@/lib/covers";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { publishPreview, removePreview } from "@/lib/preview-pdf";
 import { previewPdfPath } from "@/lib/previews";
+import { READER_PAGES, uploadReaderPages } from "@/lib/reader-pages";
 
 async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/");
@@ -182,6 +183,26 @@ export async function saveProduct(formData: FormData) {
     const pdf = formData.get(field);
     if (pdf instanceof File && pdf.size > 0) {
       row[column] = await uploadFile("pdfs", pdf, `${slug}-${locale}`);
+      // Sample-reader pages: rendered from this PDF in the admin's browser
+      // (ProductForm) and sent along. Without them the reader falls back to
+      // the preview PDF, so stale pages of an older PDF are cleared.
+      const pageFiles = formData
+        .getAll(`reader_pages_${locale}`)
+        .filter((f): f is File => f instanceof File && f.size > 0 && f.type.startsWith("image/") && f.size <= 8 * 1024 * 1024)
+        .slice(0, READER_PAGES);
+      try {
+        row[`reader_pages_${locale}`] = pageFiles.length
+          ? await uploadReaderPages(
+              getSupabaseAdmin(ADMIN_UPLOAD_TIMEOUT_MS),
+              slug,
+              locale,
+              await Promise.all(pageFiles.map((f) => f.arrayBuffer())),
+            )
+          : null;
+      } catch (error) {
+        console.error("[saveProduct] reader pages failed", slug, locale, error);
+        row[`reader_pages_${locale}`] = null;
+      }
       // Free "first 6 pages" preview shown on the product page. A failure
       // must not lose the upload, so it is logged, not thrown.
       try {
@@ -198,6 +219,7 @@ export async function saveProduct(formData: FormData) {
     } else if (formData.get(`remove_${field.replace("_file", "")}`) === "1") {
       // The file stays in storage; only this edition stops delivering it.
       row[column] = null;
+      row[`reader_pages_${locale}`] = null;
       if (locale === "mr") row.pdf_path = null;
       await removePreview(admin, slug, locale);
       changedPreviews.push(`/media/${previewPdfPath(slug, locale)}`);

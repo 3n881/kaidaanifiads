@@ -125,6 +125,7 @@ export function localizeProduct<T extends Product>(
     galleryImages: edition.galleryImages.length
       ? edition.galleryImages
       : product.galleryImages,
+    readerPages: edition.readerPages ?? [],
   };
 }
 

@@ -288,6 +288,7 @@ export default function ProductForm({
               />
               <PdfField
                 name={`pdf_file_${locale}`}
+                readerName={`reader_pages_${locale}`}
                 removeName={`remove_pdf_${locale}`}
                 label={`${LOCALE_LABELS[locale]} PDF`}
                 uploaded={pdfUploaded(locale)}
@@ -520,11 +521,37 @@ function Thumb({ src, label, isNew = false, onRemove }: { src: string; label: st
 }
 
 /** Edition PDF: View / Replace / Remove the saved file; cancel a new pick. */
-function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name: string; removeName: string; label: string; uploaded: boolean; viewHref?: string; hint: string }) {
+function PdfField({ name, readerName, removeName, label, uploaded, viewHref, hint }: { name: string; readerName: string; removeName: string; label: string; uploaded: boolean; viewHref?: string; hint: string }) {
   const input = useRef<HTMLInputElement>(null);
+  const pagesInput = useRef<HTMLInputElement>(null);
   const [removed, setRemoved] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Sample-reader pages made from the chosen PDF (first 6 pages), uploaded with it.
+  const [pages, setPages] = useState<{ status: "idle" | "working" | "done" | "failed"; thumbs: string[] }>({ status: "idle", thumbs: [] });
+  const setPageFiles = (files: File[]) => {
+    if (!pagesInput.current) return;
+    const transfer = new DataTransfer();
+    files.forEach((file) => transfer.items.add(file));
+    pagesInput.current.files = transfer.files;
+  };
+  const makePages = async (file: File) => {
+    setPages({ status: "working", thumbs: [] });
+    setPageFiles([]);
+    try {
+      const { renderPdfPages } = await import("@/lib/render-pdf-pages");
+      const files = await renderPdfPages(file);
+      setPageFiles(files);
+      setPages({ status: "done", thumbs: files.map((f) => URL.createObjectURL(f)) });
+    } catch (renderError) {
+      console.error("[admin] reader pages failed", renderError);
+      setPages({ status: "failed", thumbs: [] });
+    }
+  };
+  const clearPages = () => {
+    setPageFiles([]);
+    setPages({ status: "idle", thumbs: [] });
+  };
   const hasFile = uploaded && !removed;
   return (
     <div className="space-y-2 border-t border-brand-100 pt-4">
@@ -532,6 +559,7 @@ function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name:
         <FileText className="h-4 w-4" /> {label}
       </h3>
       <input type="hidden" name={removeName} value={removed && !selected ? "1" : ""} />
+      <input ref={pagesInput} name={readerName} type="file" accept="image/*" multiple className="sr-only" tabIndex={-1} aria-hidden="true" />
       <input
         ref={input}
         name={name}
@@ -549,6 +577,7 @@ function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name:
           }
           setError("");
           setSelected(file.name);
+          void makePages(file);
         }}
       />
       {hasFile && !selected && (
@@ -562,6 +591,29 @@ function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name:
         </p>
       )}
       {selected && <p className="truncate text-[11px] font-semibold text-green-600">New: {selected}</p>}
+      {selected && pages.status === "working" && (
+        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-600">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Making the sample-reader pages from this PDF… please wait before saving.
+        </p>
+      )}
+      {selected && pages.status === "done" && (
+        <div>
+          <p className="mb-1 text-[11px] font-semibold text-green-600">
+            Sample-reader pages ready ({pages.thumbs.length}) — buyers see these in “first pages free”.
+          </p>
+          <div className="flex gap-1.5">
+            {pages.thumbs.map((src, i) => (
+              // eslint-disable-next-line @next/next/no-img-element -- local preview of a rendered page.
+              <img key={src} src={src} alt={`Page ${i + 1}`} className="h-16 w-12 rounded border border-brand-100 object-cover" />
+            ))}
+          </div>
+        </div>
+      )}
+      {selected && pages.status === "failed" && (
+        <p className="text-[11px] font-semibold text-amber-700">
+          Could not make the page images in this browser — the reader will use the PDF preview instead. You can still save.
+        </p>
+      )}
       {removed && !selected && (
         <p className="text-[11px] font-semibold text-amber-700">
           PDF will be removed when you save. This edition can’t be sold or downloaded until a new PDF is uploaded.
@@ -573,7 +625,7 @@ function PdfField({ name, removeName, label, uploaded, viewHref, hint }: { name:
           <Upload className="h-3.5 w-3.5" /> {hasFile || selected ? "Replace PDF" : "Upload PDF"}
         </button>
         {selected && (
-          <button type="button" onClick={() => { if (input.current) input.current.value = ""; setSelected(null); }} className={`${smallButton} border-brand-200 text-brand-600 hover:bg-brand-50`}>
+          <button type="button" onClick={() => { if (input.current) input.current.value = ""; setSelected(null); clearPages(); }} className={`${smallButton} border-brand-200 text-brand-600 hover:bg-brand-50`}>
             <X className="h-3.5 w-3.5" /> Cancel new
           </button>
         )}

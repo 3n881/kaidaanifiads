@@ -21,6 +21,8 @@ export interface ProductEdition {
   pages: number;
   coverImage?: string;
   galleryImages: string[];
+  /** First pages of this edition's PDF as images (sample reader), 800 px URLs. */
+  readerPages?: string[];
 }
 
 export interface Product {
@@ -54,6 +56,8 @@ export interface Product {
   coverImage?: string;
   /** Optional inside-page previews. The cover plus these is capped at five images. */
   galleryImages?: string[];
+  /** Sample-reader page images of the shown edition (set by localizeProduct). */
+  readerPages?: string[];
   /** PDF editions currently available for checkout. */
   availableLocales?: ProductLocale[];
   /** Customer-facing content and media for each language edition. */

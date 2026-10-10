@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
-    "db:upload-pdfs": "tsx --env-file=.env.local scripts/upload-pdfs.ts"
+    "db:upload-pdfs": "tsx --env-file=.env.local scripts/upload-pdfs.ts",
+    "db:reader-pages": "tsx --env-file=.env.local scripts/build-reader-pages.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

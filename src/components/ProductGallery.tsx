@@ -27,9 +27,11 @@ export default function ProductGallery({
   labelsLocale?: Locale;
 }) {
   const g = GALLERY_COPY[labelsLocale];
-  const images = product.coverImage
-    ? [product.coverImage, ...(product.galleryImages ?? []).slice(0, 5)]
-    : [];
+  // After the cover: the book's real pages 2–6 (made from its PDF) when
+  // available, otherwise the owner's preview images.
+  const readerPages = product.readerPages ?? [];
+  const extra = readerPages.length > 1 ? readerPages.slice(1, 6) : (product.galleryImages ?? []).slice(0, 5);
+  const images = product.coverImage ? [product.coverImage, ...extra] : [];
   const [selected, setSelected] = useState(0);
   const [readerAt, setReaderAt] = useState<number | null>(null);
   const total = images.length;
@@ -46,7 +48,7 @@ export default function ProductGallery({
         </div>
         <PreviewActions g={g} previewPages={previewPages} previewUrl={previewUrl} onOpen={() => setReaderAt(0)} />
         {readerAt !== null && (
-          <SampleReader product={product} previewUrl={previewUrl} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
+          <SampleReader product={product} previewUrl={previewUrl} pages={readerPages} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
         )}
       </div>
     );
@@ -70,7 +72,7 @@ export default function ProductGallery({
             loading={selected === 0 ? "eager" : "lazy"}
             fetchPriority={selected === 0 ? "high" : "auto"}
             className="absolute inset-0 h-full w-full cursor-zoom-in object-contain"
-            onClick={() => setReaderAt(previewUrl ? 0 : selected)}
+            onClick={() => setReaderAt(readerPages.length || !previewUrl ? selected : 0)}
           />
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white">
             {g.page} {selected + 1} / {total}
@@ -135,7 +137,7 @@ export default function ProductGallery({
       )}
 
       {readerAt !== null && (
-        <SampleReader product={product} previewUrl={previewUrl} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
+        <SampleReader product={product} previewUrl={previewUrl} pages={readerPages} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
       )}
     </div>
   );
