@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Lato, Noto_Sans_Devanagari } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -13,17 +13,23 @@ import { getAllProducts } from "@/lib/products";
 import type { SearchItem } from "@/data/catalog";
 import { SITE_URL } from "@/lib/supabase/config";
 
-const lato = Lato({
+// Fonts are stored in the repo (Google Fonts files) so builds never download
+// them — Turbopack's Google-font fetch broke a production build (go-live problem 18).
+const lato = localFont({
   variable: "--font-lato",
-  subsets: ["latin"],
-  weight: ["400", "700", "900"],
+  src: [
+    { path: "./fonts/Lato-400-latin.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Lato-700-latin.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/Lato-900-latin.woff2", weight: "900", style: "normal" },
+  ],
   display: "swap",
 });
 
-const devanagari = Noto_Sans_Devanagari({
+// One variable font file (devanagari subset) covers weights 400–700.
+const devanagari = localFont({
   variable: "--font-devanagari",
-  subsets: ["devanagari"],
-  weight: ["400", "500", "600", "700"],
+  src: "./fonts/NotoSansDevanagari-devanagari.woff2",
+  weight: "400 700",
   display: "swap",
 });
 
