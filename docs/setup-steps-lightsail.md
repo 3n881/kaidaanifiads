@@ -62,15 +62,15 @@ Mumbai project → **Authentication → URL Configuration**:
 - [ ] Check: Lightsail → `kaf-a` → **Networking** shows the static IP attached; **Snapshots** →
       Automatic snapshots **Enabled**.
 
-## Step 4 — Firewall (3 min)
+## Step 4 — Firewall ✅ (done 2026-10-10, verified: SSH open for the admin IP only, 80/443 Cloudflare only)
 
-- [ ] On your **laptop**, open https://checkip.amazonaws.com → note your IP.
-- [ ] AWS console (any page) → **`>_` CloudShell** icon in the top bar, region **Mumbai**.
-- [ ] Paste (replace the IP):
+- [x] On your **laptop**, open https://checkip.amazonaws.com → note your IP.
+- [x] AWS console (any page) → **`>_` CloudShell** icon in the top bar, region **Mumbai**.
+- [x] Paste (replace the IP):
       ```bash
       curl -fsSLO https://raw.githubusercontent.com/3n881/kaidaanifiads/main/deploy/lightsail-firewall.sh && bash lightsail-firewall.sh kaf-a YOUR.LAPTOP.IP/32 ap-south-1
       ```
-- [ ] It prints `Firewall updated for kaf-a: 80/443 Cloudflare only, 22 from …`. In Lightsail →
+- [x] It prints `Firewall updated for kaf-a: 80/443 Cloudflare only, 22 from …`. In Lightsail →
       `kaf-a` → **Networking**, the IPv4/IPv6 firewall now lists HTTPS + HTTP (Cloudflare ranges)
       and SSH (your IP only).
 
