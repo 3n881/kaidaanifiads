@@ -1,6 +1,6 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-10** (live commit `7d087da`). One place for any developer or AI agent to
+> **Last updated 2026-10-11** (live commit `5c3f788` + this doc update). One place for any developer or AI agent to
 > understand where the project is: what exists, how it was built, what is live, what is next, and
 > which deeper doc to open for details. Facts were checked against the code, the git history, the
 > live site (`/api/health`) and the production database (read-only) on this date.
@@ -80,7 +80,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 
 ---
 
-## 3. Status at a glance (2026-10-10)
+## 3. Status at a glance (2026-10-11)
 
 | Area | State |
 |---|---|
@@ -94,7 +94,8 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Database moved Tokyo → Mumbai | ✅ 2026-10-04 |
 | Server + Cloudflare + auto-deploy | ✅ 2026-10-10 (go-live Stages 0–3) |
 | **Stage 4: functional tests on the live domain** | 🟡 **In progress.** The DB shows 3 paid test orders on 10-10 at 21:25–21:47 IST (#27, #30, #25) plus 1 abandoned. Results are not yet written up. Run the full checklist in `go-live-plan.md` Stage 4 |
-| Stage 5: speed + load tests | ⬜ Not started (k6 scripts in `loadtest/` are written, never run) |
+| Page speed (first screen) | ✅ 2026-10-11 — PageSpeed mobile: home **93**, book page **85** (§7a) |
+| Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). WebPageTest, real-phone check and k6 `loadtest/` (written, never run) still to do |
 | Stage 6: go-live (Razorpay **live** keys + announce) | ⬜ Blocked on Razorpay live key decision + Stage 4/5 |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
 | Meta Pixel | ⬜ Waiting for pixel IDs from the client |
@@ -245,6 +246,49 @@ no anon access to orders) + `onboarding.sql` + migrations:
 | 007 | `reader_pages_mr/hi/en` text[] (sample-reader page images) |
 
 `supabase/checks/verify.sql` = pre-launch checks (written, never formally run).
+
+## 7a. Page speed — targets, results, what we did (2026-10-11)
+
+**Industry standard = Google's Core Web Vitals**, judged on the 75th percentile of *real* visitors:
+LCP (main content visible) ≤ 2.5 s, INP (tap response) ≤ 200 ms, CLS (layout jumps) ≤ 0.1. PageSpeed's
+mobile lab test fakes a slow mid-range phone (Moto G Power, 4× slower CPU, "slow 4G" 1.6 Mbps / 150 ms),
+so lab numbers are much slower than real Jio/Airtel 4G. Our targets: **lab score ≥ 90, lab LCP < 2.5–3 s,
+real phones first screen ≈ 1 s.** Real-user numbers ("Discover what your real users are experiencing" in
+PageSpeed, and Cloudflare Web Analytics) appear only after launch traffic — watch those.
+
+**Results (PageSpeed mobile):**
+
+| Page | Before (10-11 morning) | After (`5c3f788` + Cloudflare rule) |
+|---|---|---|
+| Home `/` | 85 · FCP 1.8 s · LCP 3.8 s · SI 4.5 s | **93** · FCP 1.7 s · LCP 3.1 s · SI 3.1 s · TBT 20 ms · CLS 0 |
+| Book page (Reel landing) | 75 · FCP 1.7 s · **LCP 6.0 s** | **85** · LCP 3.2 s |
+
+**What was wrong and what we did** (measured with Lighthouse + throttled Chrome experiments on the live
+pages before changing code):
+
+| Problem | Fix |
+|---|---|
+| Chrome holds the first paint until **preloaded fonts** arrive (Geist 29 KB + Noto Devanagari 119 KB). Fonts also had no `unicode-range`, so the browser tried Geist and its Arial stand-in for every Marathi letter (very slow text layout) | Geist `preload: false` + Latin-only `unicode-range` (`src/app/layout.tsx`); Devanagari web font **removed** — Marathi/Hindi use the device font (Android = Noto Sans Devanagari, like the original site). Throttled-phone test: first paint 5.9 s → ~1.5 s |
+| **Instagram links** (`?igsh=…`, also `fbclid`, `utm_*`) were a Cloudflare cache MISS every time (Free plan can't customise the cache key): 370–700 ms and every visitor reached the server | Cloudflare **Transform Rule `strip-tracking-query`** (URL rewrite, made by the owner in the dashboard; the API token can't edit transform rules). Expression: `(http.request.uri.path eq "/" or starts_with(http.request.uri.path, "/ebooks") or starts_with(http.request.uri.path, "/combos")) and http.request.uri.query ne "" and not http.request.uri.query contains "_rsc="` → Path preserve, Query rewrite to empty. Verified: random `?igsh=` → HIT; `?_rsc=` navigation still works; `/ebooks?lang=Hindi` still filters (read client-side). **Never strip `_rsc`** — that would mix HTML and RSC payloads in the cache |
+| `/ebooks` and `/combos` had **no books in the HTML** ("लोड होत आहे…" until JS ran) because `Catalog` used `useSearchParams` | `?lang=` read in a `useEffect` (`src/components/Catalog.tsx`); all cards now in the server HTML |
+| Phones got 800 px covers for ~490 px slots; 48 px thumbnails used the 400 px file | 600 px variant everywhere (`COVER_WIDTHS`, reader pages), `npm run db:cover-600` backfilled 91 old images; `coverThumbSrc()` = 200 px for thumbnails. Book cover 96 KB → 62 KB |
+
+Checked and **not** the cause: blur effects and the language pop-up (removing them didn't change paint
+times). The pop-up stays (owner decision 10-11: visitors choose their language first).
+
+**Owner decisions 10-11:** language pop-up unchanged · Cloudflare **Web Analytics stays on** (10 KB, loads
+after the page, gives real-visitor speed data; turning it off would not affect cache/rules/SSL/WAF).
+
+**Remaining ideas (optional, small):** inline the 16 KB stylesheet (`experimental.inlineCss`, saves one
+request before first paint — test carefully, experimental); legacy JS polyfills 24 KB (framework, risky);
+images "larger than needed" by ~20 KB each (smaller would blur on most phones — leave). The remaining
+~1.1 s "element render delay" in the lab is the emulated slow CPU laying out text.
+
+**How to measure again:** pagespeed.web.dev (mobile) on `/` and a book page. For experiments, Lighthouse
+13.5 + Puppeteer with devtools throttling (4× CPU, 150 ms / 1.6 Mbps) — note that on the Windows dev PC
+text layout is slowed by Windows loading system font files, so local numbers look worse than Android.
+**Rules:** don't re-add font preloads or a Devanagari web font, keep the cover `fetchpriority=high` +
+eager on the first carousel/book cover, and keep list pages free of `useSearchParams`.
 
 ---
 
@@ -400,8 +444,9 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 2. **Supabase Auth → URL Configuration** for the Mumbai project (Site URL + redirect URLs): never
    confirmed (`go-live-plan.md` 1B, `setup-steps-lightsail.md` Step 2). Dashboard login on the new
    domain is the test.
-3. **Stage 5**: PageSpeed (mobile ≥ 90; LCP was 3.8 s on 10-10 before fixes), WebPageTest, k6 `loadtest/`
-   (landing spike, checkout, webhook replay, download), container drill, deploy-under-load.
+3. **Stage 5**: PageSpeed ✅ (home 93, book 85 — §7a). Still to do: a real phone on Jio/Airtel 4G opening a
+   book link from Instagram, WebPageTest (Mumbai, Moto G, 4G), k6 `loadtest/` (landing spike, checkout,
+   webhook replay, download), container drill, deploy-under-load.
 4. **Stage 6 go-live**: Razorpay **live** keys (reuse the client's existing live key, or regenerate with
    "deactivate old key within 24 h" and update the original site's Vercel too), a **new** live webhook
    (don't edit the original's), add the domain in Razorpay website settings, then `app.env` → restart →
@@ -476,7 +521,8 @@ Trust this file over these where they disagree:
 | 10-10 | `03af860` `85d4131` `63c3183` | Hero animation fix, favicon/app icons from the logo, **UI match with the original** (items 1–36, tracker `ui-match-original.md`), Caddy static-file fallback between containers during deploys |
 | 10-10 | `53982ee` | **Language picker + full mr/hi/en UI**, contact form + `/dashboard/messages` (migration 006), "where is my PDF" help on the order page |
 | 10-10 | `f238d38` `d0552dc` `7d087da` | **In-page sample reader** (no new tab), reader pages = WebP images made from the PDF (migration 007, `db:reader-pages`, built in the dashboard on upload); phone carousel autoplay; reader as a pop-up on phones, hand cursor, frosted loading on tapped cards |
-| 10-11 | (this commit) | **Speed pass from PageSpeed** (home 85, book page 75 / LCP 6.0 s): no font preloads, Geist limited to Latin, Devanagari web font dropped (device font), `/ebooks` + `/combos` lists in the HTML (no `useSearchParams`), 600 px image variant + 200 px thumbnails. Cloudflare Transform Rule so Instagram `?igsh=` links hit the cache (see §7) |
+| 10-11 | `5c3f788` + Cloudflare rule | **Speed pass from PageSpeed** (home 85, book page 75 / LCP 6.0 s): no font preloads, Geist limited to Latin, Devanagari web font dropped (device font), `/ebooks` + `/combos` lists in the HTML (no `useSearchParams`), 600 px image variant + 200 px thumbnails. Cloudflare Transform Rule so Instagram `?igsh=` links hit the cache (see §7) |
+| 10-11 | docs | PageSpeed after the changes: home 85 → **93**, book page 75 → **85**. Owner decisions: language pop-up stays as it is; Cloudflare Web Analytics stays **on** (real-user speed data). Speed section §7a added |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

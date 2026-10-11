@@ -369,6 +369,9 @@ Claude checks the database after each.
 | Tool | Pages | Target |
 |---|---|---|
 | PageSpeed Insights (mobile) — pagespeed.web.dev | `/`, `/ebooks`, 2 book pages | Performance ≥ 90, LCP < 2.5 s, CLS < 0.1, TBT < 200 ms |
+
+> **10-11 result:** home **93** (LCP 3.1 s), book page **85** (LCP 3.2 s), CLS 0 — after removing font preloads, device Devanagari font, lists in HTML, 600 px images and the Cloudflare `strip-tracking-query` rule. Details: `PROJECT-STATUS.md` §7a.
+
 | WebPageTest — Mumbai, Moto G, 4G | 1 book page, first + repeat view | first view visually complete < 3 s |
 | `curl -w "%{time_starttransfer}"` from India | book page, twice | `cf-cache-status: HIT`, TTFB < 200 ms |
 | Real phone on Jio/Airtel 4G, from Instagram | book page → Buy | page usable < 2 s; Razorpay opens < 2 s after tap |
