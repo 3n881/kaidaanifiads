@@ -348,7 +348,7 @@ Note: `store_settings.content` (hero text, testimonials, socials) is **not read 
 testimonials are hard-coded in components.
 
 ### Libraries (`src/lib`)
-`products.ts` (catalog reads, React `cache()`) · `catalog.ts` (`editionLocaleFor`, `localizeProduct`, sort/categories) ·
+`products.ts` (catalog reads: `unstable_cache` 5 min, tag `products` (`CATALOG_TAG`), + React `cache()`) · `catalog.ts` (`editionLocaleFor`, `localizeProduct`, sort/categories) ·
 `orders.ts` (`markOrderPaid`, deliverable items, order URLs/tokens) · `delivery.ts` (signed URLs, WhatsApp send +
 caps) · `interakt.ts` (per-locale template config from env) · `reminders.ts` · `reconcile.ts` · `razorpay.ts` ·
 `cdn.ts` (`purgeFiles`, `purgePublicPages`) · `covers.ts` (`mediaUrl`, WebP variants) · `previews.ts` +
@@ -447,6 +447,13 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 - Keep `npx tsc --noEmit` and `npx eslint` clean. The React Compiler lint rejects manual `useCallback` it
   can't preserve and `Date.now()` in a component body (move it into a helper).
 - After moving route files, delete `.next/types` and `.next/dev/types` (stale "Cannot find module" errors).
+- **Catalog cache:** any new code that changes `products` from the app must call `updateTag(CATALOG_TAG)`
+  (or reuse `revalidatePublic()` in `src/app/dashboard/actions.ts`), otherwise the header search, order page and
+  dashboard can show old book data for up to 5 min. Don't remove the cache: without it every per-request page
+  queries Supabase (k6 Server direct: p95 2–4 s at 50–60 req/s vs ≤ 1.6 s with it).
+- **Load tests:** `loadtest/landing.js` (Reel spike) and `loadtest/origin.js` (Server direct) are safe on
+  production; `checkout.js` / `download.js` are not (live payments). Docker: `MSYS_NO_PATHCONV=1 docker run --rm
+  -v "$(pwd -W):/scripts" grafana/k6:0.54.0 run -e BASE=https://kaydyachaanifayddyacha.com /scripts/origin.js`.
 - **Don't add `loading.tsx` under `ebooks/` or `combos/`.** List-page skeletons live in the `(list)` route
   groups. A skeleton on book pages makes unknown slugs return 200 instead of 404.
 - Bash heredocs containing Devanagari broke several times. Write scripts to a file, or use the Edit tool.
