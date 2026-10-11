@@ -91,7 +91,7 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
                     {sales.latestPaid.map((o) => (
                       <tr key={o.id}>
                         <td className="whitespace-nowrap px-4 py-2.5 text-brand-600">{istTime(o.paid_at ?? o.created_at)}</td>
-                        <td className="font-deva max-w-[240px] truncate px-4 py-2.5 font-semibold text-brand-900">{bookName(o.product_id)}</td>
+                        <td className="font-deva max-w-[240px] truncate px-4 py-2.5 font-semibold text-brand-900"><Link href={`/dashboard/orders/${o.id}`} className="hover:underline">{bookName(o.product_id)}</Link></td>
                         <td className="font-deva px-4 py-2.5 text-brand-600">{LANGUAGE[o.locale ?? "mr"] ?? o.locale}</td>
                         <td className="px-4 py-2.5 font-semibold text-brand-900">{inr(Number(o.amount))}</td>
                         <td className="px-4 py-2.5"><Tick ok={Boolean(o.download_count)} /></td>
@@ -157,6 +157,11 @@ function PeriodCard({ title, stats, href, highlight = false }: { title: string; 
         <span title="Paid ÷ Buy taps that opened Razorpay"><b className="text-sm">{pct(stats.conversion)}</b> of {stats.checkouts} checkouts</span>
         <span><XCircle className="mb-0.5 inline h-3.5 w-3.5" /> <b className="text-sm">{stats.failed}</b> failed</span>
       </div>
+      {stats.refunds > 0 && (
+        <p className={`mt-2 text-[11px] ${highlight ? "text-white/75" : "text-brand-400"}`}>
+          After refunds: {stats.refunds} refunded (−{inr(stats.refundedAmount)})
+        </p>
+      )}
     </Link>
   );
 }

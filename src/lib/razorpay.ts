@@ -131,6 +131,18 @@ export interface RazorpayPayment {
   status: string; // created | authorized | captured | refunded | failed
   contact?: string;
   email?: string;
+  /** Paise refunded so far (cumulative). */
+  amount_refunded?: number;
+  refund_status?: "partial" | "full" | null;
+  created_at?: number;
+}
+
+export interface RazorpayRefund {
+  id: string;
+  payment_id: string;
+  amount: number; // paise
+  status: string; // pending | processed | failed
+  created_at: number; // unix seconds
 }
 
 async function razorpayGet<T>(path: string): Promise<T> {
@@ -166,4 +178,17 @@ export async function listPayments(
     if ((data.items ?? []).length < 100) break;
   }
   return all;
+}
+
+/** One payment (status, amount refunded so far). */
+export async function fetchPayment(paymentId: string): Promise<RazorpayPayment> {
+  return razorpayGet<RazorpayPayment>(`/payments/${encodeURIComponent(paymentId)}`);
+}
+
+/** Refunds of one payment, newest first. */
+export async function fetchPaymentRefunds(paymentId: string): Promise<RazorpayRefund[]> {
+  const data = await razorpayGet<{ items: RazorpayRefund[] }>(
+    `/payments/${encodeURIComponent(paymentId)}/refunds`,
+  );
+  return (data.items ?? []).sort((a, b) => b.created_at - a.created_at);
 }

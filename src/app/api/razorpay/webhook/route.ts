@@ -3,6 +3,7 @@ import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/serve
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { markOrderPaid, normalizePhone } from "@/lib/orders";
 import { onOrderPaid } from "@/lib/delivery";
+import { applyRefundState } from "@/lib/refunds";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,8 @@ interface PaymentEntity {
  * Razorpay webhook — the authoritative backup to /api/checkout/confirm.
  * Configure in Razorpay (Settings → Webhooks) pointing at
  * https://<your-domain>/api/razorpay/webhook with events payment.captured,
- * order.paid and payment.failed; set RAZORPAY_WEBHOOK_SECRET to its secret.
+ * order.paid and payment.failed (+ refund.created and refund.processed for
+ * refund tracking); set RAZORPAY_WEBHOOK_SECRET to its secret.
  *
  * Idempotent: duplicate or out-of-order deliveries never double-fulfil.
  * Answers 2xx once an event is handled (or can never be handled); answers
@@ -47,7 +49,13 @@ async function handle(req: NextRequest) {
     return new NextResponse("invalid signature", { status: 400 });
   }
 
-  let event: { event?: string; payload?: { payment?: { entity?: PaymentEntity } } };
+  let event: {
+    event?: string;
+    payload?: {
+      payment?: { entity?: PaymentEntity & { amount_refunded?: number; refund_status?: "partial" | "full" | null } };
+      refund?: { entity?: { id?: string; created_at?: number } };
+    };
+  };
   try {
     event = JSON.parse(raw);
   } catch {
@@ -67,6 +75,21 @@ async function handle(req: NextRequest) {
   if (lookupError) throw new DatabaseUnavailableError("webhook order lookup", lookupError);
   if (!order) {
     console.error("[webhook] unknown razorpay order", rzpOrderId);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Refunds (refund.created / refund.processed): record how much of this
+  // order was given back (migration 008). Delivery is not changed.
+  if (event.event?.startsWith("refund.")) {
+    if (event.event !== "refund.failed") {
+      const refund = event.payload?.refund?.entity;
+      await applyRefundState(
+        order.id,
+        payment,
+        refund?.id ? { id: refund.id, created_at: refund.created_at ?? Math.floor(Date.now() / 1000) } : null,
+      );
+      console.error("[webhook] refund recorded", order.id, payment.amount_refunded);
+    }
     return NextResponse.json({ ok: true });
   }
 

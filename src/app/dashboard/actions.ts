@@ -472,6 +472,17 @@ export async function resendDelivery(orderId: string) {
   revalidatePath("/dashboard/orders");
 }
 
+/** Admin "Check with Razorpay" on an order: payment + refund state. */
+export async function syncOrderAction(orderId: string): Promise<{ ok: boolean; message: string }> {
+  await requireAdmin();
+  const { syncOrderWithRazorpay } = await import("@/lib/refunds");
+  const result = await syncOrderWithRazorpay(orderId);
+  revalidatePath(`/dashboard/orders/${orderId}`);
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard");
+  return result;
+}
+
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();

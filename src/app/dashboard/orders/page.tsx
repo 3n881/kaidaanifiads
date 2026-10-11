@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, Download, IndianRupee, MessageCircle, Search, ShoppingBag, XCircle, Clock } from "lucide-react";
+import { CheckCircle2, ChevronRight, Download, IndianRupee, MessageCircle, RotateCcw, Search, ShoppingBag, XCircle, Clock } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import ResendButton from "@/components/admin/ResendButton";
 import { getAdminProducts } from "@/lib/admin";
@@ -48,9 +48,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   };
   const c = view.counts;
   const cards: Array<{ status: OrderStatusFilter; label: string; value: string; sub: string; icon: React.ElementType; tone: string }> = [
-    { status: "paid", label: "Paid", value: `₹${c.revenue.toLocaleString("en-IN")}`, sub: `${c.paid} order${c.paid === 1 ? "" : "s"}`, icon: IndianRupee, tone: "text-green-700" },
+    { status: "paid", label: "Paid", value: `₹${c.revenue.toLocaleString("en-IN")}`, sub: `${c.paid} order${c.paid === 1 ? "" : "s"}${c.refundedAmount ? " · after refunds" : ""}`, icon: IndianRupee, tone: "text-green-700" },
     { status: "created", label: "Not paid", value: String(c.created), sub: "opened Razorpay, didn't pay", icon: Clock, tone: "text-brand-600" },
     { status: "failed", label: "Failed", value: String(c.failed), sub: "payment declined", icon: XCircle, tone: "text-danger-600" },
+    { status: "refunded", label: "Refunded", value: String(c.refunded), sub: c.refundedAmount ? `−₹${c.refundedAmount.toLocaleString("en-IN")}` : "none", icon: RotateCcw, tone: "text-purple-700" },
     { status: "notdownloaded", label: "Paid, not downloaded", value: String(c.notDownloaded), sub: c.notDownloaded ? "follow up on WhatsApp" : "everyone has the PDF", icon: Download, tone: c.notDownloaded ? "text-amber-600" : "text-brand-500" },
   ];
   const since = new Date(SALES_START).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" });
@@ -72,7 +73,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       </div>
 
       {/* Summary cards = filters */}
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((card) => {
           const active = view.status === card.status;
           return (
@@ -119,12 +120,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             {view.rows.map((o) => (
               <li key={o.id} className="rounded-2xl border border-brand-100 bg-white p-4 shadow-[var(--shadow-card)]">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-deva min-w-0 text-sm font-bold text-brand-900">{bookName(o.product_id)}</p>
-                  <StatusBadge status={o.status} />
+                  <Link href={`/dashboard/orders/${o.id}`} className="font-deva min-w-0 text-sm font-bold text-brand-900 hover:underline">{bookName(o.product_id)}</Link>
+                  <StatusBadge status={o.status} refund={o.refund_status} />
                 </div>
                 <p className="mt-1 text-xs text-brand-500">{istTime(o.paid_at ?? o.created_at)} · <span className="font-deva">{LANGUAGE[o.locale ?? "mr"] ?? o.locale}</span> · ₹{o.amount}</p>
                 <OrderFacts o={o} />
-                {o.status === "paid" && <div className="mt-3"><ResendButton orderId={o.id} /></div>}
+                <div className="mt-3 flex items-center gap-2">
+                  {o.status === "paid" && <ResendButton orderId={o.id} />}
+                  <Link href={`/dashboard/orders/${o.id}`} className="inline-flex items-center gap-1 rounded-lg border border-brand-200 px-2.5 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50">Details <ChevronRight className="h-3.5 w-3.5" /></Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -152,10 +156,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                     return (
                       <tr key={o.id} className="hover:bg-brand-50/40">
                         <td className="whitespace-nowrap px-4 py-3 text-brand-500">{istTime(o.paid_at ?? o.created_at)}</td>
-                        <td className="font-deva max-w-[260px] truncate px-4 py-3 font-semibold text-brand-900" title={bookName(o.product_id)}>{bookName(o.product_id)}</td>
+                        <td className="font-deva max-w-[260px] truncate px-4 py-3 font-semibold text-brand-900" title={bookName(o.product_id)}><Link href={`/dashboard/orders/${o.id}`} className="hover:underline">{bookName(o.product_id)}</Link></td>
                         <td className="font-deva px-4 py-3 text-brand-600">{LANGUAGE[o.locale ?? "mr"] ?? o.locale}</td>
                         <td className="px-4 py-3 font-semibold text-brand-800">₹{o.amount}</td>
-                        <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
+                        <td className="px-4 py-3"><StatusBadge status={o.status} refund={o.refund_status} /></td>
                         <td className="px-4 py-3">
                           {phone ? (
                             <a href={waLink(phone)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-green-700"><MessageCircle className="h-3.5 w-3.5" /> {phone}</a>
@@ -164,7 +168,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                         </td>
                         <td className="px-4 py-3 text-brand-600">{o.download_count ?? 0}</td>
                         <td className="px-4 py-3">{o.whatsapp_sends ? <span className="inline-flex items-center gap-1 text-green-700"><CheckCircle2 className="h-4 w-4" /> {o.whatsapp_sends}</span> : <span className="text-brand-300">—</span>}</td>
-                        <td className="px-4 py-3 text-right">{o.status === "paid" && <ResendButton orderId={o.id} />}</td>
+                        <td className="px-4 py-3 text-right"><span className="inline-flex items-center gap-2">{o.status === "paid" && <ResendButton orderId={o.id} />}<Link href={`/dashboard/orders/${o.id}`} aria-label="Order details" className="rounded-lg border border-brand-200 p-1.5 text-brand-600 hover:bg-brand-50"><ChevronRight className="h-4 w-4" /></Link></span></td>
                       </tr>
                     );
                   })}
@@ -179,7 +183,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, refund }: { status: string; refund?: "partial" | "full" | null }) {
+  if (refund) {
+    return <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">{refund === "full" ? "Refunded" : "Part refunded"}</span>;
+  }
   const s = STATUS[status] ?? { label: status, className: "bg-brand-100 text-brand-600" };
   return <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${s.className}`}>{s.label}</span>;
 }
