@@ -1,6 +1,6 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-11** (live commit `5c3f788` + this doc update). One place for any developer or AI agent to
+> **Last updated 2026-10-11 evening** (live commit `bd822ce` + this doc update). One place for any developer or AI agent to
 > understand where the project is: what exists, how it was built, what is live, what is next, and
 > which deeper doc to open for details. Facts were checked against the code, the git history, the
 > live site (`/api/health`) and the production database (read-only) on this date.
@@ -84,9 +84,9 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 
 | Area | State |
 |---|---|
-| Store code (catalog, book pages, checkout, order page, downloads, My Books) | ✅ Built and working end to end in Razorpay test mode |
+| Store code (catalog, book pages, checkout, order page, downloads, My Books) | ✅ Working end to end with **live** Razorpay payments (2026-10-11) |
 | WhatsApp delivery (PDF after payment) + payment reminder | ✅ Working (tested 2026-10-01; seen again in 10-10 test orders) |
-| Admin dashboard (products per language, PDFs, covers, previews, orders, messages, setup) | ✅ |
+| Admin dashboard | ✅ Rebuilt 2026-10-11: **sales Overview**, **Orders** with filters + **order detail page**, **refund tracking**, readable save errors, PDF uploads > 10 MB fixed, works on phone / tablet / desktop (§8 Dashboard) |
 | Multilingual UI (Marathi / Hindi / English) + first-visit language picker | ✅ 2026-10-10 |
 | UI matched to the original site | ✅ 49 tracked items done. 3 wait for an owner decision (§11) |
 | In-page sample reader (page images made from the PDF) | ✅ 2026-10-10. All 9 editions have 6 reader pages |
@@ -95,13 +95,12 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Server + Cloudflare + auto-deploy | ✅ 2026-10-10 (go-live Stages 0–3) |
 | **Stage 4: functional tests on the live domain** | 🟡 **In progress.** The DB shows 3 paid test orders on 10-10 at 21:25–21:47 IST (#27, #30, #25) plus 1 abandoned. Results are not yet written up. Run the full checklist in `go-live-plan.md` Stage 4 |
 | Page speed (first screen) | ✅ 2026-10-11 — PageSpeed mobile: home **93**, book page **85** (§7a) |
-| Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). WebPageTest, real-phone check and k6 `loadtest/` (written, never run) still to do |
+| Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). **k6 Reel spike PASSED** 2026-10-11 from Grafana Cloud Mumbai: 66,825 requests, peak 300 req/s, **0 errors**, p95 17 ms, **100 % from Cloudflare**, server CPU flat. Still to do: k6 **Server direct** (`loadtest/cloud-origin.js`), WebPageTest, real-phone check |
 | Stage 6: go-live (Razorpay **live** keys + announce) | 🟡 **Live payments working 2026-10-11**: real ₹99 purchase 14:50 IST (#30) → paid, downloaded, PDF on WhatsApp, webhook saved the phone. Refund that test payment in Razorpay. Not announced yet (Search Console, Instagram bio pending) |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
 | Meta Pixel + Conversions API | ⬜ Waiting for the 3 items from the client's Meta account (§11 item 8) |
 
-Production database snapshot (2026-10-10, read-only): **9 active products** (all ₹99), **9 orders**
-(7 paid, 1 failed, 1 created — all Razorpay **test** payments), **0 contact messages**.
+Production database snapshot (2026-10-11 evening, read-only): **10 products** (9 books at ₹99 + the owner's **#31 "test book" at ₹1, still visible — hide or delete it**). Since live payments (11 Oct ≈ 14:30 IST): 6 paid orders (₹496, incl. the owner's ₹99 and ₹1 test purchases — to be refunded), 2 not paid, 1 failed.
 
 ---
 
@@ -156,7 +155,13 @@ Full detail: `docs/HANDOFF.md` §3.
    30 min (cron), at most one per phone + book per day.
 8. If the browser dies after paying, the webhook, the order page and the 10-minute cron all ask Razorpay
    directly, so no paid order is lost.
-9. **Languages:** each product has `mr`/`hi`/`en` editions. If the visitor's language has no edition,
+9. **After paying:** the order page also shows **"तुम्हाला हे देखील आवडेल"** (other books, buyer's language first).
+   Pressing **Back** returns to the normal book page: phones restore the book page from the back/forward
+   cache with the "Opening payment…" spinner still up, so `BuyButton` closes the checkout window on
+   `pageshow` with `persisted` (fixed 2026-10-11; before, the buyer looked stuck on the payment spinner).
+10. **Refunds:** done by the owner in the Razorpay dashboard. The order stays `paid` and downloads keep
+   working; `refunded_amount` / `refund_status` record it (webhook `refund.*` or "Check with Razorpay").
+11. **Languages:** each product has `mr`/`hi`/`en` editions. If the visitor's language has no edition,
    the page sells the edition that exists (`editionLocaleFor`). The order's `locale` = the edition sold
    = the PDF delivered.
 
@@ -450,12 +455,20 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    book link from Instagram, WebPageTest (Mumbai, Moto G, 4G), k6 `loadtest/` (landing spike, checkout,
    webhook replay, download), container drill, deploy-under-load.
 4. **Stage 6 go-live**: ✅ Razorpay live keys + new live webhook + real ₹99 purchase (2026-10-11).
-   Still: **refund the test payment**; confirm with the owner whether the live key was *regenerated* (if
+   **Owner to do now:** hide/delete **#31 "test book" (₹1, visible)**; refund the ₹99 + ₹1 test payments in
+   Razorpay, then press **Check with Razorpay** on those orders; in Razorpay → Live → Webhooks → **our**
+   webhook, also tick **`refund.created`** and **`refund.processed`**; run the k6 **Server direct** test.
+   Still: confirm with the owner whether the live key was *regenerated* (if
    yes, the original site's Vercel needs the new secret within 24 h); an iPhone purchase from Instagram;
    warm the cache; Google Search Console (add domain, submit `/sitemap.xml`); update the Instagram bio and
    Reel links. **SSH note:** the laptop can't SSH to the server (home IP changed); server edits go through
    Lightsail → kaf-a → Connect using SSH (browser SSH allowed in the SSH firewall rule), or update the
    port-22 rule with the new IP.
+
+### Ideas (not started)
+- Order CSV export (accounts/GST) · nightly WhatsApp sales summary to the owner · move dashboard totals into
+  SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
+  block downloads for fully refunded orders (today a refund does not revoke access).
 
 ### Waiting on the owner / client
 5. UI decisions: **#9** WhatsApp button label, **#23** disclaimer box + "Featured" sort on `/ebooks`
@@ -539,25 +552,6 @@ Trust this file over these where they disagree:
 | 10-11 | `5c3f788` + Cloudflare rule | **Speed pass from PageSpeed** (home 85, book page 75 / LCP 6.0 s): no font preloads, Geist limited to Latin, Devanagari web font dropped (device font), `/ebooks` + `/combos` lists in the HTML (no `useSearchParams`), 600 px image variant + 200 px thumbnails. Cloudflare Transform Rule so Instagram `?igsh=` links hit the cache (see §7) |
 | 10-11 | `3795afe` `1eaa7ab` | Book page 91–92 (sample reader on demand, `.cv-auto` below the fold); `inlineCss` tried and removed. Speed comparison with the original (doc "Site Speed: Ours vs Original": ours 83–94 mobile vs 44–64; the original is only ahead on server answer from Airtel, which Cloudflare Free routes via Marseille; a paid Cloudflare plan is not expected to fix that). **Razorpay LIVE** keys + live webhook; first real ₹99 purchase OK |
 | 10-11 | docs | PageSpeed after the changes: home 85 → **93**, book page 75 → **85**. Owner decisions: language pop-up stays as it is; Cloudflare Web Analytics stays **on** (real-user speed data). Speed section §7a added |
-
-Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
-(19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
-variables, fonts, Cloudflare Free-plan limits …).
-
----
-
-## 14. Doc index
-
-| Doc | Use it for | Freshness |
-|---|---|---|
-| **`docs/PROJECT-STATUS.md`** | This overview | Current |
-| `docs/go-live-plan.md` | Go-live stages 0–7 with checklists, problems log, hosting decision, test tables for Stages 4–6 | Current (minor stale bits, §12) |
-| `docs/ui-match-original.md` | Every UI decision vs the original site (items 1–49 + status) | Current |
-| `docs/HANDOFF.md` | Deep detail: buyer flow, catalog, dashboard, env vars, Interakt templates, Razorpay rules, local dev tips | Detail still right; hosting/DB parts stale (§12) |
-| `docs/setup-steps-lightsail.md` | Server setup steps 1–7 with "if it fails" fixes | Current (done) |
-| `docs/viral-launch-plan.md` | Original audit, cache/WAF rule tables (Phase 5), outage handling (Phase 9), per-Reel runbook | Rules current; status table stale |
-| `docs/deploy-lightsail.md` | Server runbook: manual deploy/rollback, monitoring, per-Reel routine, how code supports multiple servers | Two-server parts superseded |
-| `docs/setup-steps-ec2.md` | EC2 alternative | Not used |
-| `loadtest/README.md` | k6 tests A–E + 12 failure drills | Current, not run |
-| `supabase/checks/verify.sql` | Pre-launch DB checks | Not run |
-| `AGENTS.md` / `CLAUDE.md` | Next.js 16 warning (auto-written by `next dev`) | — |
+| 10-11 | `e989e59` `4c27f38` `0ae3439` `d40949e` `49d823f` | **Admin rework.** Overview = sales dashboard; Orders page (period tabs, clickable filter cards, search, book names, IST, wa.me, Resend); **order detail page** with Check with Razorpay / copy buyer link; **refund tracking** (migration 008, webhook `refund.*`, net revenue); **PDF uploads > 10 MB were failing** (Next 16 `proxy.ts` copies only 10 MB → "Unexpected end of form" → 500 / React #441) → `experimental.proxyClientMaxBodySize: "95mb"`, reproduced + verified locally; refused saves show "Not saved: …" and keep the form; Marathi-only titles got URL `-` → now `book-<id>`; no cover → PDF's first page; dashboard checked at 375/768/1280 px (2-row menu on phones, overflow fixes) |
+| 10-11 | `bd822ce` | Buyer: Back after paying no longer shows the stuck payment spinner (bfcache `pageshow` closes checkout); "you may also like" carousel on the order page |
+| 10-11 | loadtest | k6 Reel spike from Grafana Cloud Mumbai: 66,825 req, 300 req/s peak, 0 errors, p95 17 ms, 100 % edge, server CPU flat. Scripts: `loadtest/landing.js`, `origin.js`, `cloud-*.js` (free plan: 100 VUs, URLs grouped by `name` tag) |

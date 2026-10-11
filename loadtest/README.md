@@ -8,7 +8,7 @@ no orders, payments or WhatsApp. `checkout.js` / `download.js` stay staging-only
 | Test | Command (k6 via Docker on the dev PC, or Grafana Cloud k6 with load zone **Mumbai**) | Pass |
 |---|---|---|
 | Smoke (done 10-11 ✅) | `landing.js -e PEAK=5 -e SHORT=1`, `origin.js -e MAX=3 -e SHORT=1` | 0 errors |
-| **Reel spike** | `landing.js -e BASE=https://kaydyachaanifayddyacha.com -e PEAK=300` (then 500) | errors < 1 %, `cf_edge_served` > 98 %, html p95 < 400 ms |
+| **Reel spike** | `landing.js -e BASE=https://kaydyachaanifayddyacha.com -e PEAK=300` (then 500) | errors < 1 %, `cf_edge_served` > 98 %, html p95 < 400 ms — ✅ **passed 11 Oct** (Grafana Cloud Mumbai, `cloud-landing.js`): 66,825 req, 300 req/s, 0 errors, p95 17 ms, edge 100 %, server CPU flat |
 | **Server direct** | `origin.js -e BASE=https://kaydyachaanifayddyacha.com -e MAX=60` (steps 10→20→40→60 req/s) | errors < 1 %, health p95 < 300 ms, order page p95 < 1.5 s; note where times start to climb |
 
 Docker form (Git Bash): `MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/scripts" grafana/k6:0.54.0 run -e BASE=… /scripts/landing.js`
