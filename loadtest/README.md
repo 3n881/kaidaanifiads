@@ -1,5 +1,25 @@
 # Load & failure tests (Phase 7)
 
+## Production-safe tests (2026-10-11, site is LIVE with real payments)
+
+Only `landing.js` and `origin.js` may run against `kaydyachaanifayddyacha.com`: GET requests only,
+no orders, payments or WhatsApp. `checkout.js` / `download.js` stay staging-only (live Razorpay keys).
+
+| Test | Command (k6 via Docker on the dev PC, or Grafana Cloud k6 with load zone **Mumbai**) | Pass |
+|---|---|---|
+| Smoke (done 10-11 ✅) | `landing.js -e PEAK=5 -e SHORT=1`, `origin.js -e MAX=3 -e SHORT=1` | 0 errors |
+| **Reel spike** | `landing.js -e BASE=https://kaydyachaanifayddyacha.com -e PEAK=300` (then 500) | errors < 1 %, `cf_edge_served` > 98 %, html p95 < 400 ms |
+| **Server direct** | `origin.js -e BASE=https://kaydyachaanifayddyacha.com -e MAX=60` (steps 10→20→40→60 req/s) | errors < 1 %, health p95 < 300 ms, order page p95 < 1.5 s; note where times start to climb |
+
+Docker form (Git Bash): `MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/scripts" grafana/k6:0.54.0 run -e BASE=… /scripts/landing.js`
+
+Rules: quiet hour, no Reel that day, no deploys during a run. Watch Lightsail → kaf-a → **Metrics** (CPU),
+Cloudflare → Analytics (cache ratio, requests), Supabase → Reports (DB CPU). Run the big tests from **Mumbai**
+(Grafana Cloud k6 or a temporary AWS Mumbai machine), not from a home connection — Airtel is routed via
+Cloudflare Marseille and the home link becomes the bottleneck. Above ~500 req/s from one source Cloudflare's
+DDoS protection may start challenging the generator. Record results in `docs/PROJECT-STATUS.md`.
+Note: every `/order/…` request reads the catalog from Supabase once (root layout search box).
+
 Run against **staging** only (a separate deployment behind the same Cloudflare
 rules, Razorpay **test** keys, a staging Supabase project or branch).
 Install k6: https://grafana.com/docs/k6/latest/set-up/install-k6/

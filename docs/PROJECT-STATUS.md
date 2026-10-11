@@ -322,7 +322,7 @@ eager on the first carousel/book cover, and keep list pages free of `useSearchPa
 | `media/[...path]` | Proxies the public `covers` bucket (whitelisted names): images 1 year immutable, `previews/*` 1 h at the edge |
 
 ### Dashboard (`/dashboard`, all dynamic; `src/proxy.ts` guards it, fails closed if `ADMIN_EMAILS` empty)
-Overview (stats + onboarding progress) · **Products** (per-edition editor `ProductForm`: text, cover, up to 5
+**Overview = sales dashboard** (2026-10-11, `src/lib/sales.ts` + `components/admin/SalesOverviewView.tsx`): revenue / paid / conversion / failed for today (IST), 7 days, all time — counted from `SALES_START` (live keys, 11 Oct 14:30 IST; test orders excluded; refunds not tracked yet); needs-attention lists (paid > 15 min not downloaded, paid without WhatsApp, unhandled contact messages) with wa.me links; top books 7 days; latest 10 paid orders; one small Setup card (business details still missing). The old setup checklist lives on Launch · **Products** (per-edition editor `ProductForm`: text, cover, up to 5
 preview images, PDF View/Replace/Remove; choosing a PDF renders 6 reader pages **in the browser** with PDF.js
 and uploads them on save) · `products/new` · `products/[id]/pdf` (admin 5-min signed URL) · **Orders** (last 200,
 Resend WhatsApp bypassing the cap) · **Messages** (contact inbox, mark done) · Setup / Content / Integrations /

@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useFormStatus } from "react-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -18,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { AdminProduct } from "@/lib/admin";
-import { saveProduct } from "@/app/dashboard/actions";
+import { saveProductWithFeedback } from "@/app/dashboard/actions";
 import { LOCALE_LABELS, type Locale } from "@/lib/i18n";
 import { coverSrc } from "@/lib/covers";
 
@@ -89,8 +88,29 @@ export default function ProductForm({
     return Boolean(product?.[`pdf_path_${locale}`]);
   };
 
+  // A refused save (too big, wrong file, database error…) comes back as a
+  // message here instead of the generic server-error page. Submitted by hand
+  // (not <form action>) so a refused save keeps everything typed and picked.
+  const [saveState, setSaveState] = useState<{ error: string } | null>(null);
+  const [saving, startSaving] = useTransition();
+
   return (
-    <form action={saveProduct} className="space-y-5">
+    <form
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        setSaveState(null);
+        startSaving(async () => {
+          setSaveState(await saveProductWithFeedback(null, data));
+        });
+      }}
+    >
+      {saveState?.error && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          Not saved: {saveState.error}
+        </div>
+      )}
       {product && <input type="hidden" name="id" value={product.id} />}
       <input type="hidden" name="edition_locale" value={activeLocale} />
       <input type="hidden" name="legacy_title" value={product?.title ?? ""} />
@@ -340,8 +360,13 @@ export default function ProductForm({
         </aside>
       </div>
 
+      {saveState?.error && (
+        <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          Not saved: {saveState.error}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
-        <SubmitButton locale={activeLocale} />
+        <SubmitButton locale={activeLocale} pending={saving} />
         <Link href="/dashboard/products" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-brand-200 px-5 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50">
           <ArrowLeft className="h-4 w-4" /> Back to products
         </Link>
@@ -656,7 +681,6 @@ function Toggle({ name, label, defaultChecked }: { name: string; label: string; 
   return <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-brand-800"><span>{label}</span><input name={name} type="checkbox" defaultChecked={defaultChecked} className="h-5 w-5 accent-brand-teal" /></label>;
 }
 
-function SubmitButton({ locale }: { locale: Locale }) {
-  const { pending } = useFormStatus();
+function SubmitButton({ locale, pending }: { locale: Locale; pending: boolean }) {
   return <button type="submit" disabled={pending} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-teal px-6 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">{pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : <><Save className="h-4 w-4" /> Save {LOCALE_LABELS[locale]} edition</>}</button>;
 }

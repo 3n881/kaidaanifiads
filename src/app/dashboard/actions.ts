@@ -2,7 +2,7 @@
 
 import sharp from "sharp";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { ADMIN_UPLOAD_TIMEOUT_MS, getSupabaseAdmin } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
@@ -31,6 +31,7 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 }
 
@@ -96,6 +97,25 @@ async function uploadCover(file: File, slug: string): Promise<string> {
 }
 
 /** Create or update a product from the admin form. */
+/**
+ * The product form's action: same as saveProduct, but a refused save comes back
+ * as a message for the form instead of the generic "server error" page
+ * (production hides thrown messages). Redirects still go through.
+ */
+export async function saveProductWithFeedback(
+  _previous: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  try {
+    await saveProduct(formData);
+    return null;
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[saveProduct] failed", error);
+    return { error: error instanceof Error ? error.message : "Saving failed. Please try again." };
+  }
+}
+
 export async function saveProduct(formData: FormData) {
   await requireAdmin();
   const admin = getSupabaseAdmin();
@@ -122,8 +142,13 @@ export async function saveProduct(formData: FormData) {
     : String(formData.get("legacy_title") || "").trim();
   if (!legacyTitle) throw new Error("Save the Marathi edition first");
 
+  // A Marathi/Hindi title has no Latin letters, so slugify() leaves nothing
+  // (it used to leave just "-"): fall back to book-<id>. The admin can type an
+  // English address under "Advanced options → URL".
+  const typedSlug = slugify(String(formData.get("slug") || ""));
+  const titleSlug = slugify(legacyTitle);
   const slug =
-    String(formData.get("slug") || "").trim() || slugify(legacyTitle) || `book-${id}`;
+    typedSlug || (titleSlug.replace(/-/g, "").length >= 3 ? titleSlug : "") || `book-${id}`;
   const isCombo = formData.get("is_combo") === "on";
   const shortDescription = String(
     formData.get(`short_description_${locale}`) || "",
