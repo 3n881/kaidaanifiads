@@ -279,8 +279,9 @@ times). The pop-up stays (owner decision 10-11: visitors choose their language f
 **Owner decisions 10-11:** language pop-up unchanged · Cloudflare **Web Analytics stays on** (10 KB, loads
 after the page, gives real-visitor speed data; turning it off would not affect cache/rules/SSL/WAF).
 
-**Remaining ideas (optional, small):** inline the 16 KB stylesheet (`experimental.inlineCss`, saves one
-request before first paint — test carefully, experimental); legacy JS polyfills 24 KB (framework, risky);
+**Book page, 11 Oct 13:50:** sample reader loaded on demand (`next/dynamic`), FAQ + related row `content-visibility:auto` (`.cv-auto`) → book page **91–92**, 0.5 MB, JS 0.4 s. `experimental.inlineCss` was tried and **removed** (no first-paint gain, HTML doubled). Comparison with the original site: doc "Site Speed: Ours vs Original" (ours 83–94 mobile vs 44–64).
+
+**Remaining ideas (optional, small):** legacy JS polyfills 24 KB (framework, risky);
 images "larger than needed" by ~20 KB each (smaller would blur on most phones — leave). The remaining
 ~1.1 s "element render delay" in the lab is the emulated slow CPU laying out text.
 
