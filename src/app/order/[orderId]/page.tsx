@@ -14,6 +14,8 @@ import { OrderMemory, PendingRefresh, WhatsAppOptIn } from "@/components/order/O
 import InAppBrowserHint from "@/components/order/InAppBrowserHint";
 import DownloadWhere from "@/components/order/DownloadWhere";
 import { ORDER_EXTRA } from "@/lib/order-copy";
+import { getAllProducts } from "@/lib/products";
+import Carousel from "@/components/Carousel";
 import { isLocale, localizedTitle, normalizeLocale, ORDER_COPY, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -138,6 +140,19 @@ export default async function OrderPage({
     }
     throw error;
   }
+  // "You may also like": other books, the buyer's language first. Same cached
+  // catalog the layout already loaded for this request (no extra query).
+  let moreBooks: Awaited<ReturnType<typeof getAllProducts>> = [];
+  try {
+    const others = (await getAllProducts()).filter((p) => p.id !== order.product_id);
+    moreBooks = [
+      ...others.filter((p) => p.availableLocales?.includes(locale)),
+      ...others.filter((p) => !p.availableLocales?.includes(locale)),
+    ].slice(0, 8);
+  } catch {
+    moreBooks = []; // never let recommendations break the download page
+  }
+
   const downloadHref = (itemId: number) =>
     `/api/download/${orderId}?t=${token}&item=${itemId}`;
 
@@ -206,9 +221,25 @@ export default async function OrderPage({
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {copy.help}
         </a>
       </div>
+
+      {moreBooks.length > 0 && (
+        <section className="mt-10 border-t border-brand-100 pt-6" aria-labelledby="more-books">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <h2 id="more-books" className="font-deva text-lg font-extrabold text-brand-900">{MORE_BOOKS[textLocale].title}</h2>
+            <Link href="/ebooks" className="font-deva shrink-0 text-xs font-bold text-brand-teal hover:underline">{MORE_BOOKS[textLocale].all}</Link>
+          </div>
+          <Carousel products={moreBooks} />
+        </section>
+      )}
     </div>
   );
 }
+
+const MORE_BOOKS: Record<Locale, { title: string; all: string }> = {
+  mr: { title: "तुम्हाला हे देखील आवडेल", all: "सर्व पुस्तके" },
+  hi: { title: "आपको यह भी पसंद आएगा", all: "सभी किताबें" },
+  en: { title: "You may also like", all: "All books" },
+};
 
 function IncompleteLink({ locale }: { locale: Locale }) {
   const extra = ORDER_EXTRA[locale];

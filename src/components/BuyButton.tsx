@@ -91,6 +91,17 @@ export default function BuyButton({
   const [open, setOpen] = useState(false);
   // Bumping the key remounts the modal = a fresh checkout attempt.
   const [attempt, setAttempt] = useState(0);
+  // After paying we go to the order page; pressing Back on a phone restores
+  // this page from the back/forward cache exactly as it was left — with the
+  // "Opening payment…" spinner still up and no way to close it. A restored
+  // page closes the checkout window so Back shows the normal book page.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setOpen(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
   return (
     <>
       <button
