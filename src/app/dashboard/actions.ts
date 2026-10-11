@@ -189,6 +189,7 @@ export async function saveProduct(formData: FormData) {
   // Only the active language fieldset is enabled in the browser, keeping each
   // request under the 95 MB Server Action limit.
   const cover = formData.get(`cover_file_${locale}`);
+  const coverUploaded = cover instanceof File && cover.size > 0;
   if (cover instanceof File && cover.size > 0) {
     const coverUrl = await uploadCover(cover, `${slug}-${locale}`);
     row[`cover_image_${locale}`] = coverUrl;
@@ -251,6 +252,26 @@ export async function saveProduct(formData: FormData) {
     }
   }
   await purgeFiles(changedPreviews);
+
+  // No cover picked and none saved yet → use the book's own first page (the
+  // sample-reader image of page 1, already stored in every size). A cover
+  // uploaded later replaces it.
+  const firstPage = (row[`reader_pages_${locale}`] as string[] | null | undefined)?.[0];
+  if (!coverUploaded && firstPage && formData.get(`remove_cover_${locale}`) !== "1") {
+    let hasCover = false;
+    if (isEdit) {
+      const { data: current } = await admin
+        .from("products")
+        .select("cover_image, cover_image_mr, cover_image_hi, cover_image_en")
+        .eq("id", id)
+        .maybeSingle<Record<string, string | null>>();
+      hasCover = Boolean(current?.[`cover_image_${locale}`] || (locale === "mr" && current?.cover_image));
+    }
+    if (!hasCover) {
+      row[`cover_image_${locale}`] = firstPage;
+      if (locale === "mr") row.cover_image = firstPage;
+    }
+  }
 
   const previewFiles = formData
     .getAll(`preview_files_${locale}`)

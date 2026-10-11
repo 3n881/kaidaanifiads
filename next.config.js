@@ -89,6 +89,11 @@ const nextConfig = (() => {
       // Admin-only forms can upload one or more localized PDFs plus previews.
       // Keep this below Cloudflare's common 100 MB request ceiling.
       serverActions: { bodySizeLimit: "95mb" },
+      // /dashboard requests go through src/proxy.ts, and Next copies at most
+      // 10 MB of a proxied request body by default — a bigger PDF upload
+      // arrived cut off and the save failed with a 500 (React #441, 11 Oct).
+      // Same ceiling as the Server Action limit above.
+      proxyClientMaxBodySize: "95mb",
     },
     images: {
       // Optimised brand images are cached by Cloudflare too; a month here keeps

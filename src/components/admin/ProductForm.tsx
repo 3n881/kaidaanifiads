@@ -302,6 +302,11 @@ export default function ProductForm({
                 existingUrl={coverFor(locale)}
                 onPreviewChange={(url) => setCoverPreviews((current) => ({ ...current, [locale]: url }))}
               />
+              {!coverFor(locale) && (
+                <p className="-mt-2 text-[11px] text-brand-500">
+                  No cover? When you save with a PDF, the PDF&apos;s first page becomes the cover. You can upload a cover later.
+                </p>
+              )}
               <PreviewsField
                 locale={locale}
                 existing={galleryFor(locale)}
