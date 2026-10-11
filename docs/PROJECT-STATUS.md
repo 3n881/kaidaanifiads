@@ -126,7 +126,7 @@ cron-job.org ─► POST /api/cron/reconcile every 10 min (payment sweep + remin
 - **Caching:** home, list and book pages use ISR with a 5-minute revalidate (`s-maxage=300,
   stale-while-revalidate`). Policy pages are static. `/api/*`, `/order/*` and `/my-books` are
   `private, no-store`. Admin saves call `revalidatePath` and purge Cloudflare (`src/lib/cdn.ts`).
-  Every deploy purges all of Cloudflare's cache (`deploy/deploy.sh`).
+  Every deploy purges only the **pages** from Cloudflare (`deploy/deploy.sh`; images and build files stay cached).
 - **Images:** covers and preview pages are stored as 200/400/800 px WebP. With
   `NEXT_PUBLIC_MEDIA_PROXY=true`, they are served as `/media/<path>` from our domain so Cloudflare caches
   them in India (images 1 year, preview PDFs 1 hour). PDFs for buyers come straight from Supabase via
@@ -218,7 +218,11 @@ Storage: `pdfs` (private) `<slug>-<locale>-<ts>.pdf` · `covers` (public) `<slug
 12 characters of the SHA, pushed to GHCR) → opens Lightsail port 22 for the runner's IP only → copies
 `deploy/deploy.sh`, `docker-compose.yml` and `Caddyfile` to `/opt/kaf/` → `deploy.sh` restarts app1, waits
 until it is healthy, then does the same for app2 (it rolls back the replaced container on failure) →
-reloads Caddy → **purges the whole Cloudflare cache** → closes port 22 again. Zero downtime.
+reloads Caddy → **purges the pages from Cloudflare** (home by URL + 15 page prefixes on both hosts = 30
+prefixes, Free plan's max per call; `/media/…` images and `/_next/static/…` are kept because their names change
+with their content) → closes port 22 again. Zero downtime. **If you add a new public page, add it to `pages=` in
+`deploy.sh`** (otherwise it refreshes within 5 min anyway). Until 2026-10-11 every deploy purged *everything*,
+which left covers cold (1.1–1.6 s each) right after a deploy.
 `/api/health` returns `{"ok":true,"deployment":"<sha>"}`. Use it to confirm which commit is live.
 
 > ⚠️ **Pushing to `main` = deploying to production.** Commit/push only when the user asks.
@@ -300,6 +304,19 @@ after the page, gives real-visitor speed data; turning it off would not affect c
 **Remaining ideas (optional, small):** legacy JS polyfills 24 KB (framework, risky);
 images "larger than needed" by ~20 KB each (smaller would blur on most phones — leave). The remaining
 ~1.1 s "element render delay" in the lab is the emulated slow CPU laying out text.
+
+**Evening drop to 87 (11 Oct ~22:00) and why:** (1) each of the evening's deploys purged *all* of Cloudflare's
+cache, so PageSpeed got cold covers (MISS, 1.1–1.6 s each, some timed out) — fixed: deploys now purge pages only
+(§7); (2) the ₹1 **#31 test book** is the first home card and therefore the LCP image — owner to hide/delete it;
+(3) PageSpeed varies ±5 points between runs, so judge on 2–3 runs. Re-run at 22:04 → **93** again (FCP 1.7 s,
+LCP 3.0 s, SI 3.0 s, TBT 50 ms, CLS 0; server answer 10 ms).
+
+**"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
+(≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
+already contains all content, so it draws in one go when it lands. A **splash screen would not help** (it is
+part of the same HTML, so it appears at the same moment). Google's "good" FCP is ≤ 1.8 s; we are at 1.7 s on
+the slowest lab profile, and real 4G/Wi-Fi is much faster. Inline CSS was already tried (no gain). Only small
+optional idea left: Cloudflare **Early Hints** (Speed → Optimization, free) — maybe 0.1–0.2 s, not enabled yet.
 
 **How to measure again:** pagespeed.web.dev (mobile) on `/` and a book page. For experiments, Lighthouse
 13.5 + Puppeteer with devtools throttling (4× CPU, 150 ms / 1.6 Mbps) — note that on the Windows dev PC
@@ -589,6 +606,7 @@ Trust this file over these where they disagree:
 | 10-11 | loadtest | k6 Server direct: 11,028 req, 0 errors, comfortable ≈ 30–40 req/s uncached (6–8× a Reel's origin load). Found: every `/order` visit reads the whole catalog from Supabase for the header search box — caching it (5 min) is the next easy capacity win |
 | 10-11 | `4b1fbd2` | **Catalog cached across requests** (`src/lib/products.ts`: `unstable_cache` 5 min, tag `products`, + React `cache()` per request). `/order` and other per-request pages no longer query Supabase on every visit (local prod build: first request 0.16 s, then 0.013–0.024 s). Admin save/delete/show-hide call `updateTag("products")` (read-your-writes); script changes appear within 5 min. Chose `unstable_cache` over `"use cache"` because that needs the app-wide Cache Components switch |
 | 10-11 | loadtest | **Server direct re-run after caching** (live `4b1fbd2`): 11,728 req, 0 errors, **all thresholds passed**, 1 dropped iteration (was 701); order page median ≈ 0.40 s flat from 10 to 60 req/s (≈ 0.25 s of it is network from the dev PC), p95 0.48–0.93 s up to 40 req/s and 0.78–1.6 s at 50–60 (was 2.2–4.2 s), no stall |
+| 10-11 | (this commit) | PageSpeed fell to 87 after the evening deploys → `deploy.sh` now purges only pages (30 prefixes + home URLs) instead of everything, so images/build files stay cached; same purge run once by hand (pages MISS, covers HIT). Re-run 93. Answered "white first second": network time on the slow-4G lab phone, splash screen wouldn't help (§7a) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
