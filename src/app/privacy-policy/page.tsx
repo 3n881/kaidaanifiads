@@ -19,6 +19,7 @@ export default function Page() {
           heading: "2. How We Use Your Information",
           body: [
             "The mobile number entered during payment is used solely to deliver the purchased ebook on WhatsApp, to send one reminder if a payment does not complete, to provide purchase recovery through My Books, and to offer order support. We send only order-related messages unless you separately consent to marketing.",
+            "Offers and new books on WhatsApp: if you close the payment window without paying, we may offer to send you offers and news about new books on WhatsApp. We do this only if you enter your number and tick the consent box. We store your number, the book you were viewing, your language and the time and wording of your consent. We send at most a few messages a month. Reply STOP on WhatsApp, or contact us, to stop them at any time; we then stop messaging you and keep only a record that you opted out.",
           ],
         },
         {

@@ -134,6 +134,33 @@ export async function sendPaymentReminder(opts: {
   });
 }
 
+// Next-day follow-up to an "interested buyer" (leads, migration 009) — a
+// MARKETING template, approved separately in Interakt. Body blanks:
+// {{1}} = book title, {{2}} = link to the book page. Empty name = off.
+const LEAD_NAME = process.env.INTERAKT_LEAD_TEMPLATE_NAME ?? "";
+const LEAD_DEFAULT_LANGUAGE = process.env.INTERAKT_LEAD_TEMPLATE_LANGUAGE ?? "mr";
+const LEAD_LANGUAGES: Record<Locale, string> = {
+  mr: LEAD_DEFAULT_LANGUAGE,
+  hi: process.env.INTERAKT_LEAD_TEMPLATE_LANGUAGE_HI || LEAD_DEFAULT_LANGUAGE,
+  en: process.env.INTERAKT_LEAD_TEMPLATE_LANGUAGE_EN || LEAD_DEFAULT_LANGUAGE,
+};
+
+export const isLeadFollowupConfigured = Boolean(API_KEY && LEAD_NAME);
+
+export async function sendLeadFollowup(opts: {
+  phone: string;
+  productTitle: string;
+  productLink: string;
+  locale: Locale;
+}): Promise<boolean> {
+  if (!isLeadFollowupConfigured) return false;
+  return sendTemplate(opts.phone, {
+    name: LEAD_NAME,
+    languageCode: LEAD_LANGUAGES[normalizeLocale(opts.locale)],
+    bodyValues: [opts.productTitle, opts.productLink],
+  });
+}
+
 async function sendTemplate(rawPhone: string, template: Record<string, unknown>): Promise<boolean> {
   const phone = rawPhone.replace(/\D/g, "").slice(-10);
   try {

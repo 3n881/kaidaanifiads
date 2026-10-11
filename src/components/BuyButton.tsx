@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Loader2, ShieldCheck, X } from "lucide-react";
+import { Download, Loader2, MessageCircle, ShieldCheck, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
@@ -11,8 +11,10 @@ import { UI_COPY, type Locale } from "@/lib/i18n";
 import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
+import LeadCapture, { shouldOfferLead } from "./LeadCapture";
+import { NOT_PAID_COPY } from "@/lib/lead-copy";
 
-type Step = "processing" | "error";
+type Step = "processing" | "error" | "cancelled" | "failed";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -45,7 +47,10 @@ interface CheckoutData {
   error?: string;
 }
 
-type RazorpayCtor = new (options: RazorpayOptions) => { open: () => void };
+type RazorpayCtor = new (options: RazorpayOptions) => {
+  open: () => void;
+  on: (event: "payment.failed", handler: (response: { error?: { description?: string } }) => void) => void;
+};
 
 declare global {
   interface Window {
@@ -149,6 +154,11 @@ function BuyModal({
   const [step, setStep] = useState<Step>("processing");
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
+  // Set when Razorpay reports a failed attempt (bank/UPI declined). Razorpay
+  // keeps its window open for a retry; when the buyer then closes it, we know
+  // it was a failure (help screen), not a plain cancel (stay-in-touch box).
+  const failedRef = useRef<string | null>(null);
+  const [offerLead, setOfferLead] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -238,7 +248,19 @@ function BuyModal({
               window.location.assign(data.orderUrl);
             }
           },
-          modal: { ondismiss: () => fail(UI_COPY[locale].paymentCancelled) },
+          modal: {
+            ondismiss: () => {
+              if (failedRef.current) {
+                setStep("failed");
+              } else {
+                setOfferLead(shouldOfferLead());
+                setStep("cancelled");
+              }
+            },
+          },
+        });
+        razorpay.on("payment.failed", (response) => {
+          failedRef.current = response?.error?.description || "failed";
         });
         razorpay.open();
       } catch {
@@ -250,6 +272,7 @@ function BuyModal({
   }, [fail, locale, editionLocale, product.id, product.price, product.slug, product.title]);
 
   const copy = UI_COPY[locale];
+  const notPaid = NOT_PAID_COPY[locale];
 
   return createPortal(
     <div
@@ -299,6 +322,43 @@ function BuyModal({
             <p className="font-deva text-xs text-brand-500">
               {copy.noAccount}
             </p>
+          </div>
+        )}
+
+        {step === "cancelled" && (
+          <div className="flex flex-col gap-3 py-2 text-center">
+            <p className="font-deva text-base font-bold text-brand-900">{notPaid.cancelledTitle}</p>
+            <p className="font-deva -mt-2 text-xs text-brand-500">{notPaid.cancelledBody}</p>
+            <button type="button" onClick={onRetry} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
+              {copy.retry}
+            </button>
+            {offerLead && <LeadCapture locale={locale} productId={product.id} />}
+            <button type="button" onClick={onClose} className="w-full rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50">
+              {copy.close}
+            </button>
+          </div>
+        )}
+
+        {step === "failed" && (
+          <div className="flex flex-col gap-3 py-2 text-center">
+            <X className="mx-auto h-10 w-10 rounded-full bg-danger-500/10 p-2 text-danger-600" aria-hidden="true" />
+            <p className="font-deva text-base font-bold text-brand-900">{notPaid.failedTitle}</p>
+            <p className="font-deva rounded-xl bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">{notPaid.failedSafe}</p>
+            <p className="font-deva text-xs text-brand-600">{notPaid.failedTip}</p>
+            <button type="button" onClick={onRetry} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
+              {copy.retry}
+            </button>
+            <a
+              href={`https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Payment failed — ${product.title}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-deva inline-flex items-center justify-center gap-1.5 rounded-xl border border-green-200 px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-50"
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden="true" /> {notPaid.help}
+            </a>
+            <button type="button" onClick={onClose} className="text-xs font-semibold text-brand-500 hover:underline">
+              {copy.close}
+            </button>
           </div>
         )}
 

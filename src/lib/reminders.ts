@@ -14,12 +14,17 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 
 // Wait before reminding: most buyers retry and pay within a few minutes.
 const DELAY_MINUTES = Number(process.env.PAYMENT_REMINDER_DELAY_MINUTES || 30);
+// A failed payment (bank/UPI declined) is a buyer who WANTED to pay — remind
+// sooner. Abandoned (`created`) orders keep the longer delay above.
+const FAILED_DELAY_MINUTES = Number(process.env.PAYMENT_FAILED_REMINDER_DELAY_MINUTES || 10);
 // Never remind about an attempt older than this.
 const WINDOW_HOURS = 24;
 
 interface ReminderOrder {
   id: string;
   name: string | null;
+  status: string;
+  created_at: string;
   product_id: number;
   locale: string | null;
   buyer_contact: string;
@@ -41,16 +46,21 @@ export async function sendPaymentReminders(): Promise<{ due: number; sent: numbe
 
   const { data, error } = await admin
     .from("orders")
-    .select("id, name, product_id, locale, buyer_contact, products(slug, is_combo, title, title_mr, title_hi, title_en)")
+    .select("id, name, status, created_at, product_id, locale, buyer_contact, products(slug, is_combo, title, title_mr, title_hi, title_en)")
     .in("status", ["created", "failed"])
     .is("reminder_sent_at", null)
     .not("buyer_contact", "is", null)
-    .lte("created_at", new Date(now - DELAY_MINUTES * 60_000).toISOString())
+    .lte("created_at", new Date(now - Math.min(DELAY_MINUTES, FAILED_DELAY_MINUTES) * 60_000).toISOString())
     .gte("created_at", windowStart)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new DatabaseUnavailableError("reminder candidates", error);
-  const due = (data ?? []) as unknown as ReminderOrder[];
+  // Failed payments are due after FAILED_DELAY_MINUTES, abandoned ones after DELAY_MINUTES.
+  const due = ((data ?? []) as unknown as ReminderOrder[]).filter(
+    (order) =>
+      Date.parse(order.created_at) <=
+      now - (order.status === "failed" ? FAILED_DELAY_MINUTES : DELAY_MINUTES) * 60_000,
+  );
 
   let sent = 0;
   const seen = new Set<string>();

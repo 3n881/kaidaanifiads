@@ -483,6 +483,17 @@ export async function syncOrderAction(orderId: string): Promise<{ ok: boolean; m
   return result;
 }
 
+/** Removes an interested buyer from WhatsApp offers (STOP / on request). */
+export async function optOutLead(leadId: string) {
+  await requireAdmin();
+  const { error } = await getSupabaseAdmin()
+    .from("leads")
+    .update({ opted_out_at: new Date().toISOString() })
+    .eq("id", leadId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/leads");
+}
+
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();

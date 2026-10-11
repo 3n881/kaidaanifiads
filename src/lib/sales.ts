@@ -50,6 +50,8 @@ export interface SalesOverview {
   /** Paid > 5 min ago, no WhatsApp message sent. */
   whatsappMissing: SalesOrder[];
   newMessages: number;
+  /** Interested buyers (leads) still subscribed, and new ones in 7 days. */
+  interested: { active: number; newWeek: number };
   topBooksWeek: Array<{ productId: number | null; paid: number; revenue: number }>;
   latestPaid: SalesOrder[];
 }
@@ -80,7 +82,7 @@ export async function getSalesOverview(): Promise<SalesOverview> {
 
 /** The calculation itself (no auth check — callers must be admin-guarded). */
 export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseAdmin>): Promise<SalesOverview> {
-  const [ordersRes, messagesRes] = await Promise.all([
+  const [ordersRes, messagesRes, leadsRes] = await Promise.all([
     admin
       .from("orders")
       .select("id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status")
@@ -88,6 +90,7 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
       .order("created_at", { ascending: false })
       .limit(20000),
     admin.from("contact_messages").select("id", { count: "exact", head: true }).eq("handled", false),
+    admin.from("leads").select("created_at").is("opted_out_at", null).limit(20000),
   ]);
   if (ordersRes.error) throw new Error(ordersRes.error.message);
   const rows = (ordersRes.data ?? []) as SalesOrder[];
@@ -115,6 +118,10 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
     paidNotDownloaded: paid.filter((r) => !r.download_count && paidAgo(r, 15 * 60 * 1000)).slice(0, 20),
     whatsappMissing: paid.filter((r) => !r.whatsapp_sends && paidAgo(r, 5 * 60 * 1000)).slice(0, 20),
     newMessages: messagesRes.count ?? 0,
+    interested: {
+      active: (leadsRes.data ?? []).length,
+      newWeek: ((leadsRes.data ?? []) as Array<{ created_at: string }>).filter((l) => Date.parse(l.created_at) >= weekStart).length,
+    },
     topBooksWeek: [...byBook.values()].sort((a, b) => b.paid - a.paid).slice(0, 5),
     latestPaid: paid.slice(0, 10),
   };
@@ -234,4 +241,58 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
   const { data, error } = await getSupabaseAdmin().from("orders").select("*").eq("id", orderId).maybeSingle();
   if (error) throw new Error(error.message);
   return (data as OrderDetail | null) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Interested buyers (leads, migration 009) for /dashboard/leads.
+// ---------------------------------------------------------------------------
+
+export interface LeadView {
+  id: string;
+  created_at: string;
+  phone: string;
+  product_id: number | null;
+  locale: string;
+  source: "cancelled" | "failed";
+  consent_at: string;
+  followup_sent_at: string | null;
+  opted_out_at: string | null;
+  /** A paid order from this phone after the sign-up. */
+  boughtLater: boolean;
+}
+
+export async function getLeadsView(): Promise<{ leads: LeadView[]; total: number; active: number; bought: number; followups: number; optedOut: number }> {
+  await requireAdmin();
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("leads")
+    .select("id, created_at, phone, product_id, locale, source, consent_at, followup_sent_at, opted_out_at")
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Omit<LeadView, "boughtLater">[];
+
+  // Paid orders from these phones (in chunks — URL length).
+  const paidByPhone = new Map<string, string[]>();
+  const phones = [...new Set(rows.map((r) => r.phone))];
+  for (let i = 0; i < phones.length; i += 200) {
+    const { data: orders, error: ordersError } = await admin
+      .from("orders")
+      .select("buyer_contact, created_at")
+      .eq("status", "paid")
+      .in("buyer_contact", phones.slice(i, i + 200));
+    if (ordersError) throw new Error(ordersError.message);
+    for (const o of (orders ?? []) as Array<{ buyer_contact: string; created_at: string }>) {
+      paidByPhone.set(o.buyer_contact, [...(paidByPhone.get(o.buyer_contact) ?? []), o.created_at]);
+    }
+  }
+  const leads = rows.map((r) => ({ ...r, boughtLater: (paidByPhone.get(r.phone) ?? []).some((at) => at >= r.created_at) }));
+  return {
+    leads,
+    total: leads.length,
+    active: leads.filter((l) => !l.opted_out_at).length,
+    bought: leads.filter((l) => l.boughtLater).length,
+    followups: leads.filter((l) => l.followup_sent_at).length,
+    optedOut: leads.filter((l) => l.opted_out_at).length,
+  };
 }

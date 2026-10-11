@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { reconcileRecentOrders } from "@/lib/reconcile";
 import { sendPaymentReminders } from "@/lib/reminders";
+import { sendLeadFollowups } from "@/lib/leads";
 import { DatabaseUnavailableError } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -46,5 +47,16 @@ export async function POST(req: NextRequest) {
     console.error("[reminders] failed", message);
     reminders = { error: "reminders failed" };
   }
-  return NextResponse.json({ ok: true, ...result, reminders });
+  // Next-day WhatsApp follow-up to interested buyers (off until the
+  // marketing template is configured). Never fails the sweep either.
+  let leads: { due: number; sent: number } | { error: string };
+  try {
+    leads = await sendLeadFollowups();
+    if (leads.sent > 0) console.error("[leads] follow-ups sent", leads);
+  } catch (error) {
+    const message = error instanceof DatabaseUnavailableError ? error.message : String(error);
+    console.error("[leads] follow-ups failed", message);
+    leads = { error: "lead follow-ups failed" };
+  }
+  return NextResponse.json({ ok: true, ...result, reminders, leads });
 }

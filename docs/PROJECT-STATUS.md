@@ -161,7 +161,14 @@ Full detail: `docs/HANDOFF.md` §3.
    `pageshow` with `persisted` (fixed 2026-10-11; before, the buyer looked stuck on the payment spinner).
 10. **Refunds:** done by the owner in the Razorpay dashboard. The order stays `paid` and downloads keep
    working; `refunded_amount` / `refund_status` record it (webhook `refund.*` or "Check with Razorpay").
-11. **Languages:** each product has `mr`/`hi`/`en` editions. If the visitor's language has no edition,
+11. **Didn't pay (2026-10-11):** Razorpay reports a failed attempt separately (`payment.failed`) from closing the
+   window. **Failed** → help screen: money auto-refunded in 5–7 days if deducted, try another UPI app/card/net
+   banking, Try again, "Need help? WhatsApp us". **Cancelled** → "payment not completed", Try again first, then a
+   green **"Want this book later? Get offers and new books on WhatsApp"** box (number + UNTICKED consent box;
+   at most once a day per device, never again once saved — localStorage `kaf-lead`) → `POST /api/leads`
+   (honeypot, 5/hour per IP hash, consent required) → table `leads`. Failed payments are reminded after
+   **10 min** (`PAYMENT_FAILED_REMINDER_DELAY_MINUTES`), abandoned ones after 30.
+12. **Languages:** each product has `mr`/`hi`/`en` editions. If the visitor's language has no edition,
    the page sells the edition that exists (`editionLocaleFor`). The order's `locale` = the edition sold
    = the PDF delivered.
 
@@ -250,6 +257,7 @@ no anon access to orders) + `onboarding.sql` + migrations:
 | 006 | `contact_messages` (RLS on, no policies → server only; IP stored as SHA-256) |
 | 007 | `reader_pages_mr/hi/en` text[] (sample-reader page images) |
 | 008 | Refund tracking: `refunded_amount` (₹), `refund_status` (partial/full), `refunded_at`, `razorpay_refund_id` — applied to Mumbai 2026-10-11 |
+| 009 | `leads` — interested buyers (phone unique, book, locale, source cancelled/failed, consent time + exact consent text, ip_hash, followup_sent_at, opted_out_at); RLS on, server only — applied to Mumbai 2026-10-11 |
 
 `supabase/checks/verify.sql` = pre-launch checks (written, never formally run).
 
@@ -457,7 +465,10 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 4. **Stage 6 go-live**: ✅ Razorpay live keys + new live webhook + real ₹99 purchase (2026-10-11).
    **Owner to do now:** hide/delete **#31 "test book" (₹1, visible)**; refund the ₹99 + ₹1 test payments in
    Razorpay, then press **Check with Razorpay** on those orders; in Razorpay → Live → Webhooks → **our**
-   webhook, also tick **`refund.created`** and **`refund.processed`**; run the k6 **Server direct** test.
+   webhook, also tick **`refund.created`** and **`refund.processed`**; run the k6 **Server direct** test;
+   get an Interakt **marketing** template approved for interested buyers (body `{{1}}` book title,
+   `{{2}}` book link) and set `INTERAKT_LEAD_TEMPLATE_NAME` (+ `_LANGUAGE`) in `/opt/kaf/app.env` → the
+   next-day follow-up switches on (cron, after reminders; skips buyers who paid or got a reminder that day).
    Still: confirm with the owner whether the live key was *regenerated* (if
    yes, the original site's Vercel needs the new secret within 24 h); an iPhone purchase from Instagram;
    warm the cache; Google Search Console (add domain, submit `/sitemap.xml`); update the Instagram bio and
@@ -555,6 +566,7 @@ Trust this file over these where they disagree:
 | 10-11 | `e989e59` `4c27f38` `0ae3439` `d40949e` `49d823f` | **Admin rework.** Overview = sales dashboard; Orders page (period tabs, clickable filter cards, search, book names, IST, wa.me, Resend); **order detail page** with Check with Razorpay / copy buyer link; **refund tracking** (migration 008, webhook `refund.*`, net revenue); **PDF uploads > 10 MB were failing** (Next 16 `proxy.ts` copies only 10 MB → "Unexpected end of form" → 500 / React #441) → `experimental.proxyClientMaxBodySize: "95mb"`, reproduced + verified locally; refused saves show "Not saved: …" and keep the form; Marathi-only titles got URL `-` → now `book-<id>`; no cover → PDF's first page; dashboard checked at 375/768/1280 px (2-row menu on phones, overflow fixes) |
 | 10-11 | `bd822ce` | Buyer: Back after paying no longer shows the stuck payment spinner (bfcache `pageshow` closes checkout); "you may also like" carousel on the order page |
 | 10-11 | loadtest | k6 Reel spike from Grafana Cloud Mumbai: 66,825 req, 300 req/s peak, 0 errors, p95 17 ms, 100 % edge, server CPU flat. Scripts: `loadtest/landing.js`, `origin.js`, `cloud-*.js` (free plan: 100 VUs, URLs grouped by `name` tag) |
+| 10-11 | (this commit) | **Didn't-pay flow**: failed-payment help screen; cancel → WhatsApp offers sign-up with consent (migration 009 `leads`, `/api/leads`, `src/lib/leads.ts`, `LeadCapture.tsx`, copy in `src/lib/lead-copy.ts`); **Interested buyers** admin page `/dashboard/leads` (cards, bought-later, follow-up, Remove = opt-out) + Overview card + menu item (phone menu 4+3); failed-payment reminder 10 min; next-day follow-up (off until the marketing template is set); privacy policy paragraph. Also: stale-deploy recovery (`src/lib/stale-action.ts`, error screens), docs-only pushes skip deploy, coloured order timeline. All checked at 375/768/1280 px with a fake Razorpay/checkout (no real orders) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

@@ -21,7 +21,7 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
   return (
     <AdminShell active="overview" title="Store overview" description={`Sales since live payments started (${since}). Test orders before that are not counted.`}>
       {/* Sales: today / 7 days / all time */}
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <PeriodCard title="Today" stats={sales.today} href="/dashboard/orders?period=today" highlight />
         <PeriodCard title="Last 7 days" stats={sales.week} href="/dashboard/orders?period=7d" />
         <PeriodCard title="All time" stats={sales.all} href="/dashboard/orders" />
@@ -122,6 +122,12 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
               </ol>
             )}
           </section>
+
+          {/* Interested buyers (cancelled payment → WhatsApp offers sign-up) */}
+          <Link href="/dashboard/leads" className="block rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5">
+            <h2 className="flex items-center justify-between font-bold text-brand-900">Interested buyers <ArrowRight className="h-4 w-4 text-brand-400" /></h2>
+            <p className="mt-1 text-sm text-brand-600"><b className="text-brand-900">{sales.interested.active}</b> want offers on WhatsApp{sales.interested.newWeek ? ` · ${sales.interested.newWeek} new this week` : ""}</p>
+          </Link>
 
           {/* Setup: only what is really waiting */}
           <Link href="/dashboard/setup" className="block rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5">
