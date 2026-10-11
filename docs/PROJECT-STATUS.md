@@ -555,3 +555,25 @@ Trust this file over these where they disagree:
 | 10-11 | `e989e59` `4c27f38` `0ae3439` `d40949e` `49d823f` | **Admin rework.** Overview = sales dashboard; Orders page (period tabs, clickable filter cards, search, book names, IST, wa.me, Resend); **order detail page** with Check with Razorpay / copy buyer link; **refund tracking** (migration 008, webhook `refund.*`, net revenue); **PDF uploads > 10 MB were failing** (Next 16 `proxy.ts` copies only 10 MB → "Unexpected end of form" → 500 / React #441) → `experimental.proxyClientMaxBodySize: "95mb"`, reproduced + verified locally; refused saves show "Not saved: …" and keep the form; Marathi-only titles got URL `-` → now `book-<id>`; no cover → PDF's first page; dashboard checked at 375/768/1280 px (2-row menu on phones, overflow fixes) |
 | 10-11 | `bd822ce` | Buyer: Back after paying no longer shows the stuck payment spinner (bfcache `pageshow` closes checkout); "you may also like" carousel on the order page |
 | 10-11 | loadtest | k6 Reel spike from Grafana Cloud Mumbai: 66,825 req, 300 req/s peak, 0 errors, p95 17 ms, 100 % edge, server CPU flat. Scripts: `loadtest/landing.js`, `origin.js`, `cloud-*.js` (free plan: 100 VUs, URLs grouped by `name` tag) |
+
+Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
+(19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
+variables, fonts, Cloudflare Free-plan limits …).
+
+---
+
+## 14. Doc index
+
+| Doc | Use it for | Freshness |
+|---|---|---|
+| **`docs/PROJECT-STATUS.md`** | This overview | Current |
+| `docs/go-live-plan.md` | Go-live stages 0–7 with checklists, problems log, hosting decision, test tables for Stages 4–6 | Current (minor stale bits, §12) |
+| `docs/ui-match-original.md` | Every UI decision vs the original site (items 1–49 + status) | Current |
+| `docs/HANDOFF.md` | Deep detail: buyer flow, catalog, dashboard, env vars, Interakt templates, Razorpay rules, local dev tips | Detail still right; hosting/DB parts stale (§12) |
+| `docs/setup-steps-lightsail.md` | Server setup steps 1–7 with "if it fails" fixes | Current (done) |
+| `docs/viral-launch-plan.md` | Original audit, cache/WAF rule tables (Phase 5), outage handling (Phase 9), per-Reel runbook | Rules current; status table stale |
+| `docs/deploy-lightsail.md` | Server runbook: manual deploy/rollback, monitoring, per-Reel routine, how code supports multiple servers | Two-server parts superseded |
+| `docs/setup-steps-ec2.md` | EC2 alternative | Not used |
+| `loadtest/README.md` | k6 tests (production-safe Reel spike ✅ passed 11 Oct, Server direct pending) + 12 failure drills | Current |
+| `supabase/checks/verify.sql` | Pre-launch DB checks | Not run |
+| `AGENTS.md` / `CLAUDE.md` | Next.js 16 warning (auto-written by `next dev`) | — |
