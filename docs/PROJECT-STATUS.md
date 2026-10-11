@@ -153,7 +153,8 @@ Full detail: `docs/HANDOFF.md` §3.
    about 8 s, the order page offers a "PDF on WhatsApp" popup.
 6. **माझी पुस्तके** (`/my-books`) lists orders saved on that phone and can resend the PDF to WhatsApp.
 7. A failed or abandoned payment with a phone number gets **one** `pending_followup_v2` reminder after
-   30 min (cron), at most one per phone + book per day.
+   **10 min** (both delays set to 10 on the server 2026-10-11; the cron runs every 10 min, so it arrives
+   10–20 min after the buyer leaves), at most one per phone + book per day, none if they paid since.
 8. If the browser dies after paying, the webhook, the order page and the 10-minute cron all ask Razorpay
    directly, so no paid order is lost.
 9. **After paying:** the order page also shows **"तुम्हाला हे देखील आवडेल"** (other books, buyer's language first).
@@ -168,7 +169,7 @@ Full detail: `docs/HANDOFF.md` §3.
    green **"Want this book later? Get offers and new books on WhatsApp"** box (number + UNTICKED consent box;
    at most once a day per device, never again once saved — localStorage `kaf-lead`) → `POST /api/leads`
    (honeypot, 5/hour per IP hash, consent required) → table `leads`. Failed payments are reminded after
-   **10 min** (`PAYMENT_FAILED_REMINDER_DELAY_MINUTES`), abandoned ones after 30.
+   **10 min** (`PAYMENT_FAILED_REMINDER_DELAY_MINUTES`); abandoned ones also 10 since the owner's change.
 12. **Languages:** each product has `mr`/`hi`/`en` editions. If the visitor's language has no edition,
    the page sells the edition that exists (`editionLocaleFor`). The order's `locale` = the edition sold
    = the PDF delivered.
@@ -403,7 +404,15 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
   Razorpay's webhook (a webhook 400 in Razorpay's log means a mismatch).
 - `AUTO_WHATSAPP_ON_PAYMENT=true`. `INTERAKT_TEMPLATE_*_MR/_HI` = `payment_sucess_pdf_v2`, language `mr`
   (Hindi buyers get Marathi text + the Hindi PDF until a Hindi template is approved).
-- `INTERAKT_REMINDER_TEMPLATE_NAME=pending_followup_v2`, `PAYMENT_REMINDER_DELAY_MINUTES=30`.
+- `INTERAKT_REMINDER_TEMPLATE_NAME=pending_followup_v2`. Reminder delays on the server (2026-10-11):
+  `PAYMENT_REMINDER_DELAY_MINUTES=10` (abandoned) and `PAYMENT_FAILED_REMINDER_DELAY_MINUTES=10` (failed);
+  code defaults are 30 / 10. Local copy `C:\Users\shivr\kaf-keys\app.env` updated to match (backup next to it).
+- **Cron** (cron-job.org → `POST /api/cron/reconcile` every 10 min, Bearer `CRON_SECRET`) does, in order:
+  reconcile unpaid orders with Razorpay → payment reminders → next-day lead follow-ups (off until
+  `INTERAKT_LEAD_TEMPLATE_NAME`). Changing a delay needs no cron change. Healthy response:
+  `{"ok":true,…,"reminders":{"due":…,"sent":…},"leads":{"due":0,"sent":0}}` — check cron-job.org → History = 200.
+- `INTERAKT_LEAD_TEMPLATE_NAME` / `_LANGUAGE` / `_LANGUAGE_HI` / `_LANGUAGE_EN`: interested-buyer follow-up
+  (marketing template, body `{{1}}` book, `{{2}}` link). Empty = off.
 - `ADMIN_EMAILS` (fails closed), `CRON_SECRET` (≥ 32 chars), `CHECKOUT_DEMO_MODE=false`.
 - `CLOUDFLARE_ZONE_ID` / `CLOUDFLARE_API_TOKEN` (purge on admin save + after every deploy).
 
@@ -569,6 +578,7 @@ Trust this file over these where they disagree:
 | 10-11 | `bd822ce` | Buyer: Back after paying no longer shows the stuck payment spinner (bfcache `pageshow` closes checkout); "you may also like" carousel on the order page |
 | 10-11 | loadtest | k6 Reel spike from Grafana Cloud Mumbai: 66,825 req, 300 req/s peak, 0 errors, p95 17 ms, 100 % edge, server CPU flat. Scripts: `loadtest/landing.js`, `origin.js`, `cloud-*.js` (free plan: 100 VUs, URLs grouped by `name` tag) |
 | 10-11 | `99050fb` | **Didn't-pay flow**: failed-payment help screen; cancel → WhatsApp offers sign-up with consent (migration 009 `leads`, `/api/leads`, `src/lib/leads.ts`, `LeadCapture.tsx`, copy in `src/lib/lead-copy.ts`); **Interested buyers** admin page `/dashboard/leads` (cards, bought-later, follow-up, Remove = opt-out) + Overview card + menu item (phone menu 4+3); failed-payment reminder 10 min; next-day follow-up (off until the marketing template is set); privacy policy paragraph. Also: stale-deploy recovery (`src/lib/stale-action.ts`, error screens), docs-only pushes skip deploy, coloured order timeline. All checked at 375/768/1280 px with a fake Razorpay/checkout (no real orders) |
+| 10-11 | server config | Owner set both reminder delays to **10 min** in `/opt/kaf/app.env` and restarted (live `99050fb` healthy, cron endpoint answering); local app.env copy synced |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
