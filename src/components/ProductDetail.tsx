@@ -314,7 +314,7 @@ export default function ProductDetail({
           </div>
 
           {/* FAQ */}
-          <div className="mt-8">
+          <div className="cv-auto mt-8">
             <h3 className="font-deva flex items-center gap-2 text-base font-bold text-brand-teal sm:text-lg">
               <ShieldCheck className="h-5 w-5" aria-hidden="true" /> {t.faqTitle}
             </h3>
@@ -337,7 +337,7 @@ export default function ProductDetail({
 
       {/* Related products */}
       {related.length > 0 && (
-        <section className="mt-16">
+        <section className="cv-auto mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <h2 className="font-deva text-xl font-extrabold text-brand-900 sm:text-2xl">

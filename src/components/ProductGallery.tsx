@@ -6,7 +6,11 @@ import type { Product } from "@/data/catalog";
 import { coverSrc, coverSrcSet, coverThumbSrc } from "@/lib/covers";
 import { PREVIEW_PAGES } from "@/lib/previews";
 import CoverImage from "./CoverImage";
-import SampleReader from "./SampleReader";
+import dynamic from "next/dynamic";
+
+// The reader (and PDF.js behind it) is only downloaded when someone opens it —
+// it was part of every book page's first JavaScript (PageSpeed 2026-10-11).
+const SampleReader = dynamic(() => import("./SampleReader"), { ssr: false });
 import { GALLERY_COPY, type GalleryCopy } from "@/lib/product-copy";
 import type { Locale } from "@/lib/i18n";
 

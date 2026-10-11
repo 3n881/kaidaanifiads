@@ -84,6 +84,10 @@ const nextConfig = (() => {
       ];
     },
     experimental: {
+      // The 16 KB stylesheet goes inside the page HTML instead of a separate
+      // request, so phones can paint without one more round trip (PageSpeed
+      // 2026-10-11). Experimental in Next 16 — production builds only.
+      inlineCss: true,
       // Admin-only forms can upload one or more localized PDFs plus previews.
       // Keep this below Cloudflare's common 100 MB request ceiling.
       serverActions: { bodySizeLimit: "95mb" },
