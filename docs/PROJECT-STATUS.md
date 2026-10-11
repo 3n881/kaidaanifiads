@@ -319,7 +319,14 @@ LCP 3.0 s, SI 3.0 s, TBT 50 ms, CLS 0; server answer 10 ms).
 
 **Run right after the deploy (22:15) → 90:** the HTML was a HIT (server 6 ms), but the new release's CSS
 (1.2 s) and font (2.1 s) were cold at PageSpeed's Cloudflare location → white 5 of 8 frames, SI 4.5 s. Fixed by the
-post-deploy warm-up + Smart Tiered Cache (§7).
+post-deploy warm-up + Smart Tiered Cache (§7). Checked right after the `d7518d0` deploy: the release's CSS and
+`/ebooks` were already a HIT at Marseille (Airtel's location).
+
+**Re-run 22:25 → 93** (FCP 1.7 s · LCP 3.1 s · SI **3.0 s** (was 4.5) · TBT **0 ms** · CLS 0; CSS **0.18 s** (was 1.2),
+font **0.35 s** (was 2.1), white 3 of 8 filmstrip frames (was 5)). That run probably loaded just before
+`d7518d0` went live (it referenced the previous release's files, which were cached by then), so the warm-up is
+proven by the HIT check above, not by this run. What's left is the lab itself: ≈ 1.1 s white = the slow-4G phone
+connecting; ≈ 1.2 s of LCP = the emulated slow CPU drawing the page. Nothing big left to gain in code.
 
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
@@ -617,7 +624,8 @@ Trust this file over these where they disagree:
 | 10-11 | `4b1fbd2` | **Catalog cached across requests** (`src/lib/products.ts`: `unstable_cache` 5 min, tag `products`, + React `cache()` per request). `/order` and other per-request pages no longer query Supabase on every visit (local prod build: first request 0.16 s, then 0.013–0.024 s). Admin save/delete/show-hide call `updateTag("products")` (read-your-writes); script changes appear within 5 min. Chose `unstable_cache` over `"use cache"` because that needs the app-wide Cache Components switch |
 | 10-11 | loadtest | **Server direct re-run after caching** (live `4b1fbd2`): 11,728 req, 0 errors, **all thresholds passed**, 1 dropped iteration (was 701); order page median ≈ 0.40 s flat from 10 to 60 req/s (≈ 0.25 s of it is network from the dev PC), p95 0.48–0.93 s up to 40 req/s and 0.78–1.6 s at 50–60 (was 2.2–4.2 s), no stall |
 | 10-11 | `0a6b5c2` | PageSpeed fell to 87 after the evening deploys → `deploy.sh` now purges only pages (30 prefixes + home URLs) instead of everything, so images/build files stay cached; same purge run once by hand (pages MISS, covers HIT). Re-run 93. Answered "white first second": network time on the slow-4G lab phone, splash screen wouldn't help (§7a) |
-| 10-11 | (this commit) | Run straight after that deploy scored 90 (new CSS/font cold at Cloudflare). Owner turned on **Smart Tiered Cache** (BOM + SIN); `deploy.sh` now **warms** pages, book pages, build files and fonts after the purge |
+| 10-11 | `d7518d0` | Run straight after that deploy scored 90 (new CSS/font cold at Cloudflare). Owner turned on **Smart Tiered Cache** (BOM + SIN); `deploy.sh` now **warms** pages, book pages, build files and fonts after the purge |
+| 10-11 | docs | PageSpeed re-run 22:25 → **93** (SI 3.0 s, TBT 0, CSS 0.18 s, font 0.35 s, white 3/8 frames); new release's CSS + `/ebooks` HIT at Marseille right after deploy |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
