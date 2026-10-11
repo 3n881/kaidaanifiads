@@ -22,9 +22,9 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
     <AdminShell active="overview" title="Store overview" description={`Sales since live payments started (${since}). Test orders before that are not counted.`}>
       {/* Sales: today / 7 days / all time */}
       <div className="grid gap-3 lg:grid-cols-3">
-        <PeriodCard title="Today" stats={sales.today} highlight />
-        <PeriodCard title="Last 7 days" stats={sales.week} />
-        <PeriodCard title="All time" stats={sales.all} />
+        <PeriodCard title="Today" stats={sales.today} href="/dashboard/orders?period=today" highlight />
+        <PeriodCard title="Last 7 days" stats={sales.week} href="/dashboard/orders?period=7d" />
+        <PeriodCard title="All time" stats={sales.all} href="/dashboard/orders" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -40,6 +40,7 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
               <div className="mt-3 space-y-4">
                 {sales.paidNotDownloaded.length > 0 && (
                   <AttentionList
+                    href="/dashboard/orders?status=notdownloaded"
                     title={`Paid but not downloaded (${sales.paidNotDownloaded.length})`}
                     hint="Paid more than 15 minutes ago and never downloaded. Send the PDF from Orders (Resend WhatsApp) or call them."
                     rows={sales.paidNotDownloaded}
@@ -48,6 +49,7 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
                 )}
                 {sales.whatsappMissing.length > 0 && (
                   <AttentionList
+                    href="/dashboard/orders?status=paid"
                     title={`WhatsApp not sent (${sales.whatsappMissing.length})`}
                     hint="Paid, but no WhatsApp message went out (no number from Razorpay, or Interakt failed). Use Resend WhatsApp in Orders."
                     rows={sales.whatsappMissing}
@@ -145,9 +147,9 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
   );
 }
 
-function PeriodCard({ title, stats, highlight = false }: { title: string; stats: PeriodStats; highlight?: boolean }) {
+function PeriodCard({ title, stats, href, highlight = false }: { title: string; stats: PeriodStats; href: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-2xl p-5 shadow-[var(--shadow-card)] ${highlight ? "bg-brand-teal text-white" : "border border-brand-100 bg-white text-brand-900"}`}>
+    <Link href={href} className={`block rounded-2xl p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 ${highlight ? "bg-brand-teal text-white" : "border border-brand-100 bg-white text-brand-900"}`}>
       <p className={`text-xs font-bold uppercase tracking-wide ${highlight ? "text-white/70" : "text-brand-400"}`}>{title}</p>
       <p className="mt-2 flex items-center text-3xl font-extrabold"><IndianRupee className="h-6 w-6" aria-hidden="true" />{stats.revenue.toLocaleString("en-IN")}</p>
       <div className={`mt-3 grid grid-cols-3 gap-2 text-xs ${highlight ? "text-white/85" : "text-brand-500"}`}>
@@ -155,14 +157,14 @@ function PeriodCard({ title, stats, highlight = false }: { title: string; stats:
         <span title="Paid ÷ Buy taps that opened Razorpay"><b className="text-sm">{pct(stats.conversion)}</b> of {stats.checkouts} checkouts</span>
         <span><XCircle className="mb-0.5 inline h-3.5 w-3.5" /> <b className="text-sm">{stats.failed}</b> failed</span>
       </div>
-    </div>
+    </Link>
   );
 }
 
-function AttentionList({ title, hint, rows, bookName }: { title: string; hint: string; rows: SalesOrder[]; bookName: (id: number | null) => string }) {
+function AttentionList({ title, hint, rows, bookName, href }: { title: string; hint: string; rows: SalesOrder[]; bookName: (id: number | null) => string; href: string }) {
   return (
     <div>
-      <p className="text-sm font-bold text-amber-800">{title}</p>
+      <Link href={href} className="flex items-center gap-1 text-sm font-bold text-amber-800 hover:underline">{title} <ArrowRight className="h-3.5 w-3.5" /></Link>
       <p className="text-xs text-brand-500">{hint}</p>
       <ul className="mt-2 divide-y divide-brand-50 rounded-xl border border-brand-100">
         {rows.map((o) => (
