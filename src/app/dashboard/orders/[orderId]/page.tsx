@@ -33,15 +33,31 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
     : order.status === "failed" ? { label: "Failed", className: "bg-danger-500/10 text-danger-600" }
     : { label: "Not paid", className: "bg-brand-100 text-brand-600" };
 
-  const timeline = [
-    { at: order.created_at, text: "Buy tapped — Razorpay opened" },
-    { at: order.paid_at, text: `Paid ₹${order.amount}` },
-    { at: order.reminder_sent_at, text: "Payment reminder handled (WhatsApp)" },
-    { at: order.last_downloaded_at, text: `Last download (${order.download_count ?? 0} total)` },
-    { at: order.refunded_at, text: `Refund ₹${refunded}${order.refund_status === "full" ? " (full)" : " (partial)"}` },
-  ]
-    .filter((e): e is { at: string; text: string } => Boolean(e.at))
-    .sort((a, b) => a.at.localeCompare(b.at));
+  // Colour = meaning: green success, red failure, amber waiting/attention,
+  // purple refund, blue neutral start.
+  type Tone = "neutral" | "success" | "danger" | "warning" | "refund";
+  const timeline: Array<{ at: string | null; text: string; tone: Tone; label?: string }> = [];
+  timeline.push({ at: order.created_at, text: "Buy tapped — Razorpay opened", tone: "neutral" });
+  if (paid) timeline.push({ at: order.paid_at, text: `Paid ₹${order.amount}`, tone: "success" });
+  else if (order.status === "failed") timeline.push({ at: null, text: "Payment failed (declined or cancelled at Razorpay)", tone: "danger" });
+  else timeline.push({ at: null, text: "Not paid — Razorpay was closed or the payment is still pending", tone: "warning" });
+  if (order.reminder_sent_at) timeline.push({ at: order.reminder_sent_at, text: "Payment reminder sent on WhatsApp", tone: "warning", label: "Reminder" });
+  if (paid) {
+    timeline.push(order.whatsapp_sends
+      ? { at: null, text: `PDF sent on WhatsApp (${order.whatsapp_sends}×)`, tone: "success" }
+      : { at: null, text: "PDF not sent on WhatsApp yet — use Resend", tone: "danger" });
+    timeline.push(order.download_count
+      ? { at: order.last_downloaded_at, text: `Downloaded (${order.download_count} total, last one shown)`, tone: "success" }
+      : { at: null, text: "Not downloaded yet — follow up on WhatsApp", tone: "danger" });
+  }
+  if (refunded > 0) timeline.push({ at: order.refunded_at, text: `Refund ₹${refunded}${order.refund_status === "full" ? " (full)" : " (partial)"}`, tone: "refund" });
+  const TONE: Record<Tone, { dot: string; text: string; chip: string; label: string }> = {
+    neutral: { dot: "bg-blue-500", text: "text-brand-900", chip: "bg-blue-50 text-blue-700", label: "Start" },
+    success: { dot: "bg-green-600", text: "text-green-800", chip: "bg-green-100 text-green-700", label: "Done" },
+    danger: { dot: "bg-red-600", text: "text-red-800", chip: "bg-red-100 text-red-700", label: "Problem" },
+    warning: { dot: "bg-amber-500", text: "text-amber-800", chip: "bg-amber-100 text-amber-800", label: "Waiting" },
+    refund: { dot: "bg-purple-600", text: "text-purple-800", chip: "bg-purple-100 text-purple-700", label: "Refund" },
+  };
 
   return (
     <AdminShell active="orders" title="Order details">
@@ -80,11 +96,14 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
           <section className="rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]">
             <h2 className="font-bold text-brand-900">Timeline</h2>
             <ol className="mt-3 space-y-3 border-l-2 border-brand-100 pl-4">
-              {timeline.map((e) => (
-                <li key={`${e.at}-${e.text}`} className="relative">
-                  <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-teal" aria-hidden="true" />
-                  <p className="text-sm font-semibold text-brand-900">{e.text}</p>
-                  <p className="text-xs text-brand-500">{ist(e.at)}</p>
+              {timeline.map((e, i) => (
+                <li key={`${i}-${e.text}`} className="relative">
+                  <span className={`absolute -left-[23px] top-1 h-3.5 w-3.5 rounded-full ring-2 ring-white ${TONE[e.tone].dot}`} aria-hidden="true" />
+                  <p className={`flex flex-wrap items-center gap-2 text-sm font-semibold ${TONE[e.tone].text}`}>
+                    {e.text}
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TONE[e.tone].chip}`}>{e.label ?? TONE[e.tone].label}</span>
+                  </p>
+                  {e.at && <p className="text-xs text-brand-500">{ist(e.at)}</p>}
                 </li>
               ))}
             </ol>
