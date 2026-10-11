@@ -1,5 +1,5 @@
 /**
- * Builds the sample-reader page images (first 6 pages, WebP 200/400/800/1600)
+ * Builds the sample-reader page images (first 6 pages, WebP 200/400/600/800/1600)
  * for every edition that has a PDF, from its free preview PDF (or the full
  * PDF when no preview exists), and saves them in products.reader_pages_<l>.
  *

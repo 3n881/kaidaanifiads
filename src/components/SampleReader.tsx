@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { BookOpen, ChevronLeft, ChevronRight, Hand, Loader2, RotateCw, X, ZoomIn, ZoomOut } from "lucide-react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import type { Product } from "@/data/catalog";
-import { coverSrc, mediaUrl } from "@/lib/covers";
+import { coverThumbSrc, mediaUrl } from "@/lib/covers";
 import type { GalleryCopy } from "@/lib/product-copy";
 import BuyButton from "./BuyButton";
 
@@ -313,7 +313,7 @@ export default function SampleReader({
         <div className="flex flex-col gap-3 border-t border-white/10 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
           <div className="no-scrollbar flex min-w-0 flex-1 gap-2 overflow-x-auto">
             {Array.from({ length: total }, (_, i) => {
-              const src = mode === "pdf" ? thumbs[i] : shown[i] ? coverSrc(shown[i]) : "";
+              const src = mode === "pdf" ? thumbs[i] : shown[i] ? coverThumbSrc(shown[i]) : "";
               return (
                 <button
                   key={i}

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { BookOpen, ChevronLeft, ChevronRight, Maximize2, Sparkles } from "lucide-react";
 import type { Product } from "@/data/catalog";
-import { coverSrc, coverSrcSet } from "@/lib/covers";
+import { coverSrc, coverSrcSet, coverThumbSrc } from "@/lib/covers";
 import { PREVIEW_PAGES } from "@/lib/previews";
 import CoverImage from "./CoverImage";
 import SampleReader from "./SampleReader";
@@ -127,7 +127,7 @@ export default function ProductGallery({
               className={`shrink-0 overflow-hidden rounded-lg border-2 bg-white text-center ${selected === index ? "border-brand-teal" : "border-brand-100"}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- tiny pre-sized storage thumbnail. */}
-              <img src={coverSrc(image)} alt="" width={48} height={64} loading="lazy" className="h-16 w-12 object-cover" />
+              <img src={coverThumbSrc(image)} alt="" width={48} height={64} loading="lazy" className="h-16 w-12 object-cover" />
               <span className="block py-0.5 text-[10px] font-bold text-brand-600">
                 {index === 0 ? g.cover : index + 1}
               </span>

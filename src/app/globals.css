@@ -37,8 +37,11 @@
   /* WhatsApp */
   --color-whatsapp: #25d366;
 
-  --font-sans: var(--font-geist), var(--font-devanagari), system-ui, sans-serif;
-  --font-deva: var(--font-devanagari), var(--font-geist), system-ui, sans-serif;
+  /* Geist covers only Latin (unicode-range), so Marathi/Hindi letters go to the
+     device's Devanagari font: Android Noto Sans Devanagari, Windows Nirmala UI,
+     iPhone/Mac Kohinoor Devanagari. No Devanagari web font = nothing to download. */
+  --font-sans: var(--font-geist), "Noto Sans Devanagari", "Nirmala UI", "Kohinoor Devanagari", system-ui, sans-serif;
+  --font-deva: var(--font-sans);
 
   --radius: 0.65rem;
 

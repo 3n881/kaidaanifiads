@@ -219,6 +219,10 @@ reloads Caddy → **purges the whole Cloudflare cache** → closes port 22 again
   origin TTL; Free plan can't use a custom cache key, so `?igsh=` links miss once each), WAF
   `allow-razorpay-webhook` + `block-bad-methods`, rate limit `checkout-rate-limit` (30 POST / 10 s per IP
   → block 10 s). Rocket Loader, Email obfuscation and Bot Fight Mode are **off**; Smart Tiered Cache is on.
+  **Transform Rule `strip-tracking-query`** (URL rewrite, 2026-10-11): on `/`, `/ebooks*`, `/combos*`, a query
+  string without `_rsc=` is removed before the cache lookup, so `?igsh=` / `?fbclid=` links are cache HITs
+  (before: every Instagram link was a MISS, 370–700 ms vs 160–190 ms). The browser URL keeps its query
+  (`?lang=Hindi` is read client-side).
 - **Funnel:** `select * from funnel_daily;` in Supabase SQL.
 - **Per-Reel routine:** no deploys in the hour before a Reel; watch the cache HIT ratio and
   `funnel_daily`; afterwards follow up on paid-but-not-downloaded orders (`deploy-lightsail.md` §9).
@@ -313,6 +317,7 @@ Backfill: `npm run db:reader-pages` (`--force`, `--dry-run`, `--only=<slug>`).
 | `npm run db:seed` | Upserts the seed catalog from `src/data/catalog.ts` (rarely needed now) |
 | `npm run db:upload-pdfs` | `content/ebooks/*.pdf` → `pdfs` bucket + preview PDF. Does **not** build reader pages or update `available_locales` |
 | `npm run db:reader-pages` | Builds reader page images for editions that lack them |
+| `npm run db:cover-600` | Adds the 600 px variant to images uploaded before it existed (only adds files) |
 | `scripts/create_client_intake.mjs` | Old client-intake spreadsheet generator (git-ignored, machine-specific) |
 
 ### Known small code issues (low priority)
@@ -375,8 +380,13 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 - **Don't add `loading.tsx` under `ebooks/` or `combos/`.** List-page skeletons live in the `(list)` route
   groups. A skeleton on book pages makes unknown slugs return 200 instead of 404.
 - Bash heredocs containing Devanagari broke several times. Write scripts to a file, or use the Edit tool.
-- Fonts are self-hosted in `src/app/fonts/` (`next/font/local`): Geist + Noto Sans Devanagari. Don't go
-  back to `next/font/google`, because the build-time download is flaky (go-live problem 18).
+- Fonts: only **Geist** (English, Latin letters only via `unicode-range`) is a web font, self-hosted in
+  `src/app/fonts/`, **not preloaded**. Marathi/Hindi use the device's Devanagari font (as on the original
+  site). Don't re-add font preloads or a Devanagari web font without measuring: Chrome holds the first
+  paint for preloaded fonts (book page first paint 5.9 s → ~1.5 s when removed, 2026-10-11). Don't go back
+  to `next/font/google` (flaky build-time download, go-live problem 18).
+- Images: covers / preview / reader pages have 200/400/600/800 px WebP (+1600 for reader pages). New
+  uploads make all sizes; `npm run db:cover-600` backfilled 600 px for older images.
 
 ---
 
@@ -437,7 +447,7 @@ Trust this file over these where they disagree:
 | Doc | Stale part | Truth now |
 |---|---|---|
 | `HANDOFF.md` §1–2, §7–8 | Says ours = Replov, Supabase = Tokyo `yjsm…`, deploy = "redeploy on Replov", cron URL on Replov, Lightsail "planned, not live" | Production = `kaydyachaanifayddyacha.com` on Lightsail, Supabase Mumbai `ntqwvfks…`, push-to-deploy, cron on the new domain |
-| `HANDOFF.md` §2 | Fonts / "Turbopack" | Geist + Noto Sans Devanagari, self-hosted |
+| `HANDOFF.md` §2 | Fonts / "Turbopack" | Geist (Latin, not preloaded) + the device's Devanagari font |
 | `HANDOFF.md` §4 | "4 test orders" | 9 test orders (§3 here) |
 | `deploy-lightsail.md`, `viral-launch-plan.md` §5b | **Two** servers + Load Balancing (≈ ₹4,900/mo) | **One** server (≈ ₹3,300/mo incl. Supabase Pro); second server later only if needed |
 | `viral-launch-plan.md` status table / "next actions" | Phase states from 09-26 | Migrations 001–007 applied; Phases 1–3, 9 done; 5 done (Cloudflare live); 4, 7, 8 pending |
@@ -466,6 +476,7 @@ Trust this file over these where they disagree:
 | 10-10 | `03af860` `85d4131` `63c3183` | Hero animation fix, favicon/app icons from the logo, **UI match with the original** (items 1–36, tracker `ui-match-original.md`), Caddy static-file fallback between containers during deploys |
 | 10-10 | `53982ee` | **Language picker + full mr/hi/en UI**, contact form + `/dashboard/messages` (migration 006), "where is my PDF" help on the order page |
 | 10-10 | `f238d38` `d0552dc` `7d087da` | **In-page sample reader** (no new tab), reader pages = WebP images made from the PDF (migration 007, `db:reader-pages`, built in the dashboard on upload); phone carousel autoplay; reader as a pop-up on phones, hand cursor, frosted loading on tapped cards |
+| 10-11 | (this commit) | **Speed pass from PageSpeed** (home 85, book page 75 / LCP 6.0 s): no font preloads, Geist limited to Latin, Devanagari web font dropped (device font), `/ebooks` + `/combos` lists in the HTML (no `useSearchParams`), 600 px image variant + 200 px thumbnails. Cloudflare Transform Rule so Instagram `?igsh=` links hit the cache (see §7) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

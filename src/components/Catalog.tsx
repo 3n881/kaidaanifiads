@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { Search, ArrowUpDown, Home, BookOpen, Scale, X } from "lucide-react";
 import type { Product, Language } from "@/data/catalog";
 import {
@@ -41,14 +40,22 @@ export default function Catalog({
 }) {
   const { locale } = useLanguage();
   const copy = UI_COPY[locale];
-  const searchParams = useSearchParams();
-  const initialLang = (searchParams.get("lang") as Language | "All") ?? "All";
-  const validInitial = LANGUAGES.includes(initialLang) ? initialLang : "All";
-
   const [langSelection, setLangSelection] = useState<{
     locale: typeof locale;
     value: Language | "All";
-  }>({ locale, value: validInitial });
+  }>({ locale, value: "All" });
+
+  // `?lang=Hindi` (old /ebooks/hindi links) is read after the first paint, not
+  // with useSearchParams — that would make the whole list client-only, so the
+  // page HTML had no books and phones saw "लोड होत आहे…" until the JS ran.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("lang") as Language | null;
+    if (!requested || !LANGUAGES.includes(requested)) return;
+    const id = window.setTimeout(() => setLangSelection({ locale, value: requested }), 0);
+    return () => window.clearTimeout(id);
+    // Only on first load; later changes come from the tabs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [cat, setCat] = useState<Category | "All">("All");
   const [sort, setSort] = useState<SortKey>("featured");
   const [query, setQuery] = useState("");

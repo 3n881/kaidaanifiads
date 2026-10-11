@@ -23,7 +23,7 @@ Status: ⬜ to do · 🟡 in progress · ✔️ done (commit) · ⏸ waiting for
 
 | # | Original | Ours | Decision | Status | Notes |
 |---|---|---|---|---|---|
-| 5 | English text in Geist; Marathi/Hindi in the phone's own font | Lato + Noto Sans Devanagari | ✅ | ✔️ 10-10 | Geist (self-hosted, 1 variable file 29 KB) replaces Lato (3 files 69 KB) |
+| 5 | English text in Geist; Marathi/Hindi in the phone's own font | Lato + Noto Sans Devanagari | ✅ | ✔️ 10-10 | Geist (self-hosted, 1 variable file 29 KB) replaces Lato (3 files 69 KB). 10-11: Marathi/Hindi now in the phone's own font too (Noto web font removed for speed) |
 | 6 | Footer: gold-gradient title, big tagline, pink→yellow Instagram button, gold headings + dot bullets, icon-box contact rows with labels, proprietor/Udyam pill, decorative glow | Plain, compact | ✅ | ✔️ 10-10 | Rebuilt from the original markup; Instagram link set to the real account |
 | 7 | Footer "Sitemap" → HTML page `/site-index` | → raw `/sitemap.xml` | ✅ | ✔️ 10-10 | New `/site-index` page (+ in sitemap.xml); old redirect `/site-index → /ebooks` removed |
 | 8 | Bottom nav: "कॉम्बो"; active = light bg + navy icon | "कॉम्बो पॅक्स"; solid navy + white icon | ✅ | ✔️ 10-10 |  |

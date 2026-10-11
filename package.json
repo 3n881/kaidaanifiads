@@ -10,7 +10,8 @@
     "lint": "eslint",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "db:upload-pdfs": "tsx --env-file=.env.local scripts/upload-pdfs.ts",
-    "db:reader-pages": "tsx --env-file=.env.local scripts/build-reader-pages.ts"
+    "db:reader-pages": "tsx --env-file=.env.local scripts/build-reader-pages.ts",
+    "db:cover-600": "tsx --env-file=.env.local scripts/add-cover-600.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

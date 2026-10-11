@@ -1,5 +1,5 @@
 // Server / script use only: stores the sample-reader page images.
-// Each page is saved as 200/400/800/1600 px WebP in the public `covers` bucket
+// Each page is saved as 200/400/600/800/1600 px WebP in the public `covers` bucket
 // under reader/<slug>-<locale>-v<ts>-p<n>-<w>.webp (versioned names, cached
 // for a year). Returns the 800 px URLs in page order; the reader derives the
 // other widths (same convention as covers, see src/lib/covers.ts).
@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** How many first pages the reader shows (matches the free preview PDF). */
 export const READER_PAGES = 6;
-const WIDTHS = [200, 400, 800, 1600] as const;
+const WIDTHS = [200, 400, 600, 800, 1600] as const;
 
 export async function uploadReaderPages(
   admin: SupabaseClient,
