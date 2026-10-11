@@ -1,7 +1,8 @@
 "use server";
 
 import sharp from "sharp";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { CATALOG_TAG } from "@/lib/products";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { ADMIN_UPLOAD_TIMEOUT_MS, getSupabaseAdmin } from "@/lib/supabase/server";
@@ -15,6 +16,9 @@ import { previewPdfPath } from "@/lib/previews";
 import { READER_PAGES, uploadReaderPages } from "@/lib/reader-pages";
 
 async function revalidatePublic(slug?: string, isCombo?: boolean) {
+  // The cached catalog first (src/lib/products.ts), so the pages below are
+  // rebuilt from the edit — updateTag = read-your-own-writes in a Server Action.
+  updateTag(CATALOG_TAG);
   revalidatePath("/");
   revalidatePath("/ebooks");
   revalidatePath("/combos");

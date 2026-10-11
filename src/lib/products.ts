@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { getSupabase } from "./supabase/server";
 import { isSupabaseConfigured } from "./supabase/config";
 import { categoryOf } from "./catalog";
@@ -111,15 +112,17 @@ function rowToProduct(r: ProductRow): Product {
 }
 
 // ---------------------------------------------------------------------------
-// Cached fetch of the full active catalog. One DB round-trip is shared across
-// the whole request tree and cached for `revalidate` seconds (keeps DB usage
-// low). Admin writes call revalidateTag("products") to refresh instantly.
+// The full active catalog, cached two ways:
+// - across requests: Next's data cache for 5 min, tag CATALOG_TAG. Pages that
+//   are rendered per request (/order, the dashboard) used to query Supabase on
+//   every visit just for the header search box (k6 "Server direct", 11 Oct).
+//   Admin saves call updateTag(CATALOG_TAG) so an edit shows at once; changes
+//   made outside the app (scripts) appear within 5 min, like the ISR pages.
+// - within one request: React cache() — one lookup for layout + page + related.
 // ---------------------------------------------------------------------------
-// React cache() dedupes this to ONE query per request across the whole render
-// tree (layout + page + related). Cross-request caching comes from route-level
-// `export const revalidate` on the pages — together that keeps DB hits (and
-// your Supabase credits) low.
-const loadFromSupabase = cache(async (): Promise<Product[]> => {
+export const CATALOG_TAG = "products";
+
+async function fetchCatalogFromSupabase(): Promise<Product[]> {
   const supabase = getSupabase();
   const current = await supabase
     .from("products")
@@ -158,7 +161,15 @@ const loadFromSupabase = cache(async (): Promise<Product[]> => {
   }
   if (current.error) throw current.error;
   return (current.data as unknown as ProductRow[]).map(rowToProduct);
-});
+}
+
+// Errors are thrown, never cached — a failed read is retried next request.
+const loadFromSupabase = cache(
+  unstable_cache(fetchCatalogFromSupabase, ["public-catalog-v1"], {
+    revalidate: 300,
+    tags: [CATALOG_TAG],
+  }),
+);
 
 /**
  * Loads the catalog. Uses LIVE Supabase whenever it's configured; before keys

@@ -488,7 +488,6 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    port-22 rule with the new IP.
 
 ### Ideas (not started)
-- **Cache the catalog read in the root layout** (search box) so dynamic pages (`/order`, dashboard) stop querying Supabase per request — found by the Server direct load test; should raise the ~30–40 req/s comfortable limit.
 - Order CSV export (accounts/GST) · nightly WhatsApp sales summary to the owner · move dashboard totals into
   SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
   block downloads for fully refunded orders (today a refund does not revoke access).
@@ -581,6 +580,7 @@ Trust this file over these where they disagree:
 | 10-11 | `99050fb` | **Didn't-pay flow**: failed-payment help screen; cancel → WhatsApp offers sign-up with consent (migration 009 `leads`, `/api/leads`, `src/lib/leads.ts`, `LeadCapture.tsx`, copy in `src/lib/lead-copy.ts`); **Interested buyers** admin page `/dashboard/leads` (cards, bought-later, follow-up, Remove = opt-out) + Overview card + menu item (phone menu 4+3); failed-payment reminder 10 min; next-day follow-up (off until the marketing template is set); privacy policy paragraph. Also: stale-deploy recovery (`src/lib/stale-action.ts`, error screens), docs-only pushes skip deploy, coloured order timeline. All checked at 375/768/1280 px with a fake Razorpay/checkout (no real orders) |
 | 10-11 | server config | Owner set both reminder delays to **10 min** in `/opt/kaf/app.env` and restarted (live `99050fb` healthy, cron endpoint answering); local app.env copy synced |
 | 10-11 | loadtest | k6 Server direct: 11,028 req, 0 errors, comfortable ≈ 30–40 req/s uncached (6–8× a Reel's origin load). Found: every `/order` visit reads the whole catalog from Supabase for the header search box — caching it (5 min) is the next easy capacity win |
+| 10-11 | (this commit) | **Catalog cached across requests** (`src/lib/products.ts`: `unstable_cache` 5 min, tag `products`, + React `cache()` per request). `/order` and other per-request pages no longer query Supabase on every visit (local prod build: first request 0.16 s, then 0.013–0.024 s). Admin save/delete/show-hide call `updateTag("products")` (read-your-writes); script changes appear within 5 min. Chose `unstable_cache` over `"use cache"` because that needs the app-wide Cache Components switch |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
