@@ -61,11 +61,11 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Server | Lightsail `kaf-a`, $12 plan (2 GB / 2 vCPU), Ubuntu 24.04, `ap-south-1a`, static IP `kaf-a-ip`, automatic snapshots. Files in `/opt/kaf/` |
 | Cloudflare | Free plan. Zone `kaydyachaanifayddyacha.com`, SSL Full (strict) with an Origin certificate (valid to 2041), cache + WAF rules (§7) |
 | Domain registrar | Hostinger (bought 2026-10-03); nameservers point to Cloudflare |
-| Razorpay | Client's account (shared with the original site). **Test mode** on our site; live keys not set up yet |
+| Razorpay | Client's account (shared with the original site). **LIVE keys on our site since 2026-10-11** (own live webhook, its secret in `kaf-keys/razorpay-live-webhook-secret.txt`; test keys kept in `/opt/kaf/app.env.test-keys-backup`) |
 | Interakt (WhatsApp API) | Client's account. Sender name "AS Consultancy Services". Templates `payment_sucess_pdf_v2` (sic) and `pending_followup_v2` |
 | cron-job.org | `POST https://kaydyachaanifayddyacha.com/api/cron/reconcile` every 10 min, `Authorization: Bearer <CRON_SECRET>` |
 | UptimeRobot | HTTPS monitor on `/api/health` every 5 min |
-| Meta Pixel | Code ready, **off**. Waiting for the client to confirm pixel IDs |
+| Meta Pixel | Code ready, **off**. Waiting for pixel ID + domain-verification code + Conversions API token from the client (§11 item 8) |
 
 ### Where secrets live (never commit, never paste in chat)
 
@@ -96,9 +96,9 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | **Stage 4: functional tests on the live domain** | 🟡 **In progress.** The DB shows 3 paid test orders on 10-10 at 21:25–21:47 IST (#27, #30, #25) plus 1 abandoned. Results are not yet written up. Run the full checklist in `go-live-plan.md` Stage 4 |
 | Page speed (first screen) | ✅ 2026-10-11 — PageSpeed mobile: home **93**, book page **85** (§7a) |
 | Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). WebPageTest, real-phone check and k6 `loadtest/` (written, never run) still to do |
-| Stage 6: go-live (Razorpay **live** keys + announce) | ⬜ Blocked on Razorpay live key decision + Stage 4/5 |
+| Stage 6: go-live (Razorpay **live** keys + announce) | 🟡 **Live payments working 2026-10-11**: real ₹99 purchase 14:50 IST (#30) → paid, downloaded, PDF on WhatsApp, webhook saved the phone. Refund that test payment in Razorpay. Not announced yet (Search Console, Instagram bio pending) |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
-| Meta Pixel | ⬜ Waiting for pixel IDs from the client |
+| Meta Pixel + Conversions API | ⬜ Waiting for the 3 items from the client's Meta account (§11 item 8) |
 
 Production database snapshot (2026-10-10, read-only): **9 active products** (all ₹99), **9 orders**
 (7 paid, 1 failed, 1 created — all Razorpay **test** payments), **0 contact messages**.
@@ -383,7 +383,7 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 
 - `ORDER_ACCESS_SECRET` signs order and download links. **Never change it after real sales**, because
   that breaks every buyer's saved link. It was generated new for the server on 2026-10-10.
-- `RAZORPAY_KEY_ID/SECRET` = **test** keys now. `RAZORPAY_WEBHOOK_SECRET` must equal the secret in
+- `RAZORPAY_KEY_ID/SECRET` = **live** keys since 2026-10-11 (set by the owner via Lightsail browser SSH; rollback: `cp app.env.test-keys-backup app.env` + `IMAGE=$(cat .current-image) bash deploy.sh`). `RAZORPAY_WEBHOOK_SECRET` must equal the secret in
   Razorpay's webhook (a webhook 400 in Razorpay's log means a mismatch).
 - `AUTO_WHATSAPP_ON_PAYMENT=true`. `INTERAKT_TEMPLATE_*_MR/_HI` = `payment_sucess_pdf_v2`, language `mr`
   (Hindi buyers get Marathi text + the Hindi PDF until a Hindi template is approved).
@@ -448,11 +448,13 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 3. **Stage 5**: PageSpeed ✅ (home 93, book 85 — §7a). Still to do: a real phone on Jio/Airtel 4G opening a
    book link from Instagram, WebPageTest (Mumbai, Moto G, 4G), k6 `loadtest/` (landing spike, checkout,
    webhook replay, download), container drill, deploy-under-load.
-4. **Stage 6 go-live**: Razorpay **live** keys (reuse the client's existing live key, or regenerate with
-   "deactivate old key within 24 h" and update the original site's Vercel too), a **new** live webhook
-   (don't edit the original's), add the domain in Razorpay website settings, then `app.env` → restart →
-   warm the cache → real ₹99 purchase on Android + iPhone → refund → Google Search Console → update the
-   Instagram bio.
+4. **Stage 6 go-live**: ✅ Razorpay live keys + new live webhook + real ₹99 purchase (2026-10-11).
+   Still: **refund the test payment**; confirm with the owner whether the live key was *regenerated* (if
+   yes, the original site's Vercel needs the new secret within 24 h); an iPhone purchase from Instagram;
+   warm the cache; Google Search Console (add domain, submit `/sitemap.xml`); update the Instagram bio and
+   Reel links. **SSH note:** the laptop can't SSH to the server (home IP changed); server edits go through
+   Lightsail → kaf-a → Connect using SSH (browser SSH allowed in the SSH firewall rule), or update the
+   port-22 rule with the new IP.
 
 ### Waiting on the owner / client
 5. UI decisions: **#9** WhatsApp button label, **#23** disclaimer box + "Featured" sort on `/ebooks`
@@ -461,8 +463,19 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    the full PDFs. The client must make that bucket private. Ours is safe (checked).
 7. **Support e-mail:** the site shows `support@kaydyachaanifaydyach.com`, but that domain has **no mail
    server**. Set up mail on the new domain (Hostinger or Cloudflare Email Routing) and switch the address.
-8. **Meta Pixel IDs** (the original has 5) → GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS` → deploy →
-   check in Events Manager.
+8. **Meta Pixel + Conversions API**: need from the client's Meta Business account:
+   1. **Pixel (dataset) ID** the ads optimise for: Events Manager → Data sources → the pixel → ID (15–16
+      digits). The original loads 5 pixels (~400 KB); use 1, max 2.
+   2. **Domain verification**: Business Settings → Brand safety → Domains → add `kaydyachaanifayddyacha.com`
+      → DNS TXT record → its `facebook-domain-verification=…` value goes in Cloudflare DNS (TXT, `@`) → Verify.
+   3. **Conversions API access token** (secret): Events Manager → the pixel → Settings → Conversions API →
+      Generate access token → save in `kaf-keys/meta-capi-token.txt` (never in chat).
+   Optional: the owner's Facebook account as partner/admin on the pixel (to use Test events).
+   Then: GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS` → deploy; **build** the server-side Purchase via the
+   Conversions API from the Razorpay webhook (not in code yet), deduplicated with the browser Purchase by
+   `event_id` = order id (the browser already sends `eventID` = order id); token in `app.env`; test in
+   Events Manager → Test events (PageView → ViewContent → InitiateCheckout → Purchase ₹99); add Meta
+   tracking to the privacy policy.
 9. **5 missing books** (PDFs from Ajay) → create them → point their redirects at the real pages.
 10. Hindi versions of both Interakt templates (optional) → `INTERAKT_TEMPLATE_LANGUAGE_HI=hi` etc.
 11. Past buyers of the original site: their old download links stay on the old domain (it isn't moving).
@@ -523,6 +536,7 @@ Trust this file over these where they disagree:
 | 10-10 | `53982ee` | **Language picker + full mr/hi/en UI**, contact form + `/dashboard/messages` (migration 006), "where is my PDF" help on the order page |
 | 10-10 | `f238d38` `d0552dc` `7d087da` | **In-page sample reader** (no new tab), reader pages = WebP images made from the PDF (migration 007, `db:reader-pages`, built in the dashboard on upload); phone carousel autoplay; reader as a pop-up on phones, hand cursor, frosted loading on tapped cards |
 | 10-11 | `5c3f788` + Cloudflare rule | **Speed pass from PageSpeed** (home 85, book page 75 / LCP 6.0 s): no font preloads, Geist limited to Latin, Devanagari web font dropped (device font), `/ebooks` + `/combos` lists in the HTML (no `useSearchParams`), 600 px image variant + 200 px thumbnails. Cloudflare Transform Rule so Instagram `?igsh=` links hit the cache (see §7) |
+| 10-11 | `3795afe` `1eaa7ab` | Book page 91–92 (sample reader on demand, `.cv-auto` below the fold); `inlineCss` tried and removed. Speed comparison with the original (doc "Site Speed: Ours vs Original": ours 83–94 mobile vs 44–64; the original is only ahead on server answer from Airtel, which Cloudflare Free routes via Marseille; a paid Cloudflare plan is not expected to fix that). **Razorpay LIVE** keys + live webhook; first real ₹99 purchase OK |
 | 10-11 | docs | PageSpeed after the changes: home 85 → **93**, book page 75 → **85**. Owner decisions: language pop-up stays as it is; Cloudflare Web Analytics stays **on** (real-user speed data). Speed section §7a added |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"

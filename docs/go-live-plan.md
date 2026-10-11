@@ -16,7 +16,7 @@
 | Replov (old test host) | Stays on **Tokyo** on purpose (user decision 2026-10-04). Treat it as a test site only: **no book edits / uploads on Replov's dashboard** — they would land in Tokyo, not Mumbai. If anything must change before go-live, change it in Mumbai (local scripts / the new server) or ask Claude to copy it. |
 | **Server** | ✅ **Lightsail `$12` created 2026-10-10** — AWS lifted the plan limit. Instance **`kaf-a`** (Mumbai `ap-south-1a`, Ubuntu 24.04, 2 GB / 2 vCPU, dual-stack), key pair `kaf-key`, static IP `kaf-a-ip`, automatic snapshots. (EC2 `t3.small` was the planned fallback — guide kept in `docs/setup-steps-ec2.md`, not used.) Server ≈ ₹1,000/month → total ≈ ₹3,300 incl. Supabase Pro. |
 | GitHub variables (Stage 1D) | Not confirmed yet. |
-| Next action | Site **live on `kaydyachaanifayddyacha.com`** (Razorpay **test** keys, not announced); Stage 3 done. Next: **Stage 4** functional tests (test purchase with `success@razorpay`, failed payment → reminder, dashboard edit, Instagram in-app). |
+| Next action | **Razorpay LIVE since 2026-10-11** (live webhook added; real ₹99 purchase OK, refund it). Not announced yet. Next: refund, iPhone/Instagram purchase, Meta Pixel + Conversions API (waiting for the client's ID/code/token), Google Search Console, Instagram bio. Speed: PageSpeed mobile home 83–94, book 91–92. |
 
 ### Where the secrets and key files are (never commit, never paste in chat)
 
