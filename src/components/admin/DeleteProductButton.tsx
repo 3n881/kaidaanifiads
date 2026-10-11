@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Trash2, Loader2 } from "lucide-react";
 import { deleteProduct } from "@/app/dashboard/actions";
+import { isStaleAction, reloadForNewVersion } from "@/lib/stale-action";
 
 export default function DeleteProductButton({
   id,
@@ -20,7 +21,13 @@ export default function DeleteProductButton({
         <button
           onClick={() =>
             startTransition(async () => {
-              await deleteProduct(id);
+              try {
+                await deleteProduct(id);
+              } catch (error) {
+                // Page loaded before a deploy → reload to get the new version.
+                if (isStaleAction(error) && reloadForNewVersion()) return;
+                throw error;
+              }
               setConfirming(false);
             })
           }

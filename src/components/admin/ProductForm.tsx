@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { AdminProduct } from "@/lib/admin";
 import { saveProductWithFeedback } from "@/app/dashboard/actions";
+import { isStaleAction, NEW_VERSION_TEXT } from "@/lib/stale-action";
 import { LOCALE_LABELS, type Locale } from "@/lib/i18n";
 import { coverSrc } from "@/lib/covers";
 
@@ -102,7 +103,12 @@ export default function ProductForm({
         const data = new FormData(event.currentTarget);
         setSaveState(null);
         startSaving(async () => {
-          setSaveState(await saveProductWithFeedback(null, data));
+          try {
+            setSaveState(await saveProductWithFeedback(null, data));
+          } catch (error) {
+            // Page loaded before a deploy: keep the form, ask for a refresh.
+            setSaveState({ error: isStaleAction(error) ? NEW_VERSION_TEXT.en : "Saving failed. Please try again." });
+          }
         });
       }}
     >

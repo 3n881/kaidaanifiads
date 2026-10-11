@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { CheckCircle2, Loader2, Send } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { sendContactMessage } from "./actions";
+import { NEW_VERSION_TEXT } from "@/lib/stale-action";
 
 const COPY = {
   mr: { title: "आम्हाला संदेश पाठवा", name: "पूर्ण नाव", email: "ईमेल", phone: "मोबाईल / WhatsApp नंबर", either: "ईमेल किंवा मोबाईल नंबर — किमान एक भरा", subject: "विषय", message: "तुमचा संदेश", namePh: "तुमचे नाव", subjectPh: "आम्ही कशी मदत करू?", messagePh: "तुमचा प्रश्न किंवा ऑर्डरची माहिती लिहा…", send: "संदेश पाठवा", sending: "पाठवत आहे…", done: "धन्यवाद! तुमचा संदेश मिळाला. आम्ही लवकरच संपर्क करू.", another: "आणखी एक संदेश पाठवा" },
@@ -29,7 +30,15 @@ export default function ContactForm() {
     const data = new FormData(event.currentTarget);
     data.set("locale", locale);
     startTransition(async () => {
-      const result = await sendContactMessage(data);
+      let result: Awaited<ReturnType<typeof sendContactMessage>>;
+      try {
+        result = await sendContactMessage(data);
+      } catch (sendError) {
+        // Usually a page loaded before a deploy ("Server Action not found").
+        console.error(sendError);
+        setError(NEW_VERSION_TEXT[locale]);
+        return;
+      }
       if ("error" in result) {
         setError(result.error);
         return;

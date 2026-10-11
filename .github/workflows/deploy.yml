@@ -19,6 +19,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Docs / load-test changes don't touch the site. Skipping them avoids a
+    # needless rebuild, a full Cloudflare purge and new Server Action ids
+    # (admin pages left open would hit "Server Action was not found").
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "loadtest/**"
   workflow_dispatch:
 
 concurrency:

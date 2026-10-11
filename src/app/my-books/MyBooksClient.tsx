@@ -8,6 +8,7 @@ import CoverImage from "@/components/CoverImage";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getSavedOrders, orderHref, type SavedOrder } from "@/lib/purchases";
 import { sendMyBooks } from "./actions";
+import { NEW_VERSION_TEXT } from "@/lib/stale-action";
 
 const digits = (phone: string) => phone.replace(/\D/g, "");
 
@@ -60,7 +61,15 @@ export default function MyBooksClient({ combos }: { combos: Product[] }) {
       return;
     }
     startTransition(async () => {
-      const res = await sendMyBooks(phone, locale);
+      let res: Awaited<ReturnType<typeof sendMyBooks>>;
+      try {
+        res = await sendMyBooks(phone, locale);
+      } catch (sendError) {
+        // Usually a page loaded before a deploy ("Server Action not found").
+        console.error(sendError);
+        setError(NEW_VERSION_TEXT[locale]);
+        return;
+      }
       if (res.error) {
         setError(res.error);
         return;

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Send, Loader2, Check } from "lucide-react";
 import { resendDelivery } from "@/app/dashboard/actions";
+import { isStaleAction, reloadForNewVersion } from "@/lib/stale-action";
 
 export default function ResendButton({ orderId }: { orderId: string }) {
   const [pending, startTransition] = useTransition();
@@ -12,7 +13,13 @@ export default function ResendButton({ orderId }: { orderId: string }) {
     <button
       onClick={() =>
         startTransition(async () => {
-          await resendDelivery(orderId);
+          try {
+            await resendDelivery(orderId);
+          } catch (error) {
+            // Page loaded before a deploy → reload to get the new version.
+            if (isStaleAction(error) && reloadForNewVersion()) return;
+            throw error;
+          }
           setDone(true);
           setTimeout(() => setDone(false), 2500);
         })

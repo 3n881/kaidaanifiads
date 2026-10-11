@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { syncOrderAction } from "@/app/dashboard/actions";
 import ResendButton from "./ResendButton";
+import { isStaleAction, NEW_VERSION_TEXT, reloadForNewVersion } from "@/lib/stale-action";
 
 /** Order detail actions: check Razorpay, resend WhatsApp, copy the buyer's link. */
 export default function OrderActions({ orderId, paid, buyerLink }: { orderId: string; paid: boolean; buyerLink: string | null }) {
@@ -17,7 +18,15 @@ export default function OrderActions({ orderId, paid, buyerLink }: { orderId: st
         <button
           type="button"
           disabled={pending}
-          onClick={() => startTransition(async () => setResult(await syncOrderAction(orderId)))}
+          onClick={() => startTransition(async () => {
+            try {
+              setResult(await syncOrderAction(orderId));
+            } catch (error) {
+              // Page loaded before a deploy → reload to get the new version.
+              if (isStaleAction(error) && reloadForNewVersion()) return;
+              setResult({ ok: false, message: isStaleAction(error) ? NEW_VERSION_TEXT.en : "Something went wrong. Reload the page and try again." });
+            }
+          })}
           className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Check with Razorpay
