@@ -27,8 +27,8 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
         <PeriodCard title="All time" stats={sales.all} href="/dashboard/orders" />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-6">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-6">
           {/* Needs attention */}
           <section className="rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]">
             <h2 className="flex items-center gap-2 font-bold text-brand-900">
@@ -105,7 +105,7 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
           </section>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           {/* Top books this week */}
           <section className="rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]">
             <h2 className="flex items-center gap-2 font-bold text-brand-900"><BookOpen className="h-5 w-5 text-brand-500" aria-hidden="true" /> Top books, last 7 days</h2>

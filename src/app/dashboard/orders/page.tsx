@@ -78,7 +78,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           const active = view.status === card.status;
           return (
             <Link key={card.status} href={href({ status: active ? "all" : card.status })} aria-pressed={active}
-              className={`rounded-2xl p-4 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 ${active ? "bg-brand-teal text-white" : "border border-brand-100 bg-white"}`}>
+              className={`rounded-2xl p-4 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 ${card.status === "paid" ? "col-span-2 sm:col-span-1" : ""} ${active ? "bg-brand-teal text-white" : "border border-brand-100 bg-white"}`}>
               <card.icon className={`h-5 w-5 ${active ? "text-white" : card.tone}`} aria-hidden="true" />
               <p className={`mt-2 text-2xl font-extrabold ${active ? "" : "text-brand-900"}`}>{card.value}</p>
               <p className={`text-xs font-bold ${active ? "text-white" : "text-brand-700"}`}>{card.label}</p>

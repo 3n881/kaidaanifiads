@@ -34,9 +34,10 @@ export default function AdminShell({ active, title, description, action, childre
             <form action={signOutAction}><button type="submit" aria-label="Sign out" className="rounded-lg p-2 text-danger-600 hover:bg-danger-500/10"><LogOut className="h-4 w-4" /></button></form>
           </div>
         </div>
-        <nav className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2" aria-label="Dashboard navigation">
+        {/* Phones: 2 rows of 3 (every page visible, no sideways scrolling); wider screens: one row. */}
+        <nav className="mx-auto grid max-w-7xl grid-cols-3 gap-1 px-4 pb-2 sm:flex sm:flex-wrap" aria-label="Dashboard navigation">
           {navigation.map((item) => (
-            <Link key={item.href} href={item.href} className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition sm:text-sm ${active === item.key ? "bg-brand-teal text-white" : "text-brand-600 hover:bg-brand-50"}`}>
+            <Link key={item.href} href={item.href} aria-current={active === item.key ? "page" : undefined} className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition sm:justify-start sm:px-3 sm:text-sm ${active === item.key ? "bg-brand-teal text-white" : "text-brand-600 hover:bg-brand-50"}`}>
               <item.icon className="h-4 w-4" aria-hidden="true" /> {item.label}
             </Link>
           ))}
