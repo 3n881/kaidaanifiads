@@ -222,7 +222,13 @@ reloads Caddy → **purges the pages from Cloudflare** (home by URL + 15 page pr
 prefixes, Free plan's max per call; `/media/…` images and `/_next/static/…` are kept because their names change
 with their content) → closes port 22 again. Zero downtime. **If you add a new public page, add it to `pages=` in
 `deploy.sh`** (otherwise it refreshes within 5 min anyway). Until 2026-10-11 every deploy purged *everything*,
-which left covers cold (1.1–1.6 s each) right after a deploy.
+which left covers cold (1.1–1.6 s each) right after a deploy. Then it **warms** Cloudflare: requests `/`, `/ebooks`,
+`/combos`, the book pages linked from them, every `/_next/static` CSS/JS file they use and the fonts inside the
+CSS (≈ 24 requests, a few seconds). Each release has new build-file URLs (`?dpl=<sha>`), so without this the first
+visitor per Cloudflare location waited 1–2 s for the CSS and font. **Smart Tiered Cache is ON** (owner, 11 Oct:
+Caching → Tiered Cache; upper tiers BOM + SIN for our origin 13.206.92.130), so a location that lacks a file asks
+Mumbai/Singapore before our server. The other origin listed there, 2.57.91.91, is the old Hostinger pointer —
+not in use.
 `/api/health` returns `{"ok":true,"deployment":"<sha>"}`. Use it to confirm which commit is live.
 
 > ⚠️ **Pushing to `main` = deploying to production.** Commit/push only when the user asks.
@@ -310,6 +316,10 @@ cache, so PageSpeed got cold covers (MISS, 1.1–1.6 s each, some timed out) —
 (§7); (2) the ₹1 **#31 test book** is the first home card and therefore the LCP image — owner to hide/delete it;
 (3) PageSpeed varies ±5 points between runs, so judge on 2–3 runs. Re-run at 22:04 → **93** again (FCP 1.7 s,
 LCP 3.0 s, SI 3.0 s, TBT 50 ms, CLS 0; server answer 10 ms).
+
+**Run right after the deploy (22:15) → 90:** the HTML was a HIT (server 6 ms), but the new release's CSS
+(1.2 s) and font (2.1 s) were cold at PageSpeed's Cloudflare location → white 5 of 8 frames, SI 4.5 s. Fixed by the
+post-deploy warm-up + Smart Tiered Cache (§7).
 
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
@@ -606,7 +616,8 @@ Trust this file over these where they disagree:
 | 10-11 | loadtest | k6 Server direct: 11,028 req, 0 errors, comfortable ≈ 30–40 req/s uncached (6–8× a Reel's origin load). Found: every `/order` visit reads the whole catalog from Supabase for the header search box — caching it (5 min) is the next easy capacity win |
 | 10-11 | `4b1fbd2` | **Catalog cached across requests** (`src/lib/products.ts`: `unstable_cache` 5 min, tag `products`, + React `cache()` per request). `/order` and other per-request pages no longer query Supabase on every visit (local prod build: first request 0.16 s, then 0.013–0.024 s). Admin save/delete/show-hide call `updateTag("products")` (read-your-writes); script changes appear within 5 min. Chose `unstable_cache` over `"use cache"` because that needs the app-wide Cache Components switch |
 | 10-11 | loadtest | **Server direct re-run after caching** (live `4b1fbd2`): 11,728 req, 0 errors, **all thresholds passed**, 1 dropped iteration (was 701); order page median ≈ 0.40 s flat from 10 to 60 req/s (≈ 0.25 s of it is network from the dev PC), p95 0.48–0.93 s up to 40 req/s and 0.78–1.6 s at 50–60 (was 2.2–4.2 s), no stall |
-| 10-11 | (this commit) | PageSpeed fell to 87 after the evening deploys → `deploy.sh` now purges only pages (30 prefixes + home URLs) instead of everything, so images/build files stay cached; same purge run once by hand (pages MISS, covers HIT). Re-run 93. Answered "white first second": network time on the slow-4G lab phone, splash screen wouldn't help (§7a) |
+| 10-11 | `0a6b5c2` | PageSpeed fell to 87 after the evening deploys → `deploy.sh` now purges only pages (30 prefixes + home URLs) instead of everything, so images/build files stay cached; same purge run once by hand (pages MISS, covers HIT). Re-run 93. Answered "white first second": network time on the slow-4G lab phone, splash screen wouldn't help (§7a) |
+| 10-11 | (this commit) | Run straight after that deploy scored 90 (new CSS/font cold at Cloudflare). Owner turned on **Smart Tiered Cache** (BOM + SIN); `deploy.sh` now **warms** pages, book pages, build files and fonts after the purge |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

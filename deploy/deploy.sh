@@ -98,5 +98,33 @@ if [ -n "$zone" ] && [ -n "$token" ]; then
   fi
 fi
 
+# Warm Cloudflare with this release: ask once for the main pages, every build
+# file they use (CSS, JS, and the fonts inside the CSS) and the book pages.
+# Each release has new build-file URLs, so otherwise the first visitor after a
+# deploy (often PageSpeed) waited 1-2 s for the CSS and font (11 Oct, score 90).
+# With Smart Tiered Cache on (11 Oct) the warm copies sit in Cloudflare's
+# Mumbai/Singapore tier, which every other Cloudflare location asks before us.
+warm() { curl -s -m 15 -o /dev/null --compressed "https://$host$1" || true; }
+warm_pages="/ /ebooks /combos"
+assets=""
+for p in $warm_pages; do
+  html="$(curl -s -m 15 --compressed "https://$host$p" || true)"
+  assets="$assets $(printf '%s' "$html" | grep -oE '/_next/static/[^"'"'"' )\\]+' || true)"
+  warm_pages="$warm_pages $(printf '%s' "$html" | grep -oE 'href="/ebooks/[a-z0-9-]+"' | cut -d'"' -f2 || true)"
+done
+for css in $(printf '%s\n' $assets | grep '\.css' | sort -u); do
+  dir="${css%/*}"
+  fonts="$(curl -s -m 15 --compressed "https://$host$css" | grep -oE 'url\([^)]+\)' | sed -E 's/^url\(["'"'"']?//; s/["'"'"']?\)$//' || true)"
+  for f in $fonts; do
+    case "$f" in
+      ../*) assets="$assets ${dir%/*}/${f#../}" ;;
+      /*) assets="$assets $f" ;;
+    esac
+  done
+done
+n=0
+for u in $(printf '%s\n' $assets $warm_pages | sort -u); do warm "$u"; n=$((n + 1)); done
+echo "Cloudflare: warmed $n pages and build files"
+
 docker image prune -f >/dev/null
 echo "Deployed $IMAGE"
