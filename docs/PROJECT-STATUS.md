@@ -96,7 +96,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Server + Cloudflare + auto-deploy | ✅ 2026-10-10 (go-live Stages 0–3) |
 | **Stage 4: functional tests on the live domain** | 🟡 **In progress.** The DB shows 3 paid test orders on 10-10 at 21:25–21:47 IST (#27, #30, #25) plus 1 abandoned. Results are not yet written up. Run the full checklist in `go-live-plan.md` Stage 4 |
 | Page speed (first screen) | ✅ 2026-10-11 — PageSpeed mobile: home **93**, book page **85** (§7a) |
-| Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). **k6 Reel spike PASSED** 2026-10-11 from Grafana Cloud Mumbai: 66,825 requests, peak 300 req/s, **0 errors**, p95 17 ms, **100 % from Cloudflare**, server CPU flat. Still to do: k6 **Server direct** (`loadtest/cloud-origin.js`), WebPageTest, real-phone check |
+| Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). **k6 Reel spike PASSED** 2026-10-11 from Grafana Cloud Mumbai: 66,825 requests, peak 300 req/s, **0 errors**, p95 17 ms, **100 % from Cloudflare**, server CPU flat. **k6 Server direct** 2026-10-11 (dev PC, `loadtest/origin.js`, 10→60 req/s uncached): 11,028 req, **0 errors**; comfortable up to ≈ 30–40 req/s (order page p95 < 0.8 s), slower above (p95 2–4 s at 50–60) vs ~5 req/s needed in a Reel. Still to do: WebPageTest, real-phone check |
 | Stage 6: go-live (Razorpay **live** keys + announce) | 🟡 **Live payments working 2026-10-11**: real ₹99 purchase 14:50 IST (#30) → paid, downloaded, PDF on WhatsApp, webhook saved the phone. Refund that test payment in Razorpay. Not announced yet (Search Console, Instagram bio pending) |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
 | Meta Pixel + Conversions API | ⬜ Waiting for the 3 items from the client's Meta account (§11 item 8) |
@@ -488,6 +488,7 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    port-22 rule with the new IP.
 
 ### Ideas (not started)
+- **Cache the catalog read in the root layout** (search box) so dynamic pages (`/order`, dashboard) stop querying Supabase per request — found by the Server direct load test; should raise the ~30–40 req/s comfortable limit.
 - Order CSV export (accounts/GST) · nightly WhatsApp sales summary to the owner · move dashboard totals into
   SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
   block downloads for fully refunded orders (today a refund does not revoke access).
@@ -579,6 +580,7 @@ Trust this file over these where they disagree:
 | 10-11 | loadtest | k6 Reel spike from Grafana Cloud Mumbai: 66,825 req, 300 req/s peak, 0 errors, p95 17 ms, 100 % edge, server CPU flat. Scripts: `loadtest/landing.js`, `origin.js`, `cloud-*.js` (free plan: 100 VUs, URLs grouped by `name` tag) |
 | 10-11 | `99050fb` | **Didn't-pay flow**: failed-payment help screen; cancel → WhatsApp offers sign-up with consent (migration 009 `leads`, `/api/leads`, `src/lib/leads.ts`, `LeadCapture.tsx`, copy in `src/lib/lead-copy.ts`); **Interested buyers** admin page `/dashboard/leads` (cards, bought-later, follow-up, Remove = opt-out) + Overview card + menu item (phone menu 4+3); failed-payment reminder 10 min; next-day follow-up (off until the marketing template is set); privacy policy paragraph. Also: stale-deploy recovery (`src/lib/stale-action.ts`, error screens), docs-only pushes skip deploy, coloured order timeline. All checked at 375/768/1280 px with a fake Razorpay/checkout (no real orders) |
 | 10-11 | server config | Owner set both reminder delays to **10 min** in `/opt/kaf/app.env` and restarted (live `99050fb` healthy, cron endpoint answering); local app.env copy synced |
+| 10-11 | loadtest | k6 Server direct: 11,028 req, 0 errors, comfortable ≈ 30–40 req/s uncached (6–8× a Reel's origin load). Found: every `/order` visit reads the whole catalog from Supabase for the header search box — caching it (5 min) is the next easy capacity win |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

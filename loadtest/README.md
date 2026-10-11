@@ -9,7 +9,7 @@ no orders, payments or WhatsApp. `checkout.js` / `download.js` stay staging-only
 |---|---|---|
 | Smoke (done 10-11 ✅) | `landing.js -e PEAK=5 -e SHORT=1`, `origin.js -e MAX=3 -e SHORT=1` | 0 errors |
 | **Reel spike** | `landing.js -e BASE=https://kaydyachaanifayddyacha.com -e PEAK=300` (then 500) | errors < 1 %, `cf_edge_served` > 98 %, html p95 < 400 ms — ✅ **passed 11 Oct** (Grafana Cloud Mumbai, `cloud-landing.js`): 66,825 req, 300 req/s, 0 errors, p95 17 ms, edge 100 %, server CPU flat |
-| **Server direct** | `origin.js -e BASE=https://kaydyachaanifayddyacha.com -e MAX=60` (steps 10→20→40→60 req/s) | errors < 1 %, health p95 < 300 ms, order page p95 < 1.5 s; note where times start to climb |
+| **Server direct** | `origin.js -e BASE=https://kaydyachaanifayddyacha.com -e MAX=60` (steps 10→20→40→60 req/s) | errors < 1 %, health p95 < 300 ms, order page p95 < 1.5 s; note where times start to climb — ✅ **ran 11 Oct 20:39–20:46 IST** from the dev PC via Docker (Airtel → Cloudflare Marseille, ~0.25 s network in every number): 11,028 req, **0 errors**; order page median/p95: 10 req/s 0.41/0.56 s · 20 → 0.36/0.75 · 30 → 0.44/0.77 · 40 → 0.51/1.34 · 50–60 → 0.53–0.92/2.2–4.2 s, one ~5 s stall near the top. Comfortable ≈ 30–40 req/s uncached vs ~5 req/s needed for a big Reel (6–8× headroom) |
 
 Docker form (Git Bash): `MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/scripts" grafana/k6:0.54.0 run -e BASE=… /scripts/landing.js`
 
