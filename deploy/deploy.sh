@@ -89,9 +89,9 @@ if [ -n "$zone" ] && [ -n "$token" ]; then
   for h in "$host" "www.$host"; do
     for p in $pages; do prefixes="$prefixes\"$h/$p\","; done
   done
-  # The home page alone (a prefix on "/" would clear everything).
-  files="\"https://$host/\",\"https://www.$host/\""
-  if purge "{\"prefixes\":[${prefixes%,}]}" && purge "{\"files\":[$files]}"; then
+  # The home page alone, by its Cache-Tag (next.config.js). A prefix on "/"
+  # would clear everything, and clearing a page by URL misses its compressed copies (images by URL are fine).
+  if purge "{\"prefixes\":[${prefixes%,}]}" && purge '{"tags":["kaf-home"]}'; then
     echo "Cloudflare: pages cleared (images and build files kept)"
   else
     echo "WARNING: Cloudflare page purge failed - pages refresh within 5 min, /about etc. may stay old" >&2

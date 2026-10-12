@@ -218,7 +218,7 @@ Storage: `pdfs` (private) `<slug>-<locale>-<ts>.pdf` · `covers` (public) `<slug
 12 characters of the SHA, pushed to GHCR) → opens Lightsail port 22 for the runner's IP only → copies
 `deploy/deploy.sh`, `docker-compose.yml` and `Caddyfile` to `/opt/kaf/` → `deploy.sh` restarts app1, waits
 until it is healthy, then does the same for app2 (it rolls back the replaced container on failure) →
-reloads Caddy → **purges the pages from Cloudflare** (home by URL + 15 page prefixes on both hosts = 30
+reloads Caddy → **purges the pages from Cloudflare** (home by its **Cache-Tag `kaf-home`** + 15 page prefixes on both hosts = 30
 prefixes, Free plan's max per call; `/media/…` images and `/_next/static/…` are kept because their names change
 with their content) → closes port 22 again. Zero downtime. **If you add a new public page, add it to `pages=` in
 `deploy.sh`** (otherwise it refreshes within 5 min anyway). Until 2026-10-11 every deploy purged *everything*,
@@ -335,6 +335,17 @@ after launch, on real-visitor data. To make slow CPUs matter less, the home page
 (combos row, How to buy, Benefits, Testimonials) and the **footer on every page** now use `.cv-auto`
 (`src/app/page.tsx`, `Footer.tsx`), as on the book page. Checked at 375 px: all sections and the footer render
 at full size and fade in when scrolled to.
+
+**After the `.cv-auto` deploy (12 Oct 9:19) → 97** (FCP 1.7 s · LCP **2.4 s** · SI **2.5 s** · TBT 10 ms · CLS 0;
+Style & Layout 226 ms vs 397–1,006 ms before; LCP render delay 0.31 s vs 1.2–2.0 s).
+
+**Cloudflare purge by URL doesn't work for pages (found 12 Oct):** the API answers `success` but the page stays a
+HIT (tested `/`, `/contact`, `/terms`; also with an `Accept-Encoding` header). Pages are stored compressed
+(`Vary: …, Accept-Encoding`) and the URL purge misses those copies; images by URL purge fine. So after every
+deploy the home page showed the *previous* release for up to 5 min (it then refreshes itself — s-maxage 300).
+Fix: `next.config.js` sends `Cache-Tag: kaf-home` on `/` only (Cloudflare strips it from visitors); `deploy.sh`
+and the admin's `purgePublicPages` (`src/lib/cdn.ts`) purge the home page **by tag**. Other pages keep using
+prefix purge (works). **Never go back to URL purge for pages.**
 
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
@@ -634,7 +645,8 @@ Trust this file over these where they disagree:
 | 10-11 | `0a6b5c2` | PageSpeed fell to 87 after the evening deploys → `deploy.sh` now purges only pages (30 prefixes + home URLs) instead of everything, so images/build files stay cached; same purge run once by hand (pages MISS, covers HIT). Re-run 93. Answered "white first second": network time on the slow-4G lab phone, splash screen wouldn't help (§7a) |
 | 10-11 | `d7518d0` | Run straight after that deploy scored 90 (new CSS/font cold at Cloudflare). Owner turned on **Smart Tiered Cache** (BOM + SIN); `deploy.sh` now **warms** pages, book pages, build files and fonts after the purge |
 | 10-11 | docs | PageSpeed re-run 22:25 → **93** (SI 3.0 s, TBT 0, CSS 0.18 s, font 0.35 s, white 3/8 frames); new release's CSS + `/ebooks` HIT at Marseille right after deploy |
-| 10-12 | (this commit) | Morning PageSpeed 80/76 = lab machine variance (network warm, less CPU work). Home below-the-fold sections + footer get `.cv-auto` (skip layout until scrolled near) |
+| 10-12 | `e0b7395` | Morning PageSpeed 80/76 = lab machine variance (network warm, less CPU work). Home below-the-fold sections + footer get `.cv-auto` (skip layout until scrolled near) |
+| 10-12 | (this commit) | PageSpeed **97** after `.cv-auto`. Found Cloudflare URL purge silently fails for pages (home showed the previous release ≈ 5 min after each deploy and after admin saves) → home purged by **Cache-Tag `kaf-home`** in `deploy.sh` and `src/lib/cdn.ts` |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

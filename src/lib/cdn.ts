@@ -41,13 +41,16 @@ export async function purgePublicPages(paths: string[]): Promise<void> {
 
   const origin = new URL(SITE_URL);
   const host = origin.host;
-  const files = paths.includes("/") ? [`${origin.origin}/`] : [];
+  // The home page goes by its Cache-Tag (next.config.js): clearing a page by
+  // URL is accepted but misses its compressed copies (tested 12 Oct), and a
+  // prefix on "/" would clear the whole site. Images by URL work fine.
+  const tags = paths.includes("/") ? ["kaf-home"] : [];
   const prefixes = paths
     .filter((p) => p !== "/")
     .map((p) => `${host}${p}`);
 
   const requests: Array<Record<string, string[]>> = [];
-  if (files.length) requests.push({ files });
+  if (tags.length) requests.push({ tags });
   if (prefixes.length) requests.push({ prefixes });
 
   await Promise.all(

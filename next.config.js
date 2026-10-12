@@ -81,6 +81,11 @@ const nextConfig = (() => {
           headers: [...noStore, { key: "Referrer-Policy", value: "no-referrer" }],
         },
         { source: "/my-books", headers: noStore },
+        // Lets deploy.sh clear the home page from Cloudflare by tag. Clearing
+        // it by URL is accepted but misses its compressed copies (tested 12 Oct),
+        // and a prefix on "/" would clear every image too. Cloudflare reads
+        // and removes this header; visitors never see it.
+        { source: "/", headers: [{ key: "Cache-Tag", value: "kaf-home" }] },
       ];
     },
     experimental: {
