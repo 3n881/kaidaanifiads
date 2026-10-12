@@ -125,7 +125,14 @@ cron-job.org ─► POST /api/cron/reconcile every 10 min (payment sweep + remin
   **This Next.js differs from older docs.** Read `node_modules/next/dist/docs/` before framework-level changes.
 - **Caching:** home, list and book pages use ISR with a 5-minute revalidate (`s-maxage=300,
   stale-while-revalidate`). Policy pages are static. `/api/*`, `/order/*` and `/my-books` are
-  `private, no-store`. Admin saves call `revalidatePath` and purge Cloudflare (`src/lib/cdn.ts`).
+  `private, no-store`. **Admin save / delete / show-hide of a book** (`revalidatePublic` in
+  `src/app/dashboard/actions.ts`): `updateTag("products")` (catalog cache) → `revalidatePath` `/`, `/ebooks`,
+  `/combos`, the book page, `/sitemap.xml` → Cloudflare purge (`src/lib/cdn.ts`): home by Cache-Tag `kaf-home`
+  (both hosts), prefixes `/ebooks`, `/combos`, `/sitemap.xml` on **both** `kaydyachaanifayddyacha.com` and
+  `www.` (www serves its own copies, no redirect). A new book's page has never been cached, so it renders fresh;
+  new covers/previews get new file names. Result: a new or edited book is on home, /ebooks and /combos within
+  seconds, on both hosts, and in the sitemap the same day. (Before 12 Oct: www lists up to 5 min old, sitemap up to
+  1 day.)
   Every deploy purges only the **pages** from Cloudflare (`deploy/deploy.sh`; images and build files stay cached).
 - **Images:** covers and preview pages are stored as 200/400/800 px WebP. With
   `NEXT_PUBLIC_MEDIA_PROXY=true`, they are served as `/media/<path>` from our domain so Cloudflare caches
@@ -673,6 +680,7 @@ Trust this file over these where they disagree:
 | 10-12 | `dd7be65` | Tag purge verified live (home HIT → MISS, header hidden from visitors); 3-run PageSpeed median pending (owner runs) |
 | 10-12 | `b396683` | PageSpeed 3-run median **90** (97/81/90). Bad runs = scripts ran before first paint and the language picker's full-screen blur held it ~1.8 s → picker opens after the first paint (2 frames) and uses a solid tint instead of blur |
 | 10-12 | docs | Picker change verified live (all pages on `b396683`); 3 new PageSpeed runs pending (owner) |
+| 10-12 | (this commit) | Admin book saves now also clear the **www.** copies of /ebooks + /combos and the **sitemap** (Next + Cloudflare, both hosts). Purge body tested live: www lists, www home and both sitemaps HIT → MISS |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

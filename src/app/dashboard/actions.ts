@@ -23,9 +23,11 @@ async function revalidatePublic(slug?: string, isCombo?: boolean) {
   revalidatePath("/ebooks");
   revalidatePath("/combos");
   if (slug) revalidatePath(`/${isCombo ? "combos" : "ebooks"}/${slug}`);
+  revalidatePath("/sitemap.xml");
   revalidatePath("/dashboard");
-  // /ebooks and /combos prefixes cover every detail page and RSC variant.
-  await purgePublicPages(["/", "/ebooks", "/combos"]);
+  // /ebooks and /combos prefixes cover every detail page and RSC variant;
+  // the sitemap so Google sees new books the same day (Cloudflare keeps it 1 day).
+  await purgePublicPages(["/", "/ebooks", "/combos", "/sitemap.xml"]);
 }
 
 function slugify(input: string): string {

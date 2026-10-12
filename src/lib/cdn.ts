@@ -39,15 +39,15 @@ export async function purgeFiles(paths: string[]): Promise<void> {
 export async function purgePublicPages(paths: string[]): Promise<void> {
   if (!isCdnPurgeConfigured || paths.length === 0) return;
 
-  const origin = new URL(SITE_URL);
-  const host = origin.host;
+  // Both hosts: www. serves its own cached copy of every page (no redirect).
+  const host = new URL(SITE_URL).host.replace(/^www\./, "");
   // The home page goes by its Cache-Tag (next.config.js): clearing a page by
   // URL is accepted but misses its compressed copies (tested 12 Oct), and a
   // prefix on "/" would clear the whole site. Images by URL work fine.
   const tags = paths.includes("/") ? ["kaf-home"] : [];
   const prefixes = paths
     .filter((p) => p !== "/")
-    .map((p) => `${host}${p}`);
+    .flatMap((p) => [`${host}${p}`, `www.${host}${p}`]);
 
   const requests: Array<Record<string, string[]>> = [];
   if (tags.length) requests.push({ tags });
