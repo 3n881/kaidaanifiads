@@ -44,7 +44,9 @@ export default function LanguagePicker() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-brand-teal/60 backdrop-blur-sm sm:items-center sm:p-4">
+    // Solid tint, no backdrop blur: blurring the whole page is very slow to
+    // draw on phones without a strong GPU (PageSpeed 12 Oct).
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-brand-teal/75 sm:items-center sm:p-4">
       <div
         role="dialog"
         aria-modal="true"

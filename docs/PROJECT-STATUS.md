@@ -350,6 +350,23 @@ Verified live on `5c25355`: home HIT → tag purge → **MISS**; the `Cache-Tag`
 Home `.cv-auto` sections checked at 375 px (all render full size and fade in). Owner to run PageSpeed 2 more
 times for a 3-run median (PSI runs started from Claude's hidden browser pane stall on "Running analysis").
 
+**Why lab scores jump between ~80 and ~95 (found 12 Oct, from the PSI reports' hidden "observed" timings):**
+| Run | Page loaded | First paint | Score |
+|---|---|---|---|
+| 97 (9:19) | 1.12 s | **0.79 s** (before our scripts ran) | 97 |
+| 90 (13:40, slowest test machine, benchmark 443) | 1.17 s | **0.85 s** | 90 |
+| 81 (13:18) | 0.53 s | **2.36 s** (after them) | 81 |
+When everything arrives fast, the scripts run *before* the first paint; on a first visit they open the language
+picker — a full-screen layer with `backdrop-blur` — and that first frame took ~1.8 s on the GPU-less test phone
+(local trace: main thread idle, GPU thread busy). **3-run median after `.cv-auto`: 97 / 81 / 90 → 90.**
+Fix (owner OK, picker stays): `LanguageProvider` opens the picker two animation frames after the first-visit
+check, i.e. after the page has been drawn (≈ 1/30 s later — not noticeable; in the slow case page *and* picker now
+appear earlier); the picker backdrop is a solid `bg-brand-teal/75` tint instead of `backdrop-blur-sm`. Returning
+visitors are unchanged (their saved language applies as before, no picker). Checked at 375 px: picker opens on a
+first visit, choosing English closes it, unlocks scrolling and survives a reload. Tested and **not** the cause:
+the other ~10 blur effects on the first screen (removing all of them ≈ 0.2 s locally, within noise).
+**Rule:** don't put `backdrop-blur` on full-screen layers that can appear at load.
+
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
 already contains all content, so it draws in one go when it lands. A **splash screen would not help** (it is
@@ -650,7 +667,8 @@ Trust this file over these where they disagree:
 | 10-11 | docs | PageSpeed re-run 22:25 → **93** (SI 3.0 s, TBT 0, CSS 0.18 s, font 0.35 s, white 3/8 frames); new release's CSS + `/ebooks` HIT at Marseille right after deploy |
 | 10-12 | `e0b7395` | Morning PageSpeed 80/76 = lab machine variance (network warm, less CPU work). Home below-the-fold sections + footer get `.cv-auto` (skip layout until scrolled near) |
 | 10-12 | `5c25355` | PageSpeed **97** after `.cv-auto`. Found Cloudflare URL purge silently fails for pages (home showed the previous release ≈ 5 min after each deploy and after admin saves) → home purged by **Cache-Tag `kaf-home`** in `deploy.sh` and `src/lib/cdn.ts` |
-| 10-12 | docs | Tag purge verified live (home HIT → MISS, header hidden from visitors); 3-run PageSpeed median pending (owner runs) |
+| 10-12 | `dd7be65` | Tag purge verified live (home HIT → MISS, header hidden from visitors); 3-run PageSpeed median pending (owner runs) |
+| 10-12 | (this commit) | PageSpeed 3-run median **90** (97/81/90). Bad runs = scripts ran before first paint and the language picker's full-screen blur held it ~1.8 s → picker opens after the first paint (2 frames) and uses a solid tint instead of blur |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

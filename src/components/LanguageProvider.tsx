@@ -26,11 +26,25 @@ export default function LanguageProvider({ children }: { children: React.ReactNo
     } catch {
       // Storage may be unavailable in private browsing; Marathi remains default.
     }
+    let frame = 0;
     const id = window.setTimeout(() => {
-      if (storedLocale) setLocaleState(storedLocale);
-      setChosen(Boolean(storedLocale));
+      if (storedLocale) {
+        setLocaleState(storedLocale);
+        setChosen(true);
+        return;
+      }
+      // First visit: open the language picker only after the page has been
+      // drawn once. When the scripts ran before the first paint, the picker's
+      // full-screen layer joined that paint and held it ~1.8 s on PageSpeed's
+      // GPU-less phone (score 81 vs 90–97, 12 Oct). Two frames ≈ 1/30 s.
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setChosen(false));
+      });
     }, 0);
-    return () => window.clearTimeout(id);
+    return () => {
+      window.clearTimeout(id);
+      cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
