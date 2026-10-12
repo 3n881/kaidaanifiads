@@ -26,8 +26,10 @@ export default async function Home() {
         />
       </Reveal>
 
+      {/* Below the first screen: .cv-auto lets phones skip laying these out
+          until the visitor scrolls near them (PageSpeed 2026-10-12). */}
       <div>
-        <Reveal>
+        <Reveal className="cv-auto">
           <ProductRow
             tinted
             eyebrow="Special Packages"
@@ -40,13 +42,13 @@ export default async function Home() {
         </Reveal>
       </div>
 
-      <Reveal>
+      <Reveal className="cv-auto">
         <HowToBuy />
       </Reveal>
-      <Reveal>
+      <Reveal className="cv-auto">
         <Benefits />
       </Reveal>
-      <Reveal>
+      <Reveal className="cv-auto">
         <Testimonials />
       </Reveal>
     </>

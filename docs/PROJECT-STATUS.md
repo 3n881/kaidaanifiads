@@ -328,6 +328,14 @@ font **0.35 s** (was 2.1), white 3 of 8 filmstrip frames (was 5)). That run prob
 proven by the HIT check above, not by this run. What's left is the lab itself: ≈ 1.1 s white = the slow-4G phone
 connecting; ≈ 1.2 s of LCP = the emulated slow CPU drawing the page. Nothing big left to gain in code.
 
+**12 Oct morning runs 80 / 76:** network all warm (HTML 10 ms, CSS 0.2 s, font 0.4 s, cover 0.26 s, new
+release's files) and *less* main-thread work (1.1 s vs 1.9 s) than the 93 runs — the lab's shared test machine
+was slower (FCP 2.2 s, render delay 1.9 s). Lab score swings this much; judge on the median of 3 runs and,
+after launch, on real-visitor data. To make slow CPUs matter less, the home page's below-the-fold sections
+(combos row, How to buy, Benefits, Testimonials) and the **footer on every page** now use `.cv-auto`
+(`src/app/page.tsx`, `Footer.tsx`), as on the book page. Checked at 375 px: all sections and the footer render
+at full size and fade in when scrolled to.
+
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
 already contains all content, so it draws in one go when it lands. A **splash screen would not help** (it is
@@ -626,6 +634,7 @@ Trust this file over these where they disagree:
 | 10-11 | `0a6b5c2` | PageSpeed fell to 87 after the evening deploys → `deploy.sh` now purges only pages (30 prefixes + home URLs) instead of everything, so images/build files stay cached; same purge run once by hand (pages MISS, covers HIT). Re-run 93. Answered "white first second": network time on the slow-4G lab phone, splash screen wouldn't help (§7a) |
 | 10-11 | `d7518d0` | Run straight after that deploy scored 90 (new CSS/font cold at Cloudflare). Owner turned on **Smart Tiered Cache** (BOM + SIN); `deploy.sh` now **warms** pages, book pages, build files and fonts after the purge |
 | 10-11 | docs | PageSpeed re-run 22:25 → **93** (SI 3.0 s, TBT 0, CSS 0.18 s, font 0.35 s, white 3/8 frames); new release's CSS + `/ebooks` HIT at Marseille right after deploy |
+| 10-12 | (this commit) | Morning PageSpeed 80/76 = lab machine variance (network warm, less CPU work). Home below-the-fold sections + footer get `.cv-auto` (skip layout until scrolled near) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

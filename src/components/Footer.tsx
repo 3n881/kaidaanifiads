@@ -77,7 +77,7 @@ function LinkColumn({ title, links }: { title: Localized; links: FooterLink[] })
 /** Site footer — layout and styling follow the original site. */
 export default function Footer() {
   return (
-    <footer className="relative overflow-hidden bg-brand-teal pb-24 pt-20 text-white md:pb-10">
+    <footer className="cv-auto relative overflow-hidden bg-brand-teal pb-24 pt-20 text-white md:pb-10">
       {/* soft gold glows */}
       <div className="pointer-events-none absolute right-0 top-0 -mr-20 -mt-20 h-96 w-96 rounded-full bg-brand-gold/5 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 left-0 -mb-16 -ml-16 h-64 w-64 rounded-full bg-brand-gold/5 blur-3xl" />
