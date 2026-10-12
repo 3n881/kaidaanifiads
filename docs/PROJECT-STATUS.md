@@ -366,6 +366,9 @@ visitors are unchanged (their saved language applies as before, no picker). Chec
 first visit, choosing English closes it, unlocks scrolling and survives a reload. Tested and **not** the cause:
 the other ~10 blur effects on the first screen (removing all of them ≈ 0.2 s locally, within noise).
 **Rule:** don't put `backdrop-blur` on full-screen layers that can appear at load.
+Live on `b396683` (12 Oct): home, `/ebooks`, `/about` all serve the new release. Note: `/api/health` turns new as
+soon as app1 is updated — the Cloudflare clear + warm-up run a little later, so check pages a minute after.
+**Next:** owner runs PageSpeed 3 more times; expected to stay in the 90s (no more ~80 runs).
 
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
@@ -668,7 +671,8 @@ Trust this file over these where they disagree:
 | 10-12 | `e0b7395` | Morning PageSpeed 80/76 = lab machine variance (network warm, less CPU work). Home below-the-fold sections + footer get `.cv-auto` (skip layout until scrolled near) |
 | 10-12 | `5c25355` | PageSpeed **97** after `.cv-auto`. Found Cloudflare URL purge silently fails for pages (home showed the previous release ≈ 5 min after each deploy and after admin saves) → home purged by **Cache-Tag `kaf-home`** in `deploy.sh` and `src/lib/cdn.ts` |
 | 10-12 | `dd7be65` | Tag purge verified live (home HIT → MISS, header hidden from visitors); 3-run PageSpeed median pending (owner runs) |
-| 10-12 | (this commit) | PageSpeed 3-run median **90** (97/81/90). Bad runs = scripts ran before first paint and the language picker's full-screen blur held it ~1.8 s → picker opens after the first paint (2 frames) and uses a solid tint instead of blur |
+| 10-12 | `b396683` | PageSpeed 3-run median **90** (97/81/90). Bad runs = scripts ran before first paint and the language picker's full-screen blur held it ~1.8 s → picker opens after the first paint (2 frames) and uses a solid tint instead of blur |
+| 10-12 | docs | Picker change verified live (all pages on `b396683`); 3 new PageSpeed runs pending (owner) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
