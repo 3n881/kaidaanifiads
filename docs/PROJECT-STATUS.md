@@ -158,7 +158,11 @@ Full detail: `docs/HANDOFF.md` §3.
 5. The Razorpay webhook (`payment.captured`) saves the buyer's phone and sends the **PDF on WhatsApp**
    (`payment_sucess_pdf_v2`, Document header). It never sends twice. If WhatsApp wasn't sent after
    about 8 s, the order page offers a "PDF on WhatsApp" popup.
-6. **माझी पुस्तके** (`/my-books`) lists orders saved on that phone and can resend the PDF to WhatsApp.
+6. **माझी पुस्तके** (`/my-books`) lists **paid** orders saved on that phone and can resend the PDF to WhatsApp.
+   The phone saves an order (`kaf-orders`) *before* payment starts (so a closed browser can still find a paid
+   one); since 2026-10-12 My Books asks `POST /api/orders/status` (each order's signed access token, max 30,
+   `no-store`) and hides unpaid/cancelled/failed attempts. Shows "तपासत आहे…" while checking; if the check
+   fails it falls back to the full list.
 7. A failed or abandoned payment with a phone number gets **one** `pending_followup_v2` reminder after
    **10 min** (both delays set to 10 on the server 2026-10-11; the cron runs every 10 min, so it arrives
    10–20 min after the buyer leaves), at most one per phone + book per day, none if they paid since.
@@ -401,7 +405,7 @@ eager on the first carousel/book cover, and keep list pages free of `useSearchPa
 | `/ebooks/(list)`, `/combos/(list)` | ISR 300 s | `Catalog`: language tabs (3+ languages, else chips), **Book ID** search (overrides other filters), category chips, text search, sort. `loading.tsx` lives in the `(list)` group on purpose |
 | `/ebooks/[slug]`, `/combos/[slug]` | SSG + ISR 300 s | `ProductDetail` + `ProductGallery` (cover + reader pages 2–6) + `SampleReader` pop-up + `StickyBuyBar`. Unknown slug → real 404 |
 | `/order/[orderId]` | dynamic, noindex, no-referrer | Token check → "ही लिंक अपूर्ण आहे" if bad; DB down → "system busy" auto-refresh; `created` → inline Razorpay reconcile; paid → auto-download once (sessionStorage `kaf-dl-<id>`), `DownloadWhere`, `InAppBrowserHint`, WhatsApp popup fallback. UI language from cookie `kaf_locale` |
-| `/my-books` | client list from localStorage `kaf-orders` | Server action `sendMyBooks` sends up to 10 paid orders to a typed WhatsApp number; same reply either way (no enumeration). Combos upsell row |
+| `/my-books` | client list from localStorage `kaf-orders`, filtered to **paid** via `POST /api/orders/status` (`src/app/api/orders/status/route.ts`: paid / pending (<30 min) / unpaid) | Server action `sendMyBooks` sends up to 10 paid orders to a typed WhatsApp number; same reply either way (no enumeration). Combos upsell row |
 | `/contact` | static + server action | `ContactForm` → `contact/actions.ts`: honeypot `website`, needs email or 10-digit phone, 5/hour per SHA-256(IP) → `contact_messages` |
 | `/about`, policy pages (`PolicyPage`), `/site-index`, `not-found` | static | Policy body text stays English; titles localized |
 | `sitemap.ts`, `robots.ts` (disallows `/dashboard`), `manifest.ts` | — | Use `NEXT_PUBLIC_SITE_URL` |
@@ -680,7 +684,8 @@ Trust this file over these where they disagree:
 | 10-12 | `dd7be65` | Tag purge verified live (home HIT → MISS, header hidden from visitors); 3-run PageSpeed median pending (owner runs) |
 | 10-12 | `b396683` | PageSpeed 3-run median **90** (97/81/90). Bad runs = scripts ran before first paint and the language picker's full-screen blur held it ~1.8 s → picker opens after the first paint (2 frames) and uses a solid tint instead of blur |
 | 10-12 | docs | Picker change verified live (all pages on `b396683`); 3 new PageSpeed runs pending (owner) |
-| 10-12 | (this commit) | Admin book saves now also clear the **www.** copies of /ebooks + /combos and the **sitemap** (Next + Cloudflare, both hosts). Purge body tested live: www lists, www home and both sitemaps HIT → MISS |
+| 10-12 | `f23dbcb` | Admin book saves now also clear the **www.** copies of /ebooks + /combos and the **sitemap** (Next + Cloudflare, both hosts). Purge body tested live: www lists, www home and both sitemaps HIT → MISS |
+| 10-12 | `6e6123a` + this commit | **My Books showed unpaid attempts** (owner's 4 cancelled ग्रामपंचायत tries) → new `/api/orders/status`; My Books lists only paid orders. Checked live with the owner's 7 saved orders: 1 paid (shown), 2 unpaid + 4 fresh attempts (hidden) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

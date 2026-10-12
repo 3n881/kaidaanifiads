@@ -13,8 +13,9 @@ export type SavedOrderStatus = "paid" | "pending" | "unpaid";
 /**
  * Payment status of the orders this phone remembers (My Books). The device
  * saves an order before payment starts, so the list also holds cancelled and
- * failed attempts — My Books shows only the paid ones (and a fresh pending
- * one). Each order needs its signed access token, so ids alone reveal nothing.
+ * failed attempts — My Books shows only the paid ones ("pending" = unpaid and
+ * under 30 min old, for callers that want it). Each order needs its signed
+ * access token, so ids alone reveal nothing.
  */
 export async function POST(req: NextRequest) {
   let body: { orders?: Array<{ orderId?: unknown; token?: unknown }> };
