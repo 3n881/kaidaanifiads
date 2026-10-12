@@ -346,6 +346,9 @@ deploy the home page showed the *previous* release for up to 5 min (it then refr
 Fix: `next.config.js` sends `Cache-Tag: kaf-home` on `/` only (Cloudflare strips it from visitors); `deploy.sh`
 and the admin's `purgePublicPages` (`src/lib/cdn.ts`) purge the home page **by tag**. Other pages keep using
 prefix purge (works). **Never go back to URL purge for pages.**
+Verified live on `5c25355`: home HIT → tag purge → **MISS**; the `Cache-Tag` header is not shown to visitors.
+Home `.cv-auto` sections checked at 375 px (all render full size and fade in). Owner to run PageSpeed 2 more
+times for a 3-run median (PSI runs started from Claude's hidden browser pane stall on "Running analysis").
 
 **"White screen for the first ~1 s" (owner question):** the filmstrip is white for its first 3 of 8 frames
 (≈ 1.1 s) — that is the emulated slow-4G phone connecting and downloading the HTML + 17 KB CSS; the page's HTML
@@ -646,7 +649,8 @@ Trust this file over these where they disagree:
 | 10-11 | `d7518d0` | Run straight after that deploy scored 90 (new CSS/font cold at Cloudflare). Owner turned on **Smart Tiered Cache** (BOM + SIN); `deploy.sh` now **warms** pages, book pages, build files and fonts after the purge |
 | 10-11 | docs | PageSpeed re-run 22:25 → **93** (SI 3.0 s, TBT 0, CSS 0.18 s, font 0.35 s, white 3/8 frames); new release's CSS + `/ebooks` HIT at Marseille right after deploy |
 | 10-12 | `e0b7395` | Morning PageSpeed 80/76 = lab machine variance (network warm, less CPU work). Home below-the-fold sections + footer get `.cv-auto` (skip layout until scrolled near) |
-| 10-12 | (this commit) | PageSpeed **97** after `.cv-auto`. Found Cloudflare URL purge silently fails for pages (home showed the previous release ≈ 5 min after each deploy and after admin saves) → home purged by **Cache-Tag `kaf-home`** in `deploy.sh` and `src/lib/cdn.ts` |
+| 10-12 | `5c25355` | PageSpeed **97** after `.cv-auto`. Found Cloudflare URL purge silently fails for pages (home showed the previous release ≈ 5 min after each deploy and after admin saves) → home purged by **Cache-Tag `kaf-home`** in `deploy.sh` and `src/lib/cdn.ts` |
+| 10-12 | docs | Tag purge verified live (home HIT → MISS, header hidden from visitors); 3-run PageSpeed median pending (owner runs) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
