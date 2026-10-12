@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, ChevronRight, HelpCircle, MessageCircle, Phone, Send, Zap } from "lucide-react";
 import { SITE, type Product } from "@/data/catalog";
@@ -9,13 +9,14 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { getSavedOrders, orderHref, type SavedOrder } from "@/lib/purchases";
 import { sendMyBooks } from "./actions";
 import { NEW_VERSION_TEXT } from "@/lib/stale-action";
+import type { SavedOrderStatus } from "@/app/api/orders/status/route";
 
 const digits = (phone: string) => phone.replace(/\D/g, "");
 
 const COPY = {
-  mr: { invalid: "कृपया वैध १० अंकी व्हॉट्सॲप नंबर भरा.", home: "मुख्यपृष्ठ", title: "माझी पुस्तके", intro: "दुसऱ्या फोनवर खरेदी केली? पेमेंट करताना दिलेला नंबर टाका — पुस्तक PDF त्याच WhatsApp नंबरवर पाठवले जाईल.", placeholder: "WhatsApp नंबर टाका…", number: "WhatsApp नंबर", sending: "पाठवत आहे…", send: "पाठवा", sent: "या नंबरवर खरेदी असल्यास, पुस्तक PDF स्वरूपात काही मिनिटांत WhatsApp वर येईल.", call: "कॉल करा", help: "मदत हवी?", where: "PDF कुठे मिळेल?", whereBody: "पेमेंट झाल्यावर PDF लगेच डाउनलोड होते आणि पेमेंट करताना दिलेल्या नंबरवर WhatsApp वरही पाठवली जाते. याच फोनवरील खरेदी खाली दिसते — तिथून पुन्हा डाउनलोड करा. फोन बदलला असल्यास वर नंबर टाकून पुस्तक WhatsApp वर मागवा.", onPhone: "या फोनवरील खरेदी", empty: "या फोनवर अजून कोणतीही खरेदी नाही", emptyHint: "दुसऱ्या फोनवर खरेदी केली असल्यास वर नंबर टाका", forYou: "तुमच्यासाठी खास कॉम्बोस", combos: "कायदेशीर कॉम्बो पॅक्स", details: "Check Details / अधिक माहिती" },
-  hi: { invalid: "कृपया सही 10 अंकों का व्हॉट्सऐप नंबर भरें।", home: "होम", title: "मेरी किताबें", intro: "दूसरे फ़ोन पर खरीदा? भुगतान के समय दिया गया नंबर डालें — किताब PDF उसी WhatsApp नंबर पर भेजी जाएगी।", placeholder: "WhatsApp नंबर डालें…", number: "WhatsApp नंबर", sending: "भेज रहे हैं…", send: "भेजें", sent: "इस नंबर पर खरीदारी होने पर, किताब PDF कुछ ही मिनटों में WhatsApp पर आ जाएगी।", call: "कॉल करें", help: "मदद चाहिए?", where: "PDF कहाँ मिलेगी?", whereBody: "भुगतान होते ही PDF तुरंत डाउनलोड होती है और भुगतान के समय दिए गए नंबर पर WhatsApp पर भी भेजी जाती है। इसी फ़ोन की खरीदारी नीचे दिखती है — वहाँ से दोबारा डाउनलोड करें। फ़ोन बदल गया हो तो ऊपर नंबर डालकर किताब WhatsApp पर मंगाएँ।", onPhone: "इस फ़ोन की खरीदारी", empty: "इस फ़ोन पर अभी कोई खरीदारी नहीं", emptyHint: "दूसरे फ़ोन पर खरीदा हो तो ऊपर नंबर डालें", forYou: "आपके लिए खास कॉम्बो", combos: "कानूनी कॉम्बो पैक्स", details: "Check Details / और जानकारी" },
-  en: { invalid: "Please enter a valid 10-digit WhatsApp number.", home: "Home", title: "My Books", intro: "Bought on another phone? Enter the number you used while paying — the PDF will be sent to that WhatsApp number.", placeholder: "Enter WhatsApp number…", number: "WhatsApp number", sending: "Sending…", send: "Send", sent: "If this number has purchases, the PDF will arrive on WhatsApp in a few minutes.", call: "Call", help: "Need help?", where: "Where is my PDF?", whereBody: "Right after payment the PDF downloads and is also sent on WhatsApp to the number used while paying. Purchases made on this phone are listed below — download again from there. Changed phones? Enter your number above to get the book on WhatsApp.", onPhone: "Purchases on this phone", empty: "No purchases on this phone yet", emptyHint: "Bought on another phone? Enter your number above", forYou: "Special combos for you", combos: "Legal combo packs", details: "Check details" },
+  mr: { invalid: "कृपया वैध १० अंकी व्हॉट्सॲप नंबर भरा.", home: "मुख्यपृष्ठ", title: "माझी पुस्तके", intro: "दुसऱ्या फोनवर खरेदी केली? पेमेंट करताना दिलेला नंबर टाका — पुस्तक PDF त्याच WhatsApp नंबरवर पाठवले जाईल.", placeholder: "WhatsApp नंबर टाका…", number: "WhatsApp नंबर", sending: "पाठवत आहे…", send: "पाठवा", sent: "या नंबरवर खरेदी असल्यास, पुस्तक PDF स्वरूपात काही मिनिटांत WhatsApp वर येईल.", call: "कॉल करा", help: "मदत हवी?", where: "PDF कुठे मिळेल?", whereBody: "पेमेंट झाल्यावर PDF लगेच डाउनलोड होते आणि पेमेंट करताना दिलेल्या नंबरवर WhatsApp वरही पाठवली जाते. याच फोनवरील खरेदी खाली दिसते — तिथून पुन्हा डाउनलोड करा. फोन बदलला असल्यास वर नंबर टाकून पुस्तक WhatsApp वर मागवा.", onPhone: "या फोनवरील खरेदी", empty: "या फोनवर अजून कोणतीही खरेदी नाही", emptyHint: "दुसऱ्या फोनवर खरेदी केली असल्यास वर नंबर टाका", forYou: "तुमच्यासाठी खास कॉम्बोस", combos: "कायदेशीर कॉम्बो पॅक्स", details: "Check Details / अधिक माहिती", pending: "पेमेंट तपासत आहे", checking: "तपासत आहे…" },
+  hi: { invalid: "कृपया सही 10 अंकों का व्हॉट्सऐप नंबर भरें।", home: "होम", title: "मेरी किताबें", intro: "दूसरे फ़ोन पर खरीदा? भुगतान के समय दिया गया नंबर डालें — किताब PDF उसी WhatsApp नंबर पर भेजी जाएगी।", placeholder: "WhatsApp नंबर डालें…", number: "WhatsApp नंबर", sending: "भेज रहे हैं…", send: "भेजें", sent: "इस नंबर पर खरीदारी होने पर, किताब PDF कुछ ही मिनटों में WhatsApp पर आ जाएगी।", call: "कॉल करें", help: "मदद चाहिए?", where: "PDF कहाँ मिलेगी?", whereBody: "भुगतान होते ही PDF तुरंत डाउनलोड होती है और भुगतान के समय दिए गए नंबर पर WhatsApp पर भी भेजी जाती है। इसी फ़ोन की खरीदारी नीचे दिखती है — वहाँ से दोबारा डाउनलोड करें। फ़ोन बदल गया हो तो ऊपर नंबर डालकर किताब WhatsApp पर मंगाएँ।", onPhone: "इस फ़ोन की खरीदारी", empty: "इस फ़ोन पर अभी कोई खरीदारी नहीं", emptyHint: "दूसरे फ़ोन पर खरीदा हो तो ऊपर नंबर डालें", forYou: "आपके लिए खास कॉम्बो", combos: "कानूनी कॉम्बो पैक्स", details: "Check Details / और जानकारी", pending: "भुगतान जाँच रहे हैं", checking: "जाँच रहे हैं…" },
+  en: { invalid: "Please enter a valid 10-digit WhatsApp number.", home: "Home", title: "My Books", intro: "Bought on another phone? Enter the number you used while paying — the PDF will be sent to that WhatsApp number.", placeholder: "Enter WhatsApp number…", number: "WhatsApp number", sending: "Sending…", send: "Send", sent: "If this number has purchases, the PDF will arrive on WhatsApp in a few minutes.", call: "Call", help: "Need help?", where: "Where is my PDF?", whereBody: "Right after payment the PDF downloads and is also sent on WhatsApp to the number used while paying. Purchases made on this phone are listed below — download again from there. Changed phones? Enter your number above to get the book on WhatsApp.", onPhone: "Purchases on this phone", empty: "No purchases on this phone yet", emptyHint: "Bought on another phone? Enter your number above", forYou: "Special combos for you", combos: "Legal combo packs", details: "Check details", pending: "Checking payment", checking: "Checking…" },
 } as const;
 
 
@@ -44,6 +45,32 @@ function subscribe(onChange: () => void) {
 
 export default function MyBooksClient({ combos }: { combos: Product[] }) {
   const saved = useSyncExternalStore(subscribe, readSaved, () => EMPTY);
+  // The phone also remembers attempts that were never paid (it saves an order
+  // before payment starts), so ask the server which ones are paid.
+  // null = still checking; "all" = check failed, show everything as before.
+  const [statuses, setStatuses] = useState<Record<string, SavedOrderStatus> | "all" | null>(null);
+  useEffect(() => {
+    if (saved.length === 0) return;
+    let cancelled = false;
+    fetch("/api/orders/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orders: saved.map(({ orderId, token }) => ({ orderId, token })) }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: { statuses: Record<string, SavedOrderStatus> }) => {
+        if (!cancelled) setStatuses(data.statuses);
+      })
+      .catch(() => {
+        if (!cancelled) setStatuses("all");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [saved]);
+  const visible =
+    statuses === "all" ? saved : statuses ? saved.filter((o) => statuses[o.orderId] && statuses[o.orderId] !== "unpaid") : [];
+  const checking = saved.length > 0 && statuses === null;
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -161,11 +188,13 @@ export default function MyBooksClient({ combos }: { combos: Product[] }) {
 
         {/* purchases saved on this phone */}
         <div className="space-y-3">
-          {saved.length > 0 ? (
+          {checking ? (
+            <p className="font-deva py-10 text-center text-sm text-gray-400">{c.checking}</p>
+          ) : visible.length > 0 ? (
             <>
               <h2 className="font-deva px-1 text-xs font-black uppercase tracking-wide text-gray-400">{c.onPhone}</h2>
               <ul className="space-y-2">
-                {saved.map((o) => (
+                {visible.map((o) => (
                   <li key={o.orderId}>
                     <Link
                       href={orderHref(o)}
@@ -174,7 +203,14 @@ export default function MyBooksClient({ combos }: { combos: Product[] }) {
                       <BookOpen className="h-5 w-5 shrink-0 text-brand-teal" />
                       <span className="min-w-0 flex-1">
                         <span className="font-deva block truncate text-sm font-bold text-gray-900">{o.title}</span>
-                        <span className="text-xs text-gray-400">{new Date(o.savedAt).toLocaleDateString("en-IN")}</span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(o.savedAt).toLocaleDateString("en-IN")}
+                          {statuses !== "all" && statuses?.[o.orderId] === "pending" && (
+                            <span className="font-deva ml-2 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+                              {c.pending}
+                            </span>
+                          )}
+                        </span>
                       </span>
                       <ChevronRight className="h-4 w-4 text-gray-400" />
                     </Link>
