@@ -685,7 +685,8 @@ Trust this file over these where they disagree:
 | 10-12 | `b396683` | PageSpeed 3-run median **90** (97/81/90). Bad runs = scripts ran before first paint and the language picker's full-screen blur held it ~1.8 s → picker opens after the first paint (2 frames) and uses a solid tint instead of blur |
 | 10-12 | docs | Picker change verified live (all pages on `b396683`); 3 new PageSpeed runs pending (owner) |
 | 10-12 | `f23dbcb` | Admin book saves now also clear the **www.** copies of /ebooks + /combos and the **sitemap** (Next + Cloudflare, both hosts). Purge body tested live: www lists, www home and both sitemaps HIT → MISS |
-| 10-12 | `6e6123a` + this commit | **My Books showed unpaid attempts** (owner's 4 cancelled ग्रामपंचायत tries) → new `/api/orders/status`; My Books lists only paid orders. Checked live with the owner's 7 saved orders: 1 paid (shown), 2 unpaid + 4 fresh attempts (hidden) |
+| 10-12 | `6e6123a` `3f38d47` | **My Books showed unpaid attempts** (owner's 4 cancelled ग्रामपंचायत tries) → new `/api/orders/status`; My Books lists only paid orders. Checked live with the owner's 7 saved orders: 1 paid (shown), 2 unpaid + 4 fresh attempts (hidden) |
+| 10-12 | docs | `3f38d47` live: My Books paid-only (first version briefly also showed unpaid attempts < 30 min old as "pending" — dropped, a real payment is marked paid within seconds). `/my-books` and `/api/orders/status` not cached by Cloudflare (DYNAMIC / no-store) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
