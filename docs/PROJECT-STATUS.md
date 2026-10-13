@@ -1,6 +1,6 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-11 evening** (live commit `bd822ce` + this doc update). One place for any developer or AI agent to
+> **Last updated 2026-10-13** (live commit `3f38d47`; full refresh incl. the commands cheat sheet §7b). One place for any developer or AI agent to
 > understand where the project is: what exists, how it was built, what is live, what is next, and
 > which deeper doc to open for details. Facts were checked against the code, the git history, the
 > live site (`/api/health`) and the production database (read-only) on this date.
@@ -49,7 +49,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 
 | | Address | What it is |
 |---|---|---|
-| **Production (ours)** | **https://kaydyachaanifayddyacha.com** (+ `www`) | This repo. Live since **2026-10-10** on AWS Lightsail `kaf-a` (Mumbai) behind Cloudflare. **Still on Razorpay TEST keys and not announced.** Note the spelling: `fay`**`dd`**`yach`**`a`** |
+| **Production (ours)** | **https://kaydyachaanifayddyacha.com** (+ `www`) | This repo. Live since **2026-10-10** on AWS Lightsail `kaf-a` (Mumbai) behind Cloudflare. **Razorpay LIVE keys since 2026-10-11; real purchases work. Not announced yet** (no Search Console / Instagram bio link). Note the spelling: `fay`**`dd`**`yach`**`a`** |
 | Replov (old test host) | https://kaidyachaanifaidyacha-28da.replov.com | Earlier test deployment, still on the **Tokyo** database. Treat it as dead: **don't edit books there**, because changes land in Tokyo, not production. Delete it after go-live |
 | **Original site (NOT ours)** | https://www.kaydyachaanifaydyach.com | The client's previous site (Vercel, own DB, Cloudflare R2). **Reference only — never change it.** Its card numbers on `/ebooks` = our product `id`s. It shares the client's Razorpay and Interakt accounts with us |
 
@@ -80,7 +80,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 
 ---
 
-## 3. Status at a glance (2026-10-11)
+## 3. Status at a glance (2026-10-13)
 
 | Area | State |
 |---|---|
@@ -95,13 +95,15 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Database moved Tokyo → Mumbai | ✅ 2026-10-04 |
 | Server + Cloudflare + auto-deploy | ✅ 2026-10-10 (go-live Stages 0–3) |
 | **Stage 4: functional tests on the live domain** | 🟡 **In progress.** The DB shows 3 paid test orders on 10-10 at 21:25–21:47 IST (#27, #30, #25) plus 1 abandoned. Results are not yet written up. Run the full checklist in `go-live-plan.md` Stage 4 |
-| Page speed (first screen) | ✅ 2026-10-11 — PageSpeed mobile: home **93**, book page **85** (§7a) |
+| Page speed (first screen) | ✅ PageSpeed mobile home: best **97**, 3-run median **90** (12 Oct); book page 91–92. Lab scores swing ~80–97 — cause found and fixed 12 Oct (language picker blur at first paint, §7a); owner to re-run 3× |
+| Cloudflare caching + deploys | ✅ 2026-10-12: deploys clear only **pages** (prefix purge + home by Cache-Tag `kaf-home`), then **warm** pages/build files/fonts; **Smart Tiered Cache** on; admin book saves clear home, /ebooks, /combos, sitemap on both hosts (§4, §7) |
+| My Books | ✅ 2026-10-12: lists **paid** orders only (`/api/orders/status`); before, cancelled attempts showed as books |
 | Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). **k6 Reel spike PASSED** 2026-10-11 from Grafana Cloud Mumbai: 66,825 requests, peak 300 req/s, **0 errors**, p95 17 ms, **100 % from Cloudflare**, server CPU flat. **k6 Server direct** 2026-10-11 (dev PC, `loadtest/origin.js`, 10→60 req/s uncached): 11,028 req, **0 errors**; comfortable up to ≈ 30–40 req/s; **after catalog caching (`4b1fbd2`) all thresholds pass up to 60 req/s** (median ≈ 0.4 s flat, p95 ≤ 1.6 s) vs ~5 req/s needed in a Reel (> 10× headroom). Still to do: WebPageTest, real-phone check |
 | Stage 6: go-live (Razorpay **live** keys + announce) | 🟡 **Live payments working 2026-10-11**: real ₹99 purchase 14:50 IST (#30) → paid, downloaded, PDF on WhatsApp, webhook saved the phone. Refund that test payment in Razorpay. Not announced yet (Search Console, Instagram bio pending) |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
 | Meta Pixel + Conversions API | ⬜ Waiting for the 3 items from the client's Meta account (§11 item 8) |
 
-Production database snapshot (2026-10-11 evening, read-only): **10 products** (9 books at ₹99 + the owner's **#31 "test book" at ₹1, still visible — hide or delete it**). Since live payments (11 Oct ≈ 14:30 IST): 6 paid orders (₹496, incl. the owner's ₹99 and ₹1 test purchases — to be refunded), 2 not paid, 1 failed.
+Production database snapshot (2026-10-13 09:10 IST, read-only): **11 products** — 10 visible at ₹99 (9 original + **new #32 "ग्रामपंचायत: संपूर्ण माहिती"**, slug `book-32`, added by the owner 12 Oct: PDF + cover + 6 reader pages OK, but **no description, category "Other"**, empty `available_locales` (harmless — falls back to `language`)) + **#31 "test book" ₹1 now HIDDEN** ✅. Since live payments (11 Oct 14:30 IST): **20 orders — 8 paid (₹498, incl. the owner's test purchases; ₹0 refunded so far), 11 not paid (mostly the owner's cancelled tries), 1 failed**; 32 orders in total; 1 interested-buyer sign-up (`leads`); 0 contact messages.
 
 ---
 
@@ -192,11 +194,12 @@ All FAQ, how-to-buy, policy and order texts describe **our** flow.
 
 ## 6. Catalog and content
 
-9 live products, all ₹99 (MRP ₹198). Combos are **one merged PDF** on the combo row (`combo_items`
+**10 live products** (2026-10-13), all ₹99 (MRP ₹198; #32 MRP ₹149). #31 "test book" (₹1) exists but is **hidden**. Combos are **one merged PDF** on the combo row (`combo_items`
 stays empty on purpose).
 
 | ID | Slug | Type | Lang | PDF | Reader pages |
 |---|---|---|---|---|---|
+| 32 | `book-32` (ग्रामपंचायत: संपूर्ण माहिती — added by the owner in the dashboard 12 Oct; Marathi-only title → fallback slug) | ebook | mr | ✅ (195 pages) | 6 |
 | 30 | `rti-adhiniyam-2005-sampurna-guide` | ebook | hi | ✅ | 6 |
 | 27 | `hindu-uttaradhikar-kanoon-guide` | ebook | hi | ✅ | 6 |
 | 26 | `jamin-mojani-sampurna-margadarshak` | ebook | mr | ✅ (49.5 MB) | 6 |
@@ -207,7 +210,11 @@ stays empty on purpose).
 | 8 | `vivah-te-ghatasphot-margdarshika` | combo | mr | ✅ | 6 |
 | 4 | `malmatta-vatap-kayadeshir-hakka` | combo | mr | ✅ | 6 |
 
-**Missing (exist on the original, waiting for PDFs from Ajay):** #32 ग्रामपंचायत योद्धा (₹99),
+**Open question:** is our new #32 the original site's #32 "ग्रामपंचायत योद्धा"? If yes, point its old-URL redirect
+(`legacyPendingBooks` in `next.config.js`, now → `/ebooks`) to `/ebooks/book-32` and move it to `legacyBooks`.
+If the owner wants a readable slug instead of `book-32`, change it **before** sharing the link in a Reel (old links would 404).
+
+**Missing (exist on the original, waiting for PDFs from Ajay):**
 #31 वडिलोपार्जित जमीन… (**₹49** there), #29 हक्कसोडपत्र… , #28 ऊसाचा हिशोब… , #22 लग्न, फसवणूक + हुंडा
 प्रतिबंध (combo). Their old URLs temporarily redirect to `/ebooks` / `/combos` (`next.config.js`).
 
@@ -394,9 +401,90 @@ text layout is slowed by Windows loading system font files, so local numbers loo
 **Rules:** don't re-add font preloads or a Devanagari web font, keep the cover `fetchpriority=high` +
 eager on the first carousel/book cover, and keep list pages free of `useSearchParams`.
 
+## 7b. Commands cheat sheet — server, Cloudflare, database, local (2026-10-13)
+
+Everything an agent or developer needs to operate the store. Secrets are never typed into chat or docs:
+commands read them from files (`.env.mumbai`, `.env.local`, `/opt/kaf/app.env`).
+
+### Getting onto the server
+- **Browser SSH (always works):** AWS Lightsail console → instance **`kaf-a`** → *Connect using SSH*.
+- **Laptop SSH** only if Lightsail → kaf-a → Networking → port 22 allows the current home IP (it changes):
+  `ssh -i C:\Users\shivr\kaf-keys\kaf-key.pem ubuntu@13.206.92.130` (static IP `kaf-a-ip`).
+- Deploys don't need either: GitHub Actions opens port 22 for its own IP, deploys, closes it again.
+- Everything lives in **`/opt/kaf/`**: `app.env` (runtime secrets, chmod 600), `docker-compose.yml`, `Caddyfile`,
+  `deploy.sh` (all three copied from `deploy/` on every deploy), `certs/` (Cloudflare Origin cert),
+  `.current-image` (image now live), `app.env.test-keys-backup` (Razorpay test keys).
+
+### On the server (`cd /opt/kaf` first)
+| Task | Command |
+|---|---|
+| Container status + health | `docker compose ps` |
+| Live logs | `docker compose logs -f --tail=200 app1 app2` |
+| One topic in the last hour | `docker compose logs --since 1h app1 app2 \| grep '\[webhook\]'` (tags: `[checkout] [confirm] [webhook] [download] [reconcile] [reminders] [interakt] [cdn] [orders]`) |
+| Health from inside | `docker compose exec -T app1 node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>r.text()).then(console.log)"` |
+| CPU / memory / disk | `docker stats --no-stream` · `free -h` · `df -h` |
+| **After editing `app.env`** (e.g. reminder delays, Interakt template) | `nano app.env` (add `sudo` if denied), then `IMAGE=$(cat .current-image) bash deploy.sh` — recreates app1 then app2 with the new values, zero downtime, then clears + warms Cloudflare |
+| Roll back to an older release | `IMAGE=ghcr.io/3n881/kaidaanifiads:<12-char sha> bash deploy.sh` (sha = a commit from `git log`; images are in GHCR) |
+| Back to Razorpay test keys (emergency) | `cp app.env.test-keys-backup app.env && IMAGE=$(cat .current-image) bash deploy.sh` |
+
+`deploy.sh` order: pull → recreate app1 → wait healthy → app2 → wait healthy (rolls back on failure) → reload
+Caddy → write `.current-image` → Cloudflare page purge → warm-up → prune old images.
+
+### From the laptop (no SSH needed)
+| Task | Command |
+|---|---|
+| Which commit is live | `curl -s https://kaydyachaanifayddyacha.com/api/health` (turns new as soon as **app1** is updated; the Cloudflare clear + warm-up finish ~1 min later) |
+| Which release a page shows | `curl -s https://kaydyachaanifayddyacha.com/ \| grep -o 'dpl=[0-9a-f]*' \| sort -u` |
+| Is a page/file cached | `curl -sI https://kaydyachaanifayddyacha.com/ebooks \| grep -i cf-cache-status` (HIT / MISS / EXPIRED / DYNAMIC = never cached) |
+| Watch a deploy | GitHub → Actions → **Deploy**. Pushes that only touch `docs/**`, `**/*.md`, `loadtest/**` do **not** deploy |
+| Run the cron by hand | `curl -X POST https://kaydyachaanifayddyacha.com/api/cron/reconcile -H "Authorization: Bearer <CRON_SECRET from kaf-keys/app.env>"` — ⚠️ real: reconciles with Razorpay and **sends due WhatsApp reminders** |
+
+### Cloudflare cache purge (token + zone in `.env.mumbai`)
+```bash
+z=$(grep -m1 '^CLOUDFLARE_ZONE_ID=' .env.mumbai | cut -d= -f2- | tr -d "\"'\r")
+t=$(grep -m1 '^CLOUDFLARE_API_TOKEN=' .env.mumbai | cut -d= -f2- | tr -d "\"'\r")
+api() { curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$z/purge_cache" \
+  -H "Authorization: Bearer $t" -H "Content-Type: application/json" --data "$1"; }
+api '{"tags":["kaf-home"]}'                                   # home page, both hosts
+api '{"prefixes":["kaydyachaanifayddyacha.com/ebooks","www.kaydyachaanifayddyacha.com/ebooks"]}'  # a page + everything under it (max 30 per call)
+api '{"files":["https://kaydyachaanifayddyacha.com/media/<file>.webp"]}'  # single IMAGE/PDF only
+```
+- **Never purge a page by URL** (`files`): Cloudflare says success but keeps the compressed copy (tested 12 Oct).
+- **Avoid `purge_everything`**: it empties the image cache and the first visitors (and PageSpeed) get slow covers.
+- `CLOUDFLARE_RULES_TOKEN` can edit cache/WAF rules (not Transform Rules, not DNS); the purge token can only purge.
+- Settings changed by hand in the dashboard (record them here): Transform Rule `strip-tracking-query`,
+  Smart Tiered Cache on, Web Analytics on, Rocket Loader / Email obfuscation / Bot Fight Mode off, Early Hints off.
+
+### Database (production = Mumbai `ntqwvfksdqdyoyknkprh`)
+- **Read-only checks:** a small Node script with GET requests only to `${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/…`
+  (service key from `.env.local`), run as `node --env-file=.env.local <script>.mjs`; keep scripts outside the repo
+  (scratchpad) and mask phone numbers in output.
+- **SQL / migrations:** Supabase dashboard → SQL editor, or `psql` with the session-pooler URL `NEW_DB_URL` from
+  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–009 are applied (§7). New ones go in
+  `supabase/migrations/0NN_name.sql` and are applied by hand — the app never runs migrations.
+- `select * from funnel_daily;` = daily visits → checkouts → paid.
+- ⚠️ `.env.local` points at **production**. Every `npm run db:*` script writes live data: use `--dry-run` first.
+
+### Local development (Windows PC)
+| Task | Command |
+|---|---|
+| Dev server | `npm run dev:webpack` (Claude preview config `kaida-dev-webpack`, port 3000; Turbopack is blocked by Windows Application Control) |
+| Production build / start | `npx next build --webpack` · `npx next start -p 3100` (`kaida-prod`) |
+| Checks before pushing | `npx tsc --noEmit` · `npx eslint <changed files>` |
+| Catalog / PDFs | `npm run db:upload-pdfs -- --dry-run` → `npm run db:upload-pdfs` · `npm run db:reader-pages` · `npm run db:cover-600` (§6) |
+| Load tests (production-safe ones only) | §10 → `loadtest/landing.js`, `loadtest/origin.js` via Docker `grafana/k6:0.54.0` |
+
+### Measuring speed
+- pagespeed.web.dev, mobile, **3 runs → use the median** (single runs swing ~80–97).
+- The report page hides the *measured* timings: in the browser console of a report,
+  `document.documentElement.innerHTML.match(/observed(FirstContentfulPaint|LargestContentfulPaint|DomContentLoaded|Load)\\":\d+/g)`
+  — if first paint comes *after* load, something at hydration delayed it (that is how the picker-blur issue was found).
+- The keyless PageSpeed API (`googleapis.com/pagespeedonline/v5`) hits its daily quota quickly; use the website.
+- Local Lighthouse/Puppeteer numbers on this Windows PC are slower than real Android (Windows font loading).
+
 ---
 
-## 8. Code map (checked 2026-10-10)
+## 8. Code map (checked 2026-10-10; routes and caching updated 2026-10-13)
 
 ### Public pages (`src/app`)
 | Route | Rendering | Notes |
@@ -419,6 +507,8 @@ eager on the first carousel/book cover, and keep list pages free of `useSearchPa
 | `api/cron/reconcile` | POST, Bearer `CRON_SECRET` (timing-safe) → `reconcileRecentOrders` (created/failed, last 48 h) + `sendPaymentReminders` |
 | `api/download/[orderId]` | Token + paid → `record_order_download` (cap 30) → 302 to a 5-min signed URL named `<slug>-<locale>.pdf`; bilingual error page |
 | `api/orders/contact` | Order-page popup: save a WhatsApp number + send the PDF (cap 3 via `claim_whatsapp_send`) |
+| `api/orders/status` | My Books: POST up to 30 `{orderId, token}` → `paid` / `pending` (unpaid < 30 min) / `unpaid`; tokens verified (HMAC), `no-store` (2026-10-12) |
+| `api/leads` | Didn't-pay WhatsApp sign-up (consent required, honeypot, 5/hour per IP hash) → `leads` |
 | `api/auth/login` | Admin password login (checks `ADMIN_EMAILS`) |
 | `api/auth/magic-link`, `auth/callback` | **Unused** by the UI (login page is password-only) |
 | `api/health` | `{"ok":true,"deployment":"<sha>"}`, no DB |
@@ -472,7 +562,6 @@ Backfill: `npm run db:reader-pages` (`--force`, `--dry-run`, `--only=<slug>`).
 ### Known small code issues (low priority)
 - Dead code: `Rating.tsx`, `DetailSkeleton`, `getFeaturedEbooks`/`getFeaturedCombos`, magic-link route + `/auth/callback`,
   create-next-app SVGs in `public/`.
-- Stale comment `products.ts:116` mentions `revalidateTag("products")`; nothing calls it (we use `revalidatePath`).
 - `delivery.ts`: with a Document-header template only the **first** deliverable PDF is attached. That's fine
   while combos are one merged PDF; revisit if combos ever use member books.
 - `/my-books` exports `revalidate 300` while `next.config.js` sets `no-store` on it. It holds no personal data,
@@ -538,6 +627,11 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
   (or reuse `revalidatePublic()` in `src/app/dashboard/actions.ts`), otherwise the header search, order page and
   dashboard can show old book data for up to 5 min. Don't remove the cache: without it every per-request page
   queries Supabase (k6 Server direct: p95 2–4 s at 50–60 req/s vs ≤ 1.6 s with it).
+- **Cloudflare cache rules of thumb (2026-10-12):** pages are purged by **prefix** or the home **Cache-Tag
+  `kaf-home`**, never by URL; images/PDFs by URL are fine. A **new public page** must be added to `pages=` in
+  `deploy/deploy.sh` (purge list) and, if the admin changes it, to `revalidatePublic()` / `purgePublicPages`.
+  Don't put `backdrop-blur` on a full-screen layer that can show at load (it held first paint ~1.8 s on
+  PageSpeed's GPU-less phone). Below-the-fold sections get `.cv-auto`.
 - **Load tests:** `loadtest/landing.js` (Reel spike) and `loadtest/origin.js` (Server direct) are safe on
   production; `checkout.js` / `download.js` are not (live payments). Docker: `MSYS_NO_PATHCONV=1 docker run --rm
   -v "$(pwd -W):/scripts" grafana/k6:0.54.0 run -e BASE=https://kaydyachaanifayddyacha.com /scripts/origin.js`.
@@ -557,20 +651,22 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 ## 11. Open items (prioritised)
 
 ### Next up (before announcing)
-1. **Stage 4 functional tests** on `kaydyachaanifayddyacha.com` (test keys): success purchase, failed
+1. **Stage 4 functional tests** on `kaydyachaanifayddyacha.com` (now **live** keys — use cheap real purchases and refund them): success purchase, failed
    payment → reminder, order page refresh, My Books, **Instagram in-app on Android + iPhone**, dashboard
    edit → page updates within 5 min, unknown URL → 404, close tab after paying. Some test purchases
    already happened 10-10 evening. Check them against the table and write the results into `go-live-plan.md`.
 2. **Supabase Auth → URL Configuration** for the Mumbai project (Site URL + redirect URLs): never
    confirmed (`go-live-plan.md` 1B, `setup-steps-lightsail.md` Step 2). Dashboard login on the new
    domain is the test.
-3. **Stage 5**: PageSpeed ✅ (home 93, book 85 — §7a). Still to do: a real phone on Jio/Airtel 4G opening a
-   book link from Instagram, WebPageTest (Mumbai, Moto G, 4G), k6 `loadtest/` (landing spike, checkout,
-   webhook replay, download), container drill, deploy-under-load.
+3. **Stage 5**: PageSpeed ✅ (home median 90 / best 97, book 91–92 — §7a; owner to re-run 3× after the 12 Oct
+   picker fix). k6 Reel spike ✅ and Server direct ✅ (11 Oct). Still to do: a real phone on Jio/Airtel 4G opening a
+   book link from Instagram, WebPageTest (Mumbai, Moto G, 4G), container drill, deploy-under-load.
 4. **Stage 6 go-live**: ✅ Razorpay live keys + new live webhook + real ₹99 purchase (2026-10-11).
-   **Owner to do now:** hide/delete **#31 "test book" (₹1, visible)**; refund the ₹99 + ₹1 test payments in
+   **Owner to do now:** ~~hide #31 test book~~ ✅ hidden 12 Oct; **book #32 ग्रामपंचायत: add a description,
+   short description and a real category** (dashboard → Products → #32; it shows empty text now) and
+   answer the slug / old-link question in §6; refund the ₹99 + ₹1 test payments in
    Razorpay, then press **Check with Razorpay** on those orders; in Razorpay → Live → Webhooks → **our**
-   webhook, also tick **`refund.created`** and **`refund.processed`**; run the k6 **Server direct** test;
+   webhook, also tick **`refund.created`** and **`refund.processed`**; ~~run the k6 Server direct test~~ ✅ 11 Oct;
    get an Interakt **marketing** template approved for interested buyers (body `{{1}}` book title,
    `{{2}}` book link) and set `INTERAKT_LEAD_TEMPLATE_NAME` (+ `_LANGUAGE`) in `/opt/kaf/app.env` → the
    next-day follow-up switches on (cron, after reminders; skips buyers who paid or got a reminder that day).
@@ -620,7 +716,7 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
     sales make the risk expensive).
 
 ### Tech debt
-- No CSP header yet (must allow Razorpay + connect.facebook.net). No refund status handling.
+- No CSP header yet (must allow Razorpay + connect.facebook.net). (Refund tracking exists since 11 Oct.)
 - Old `/api/preview/<old id>` links from the original aren't redirected.
 - `README.md` is still create-next-app boilerplate.
 - Caddy still answers `new.kaydyachaanifayddyacha.com` (unused staging name); harmless.
@@ -687,6 +783,7 @@ Trust this file over these where they disagree:
 | 10-12 | `f23dbcb` | Admin book saves now also clear the **www.** copies of /ebooks + /combos and the **sitemap** (Next + Cloudflare, both hosts). Purge body tested live: www lists, www home and both sitemaps HIT → MISS |
 | 10-12 | `6e6123a` `3f38d47` | **My Books showed unpaid attempts** (owner's 4 cancelled ग्रामपंचायत tries) → new `/api/orders/status`; My Books lists only paid orders. Checked live with the owner's 7 saved orders: 1 paid (shown), 2 unpaid + 4 fresh attempts (hidden) |
 | 10-12 | docs | `3f38d47` live: My Books paid-only (first version briefly also showed unpaid attempts < 30 min old as "pending" — dropped, a real payment is marked paid within seconds). `/my-books` and `/api/orders/status` not cached by Cloudflare (DYNAMIC / no-store) |
+| 10-13 | docs | **Full refresh of this doc**: header, §2 (live keys), §3 status + DB snapshot (11 products, #31 hidden, new #32 needs text, 8 paid / ₹498), new **§7b commands cheat sheet** (server, Cloudflare purge, DB, local, speed measuring), code map (`api/orders/status`, `api/leads`), §10 cache rules, §11 open items |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
@@ -706,6 +803,6 @@ variables, fonts, Cloudflare Free-plan limits …).
 | `docs/viral-launch-plan.md` | Original audit, cache/WAF rule tables (Phase 5), outage handling (Phase 9), per-Reel runbook | Rules current; status table stale |
 | `docs/deploy-lightsail.md` | Server runbook: manual deploy/rollback, monitoring, per-Reel routine, how code supports multiple servers | Two-server parts superseded |
 | `docs/setup-steps-ec2.md` | EC2 alternative | Not used |
-| `loadtest/README.md` | k6 tests (production-safe Reel spike ✅ passed 11 Oct, Server direct pending) + 12 failure drills | Current |
+| `loadtest/README.md` | k6 tests (Reel spike ✅ and Server direct ✅ both passed 11 Oct) + 12 failure drills | Current |
 | `supabase/checks/verify.sql` | Pre-launch DB checks | Not run |
 | `AGENTS.md` / `CLAUDE.md` | Next.js 16 warning (auto-written by `next dev`) | — |
