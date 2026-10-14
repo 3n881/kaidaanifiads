@@ -65,7 +65,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Interakt (WhatsApp API) | Client's account. Sender name "AS Consultancy Services". Templates `payment_sucess_pdf_v2` (sic) and `pending_followup_v2` |
 | cron-job.org | `POST https://kaydyachaanifayddyacha.com/api/cron/reconcile` every 10 min, `Authorization: Bearer <CRON_SECRET>` |
 | UptimeRobot | HTTPS monitor on `/api/health` every 5 min |
-| Meta Pixel | Code ready, **off**. Waiting for pixel ID + domain-verification code + Conversions API token from the client (§11 item 8) |
+| Meta Pixel | **On since 2026-10-14**: ID `1323976956324834` (GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS`). Domain verification + Conversions API token still to come from the client (§11 item 8) |
 
 ### Where secrets live (never commit, never paste in chat)
 
@@ -786,6 +786,8 @@ Trust this file over these where they disagree:
 | 10-13 | docs | **Full refresh of this doc**: header, §2 (live keys), §3 status + DB snapshot (11 products, #31 hidden, new #32 needs text, 8 paid / ₹498), new **§7b commands cheat sheet** (server, Cloudflare purge, DB, local, speed measuring), code map (`api/orders/status`, `api/leads`), §10 cache rules, §11 open items |
 
 | 10-14 | this commit | **Admin cover fixes.** (1) Every successful product save showed "Not saved: Saving failed" — Next 16 rejects the action promise with the `redirect()` signal and `ProductForm`'s catch swallowed it → `unstable_rethrow` in the catch (reproduced + verified on a temporary local page). (2) Square covers (owner's #8, #12, #19 uploads, 800×800) were cropped in the 3:4 cards → `src/lib/book-shape.ts` pads any non-3:4 cover/preview upload to 3:4 with its edge colour; dashboard warns when a picked cover isn't 3:4. Those 3 covers need re-uploading to get padded. (3) The sample reader skipped the uploaded cover (showed PDF pages 1–6) → reader shows cover + pages 2–6 like the viewer; 1600 px zoom only for `-p<n>-` page images. Known, accepted: after an admin save, pages can lag up to ~15 min because app1/app2 each have their own cache (a save clears only the container that handled it); owner OK with it (fix = ask both containers to revalidate, not built) |
+
+| 10-14 | this commit | **Meta Pixel on**: client gave pixel `1323976956324834` (one of the original site's 5, so both sites report into it); owner set GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS`. Privacy policy got section 4 "Cookies and Ad Measurement (Meta Pixel)" (what is sent; never name/phone/order link; not on /order, /my-books, /dashboard). Still from the client: domain-verification TXT + Conversions API token (server-side Purchase not built yet) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

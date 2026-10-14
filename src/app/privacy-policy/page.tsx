@@ -25,17 +25,23 @@ export default function Page() {
         {
           heading: "3. Sharing of Information",
           body: [
-            "We do not sell or rent your personal information. We share it only with service providers that help us operate — such as the payment gateway (Razorpay) and the WhatsApp delivery provider (Interakt) — strictly to fulfil your order.",
+            "We do not sell or rent your personal information. We share it only with service providers that help us operate — such as the payment gateway (Razorpay) and the WhatsApp delivery provider (Interakt) — strictly to fulfil your order, and with Meta for measuring our posts and ads (see section 4).",
           ],
         },
         {
-          heading: "4. Data Security",
+          heading: "4. Cookies and Ad Measurement (Meta Pixel)",
+          body: [
+            "We use the Meta (Facebook/Instagram) Pixel to measure how our Instagram and Facebook posts and ads perform. It uses cookies and tells Meta which of our pages you open, which book you view, when you start a payment and when a purchase completes (book, price and an order number). We never send Meta your name, phone number, payment details or your private download link, and the Pixel does not run on the order page, My Books or our admin pages. Meta processes this information under its own privacy policy. You can limit this through your browser (clear or block cookies) or your Facebook/Instagram ad settings.",
+          ],
+        },
+        {
+          heading: "5. Data Security",
           body: [
             "We take reasonable technical and organisational measures to protect your information. No method of transmission over the Internet is 100% secure.",
           ],
         },
         {
-          heading: "5. Your Rights",
+          heading: "6. Your Rights",
           body: [
             "You may request access to, correction of, or deletion of your personal data at any time by contacting us (see our Data Deletion policy).",
           ],
