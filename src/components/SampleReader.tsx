@@ -196,10 +196,11 @@ export default function SampleReader({
   };
 
   // Sharp enough for the screen: the 1600 px page when 800 px would be blurry.
+  // Only PDF page images (`-p<n>-800.webp`) have one; the cover shown first does not.
   const pageSrc = (url: string) => {
     const dpr = typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2);
     const needed = Math.max(stage.w, 320) * dpr * zoom;
-    return mediaUrl(needed > 850 && url.endsWith("-800.webp") ? url.replace(/-800\.webp$/, "-1600.webp") : url);
+    return mediaUrl(needed > 850 && /-p\d+-800\.webp$/.test(url) ? url.replace(/-800\.webp$/, "-1600.webp") : url);
   };
   const buyLabel = `${g.buy} (₹${product.price})`;
   const buyClass =

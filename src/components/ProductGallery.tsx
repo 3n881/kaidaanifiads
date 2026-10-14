@@ -36,6 +36,9 @@ export default function ProductGallery({
   const readerPages = product.readerPages ?? [];
   const extra = readerPages.length > 1 ? readerPages.slice(1, 6) : (product.galleryImages ?? []).slice(0, 5);
   const images = product.coverImage ? [product.coverImage, ...extra] : [];
+  // The reader shows the same pages as the viewer: cover first, then pages
+  // 2–6 (page 1 of the PDF is usually its own printed cover).
+  const readerList = readerPages.length > 1 && product.coverImage ? images : readerPages;
   const [selected, setSelected] = useState(0);
   const [readerAt, setReaderAt] = useState<number | null>(null);
   const total = images.length;
@@ -52,7 +55,7 @@ export default function ProductGallery({
         </div>
         <PreviewActions g={g} previewPages={previewPages} previewUrl={previewUrl} onOpen={() => setReaderAt(0)} />
         {readerAt !== null && (
-          <SampleReader product={product} previewUrl={previewUrl} pages={readerPages} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
+          <SampleReader product={product} previewUrl={previewUrl} pages={readerList} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
         )}
       </div>
     );
@@ -141,7 +144,7 @@ export default function ProductGallery({
       )}
 
       {readerAt !== null && (
-        <SampleReader product={product} previewUrl={previewUrl} pages={readerPages} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
+        <SampleReader product={product} previewUrl={previewUrl} pages={readerList} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -20,7 +21,7 @@ import type { AdminProduct } from "@/lib/admin";
 import { saveProductWithFeedback } from "@/app/dashboard/actions";
 import { isStaleAction, NEW_VERSION_TEXT } from "@/lib/stale-action";
 import { LOCALE_LABELS, type Locale } from "@/lib/i18n";
-import { coverSrc } from "@/lib/covers";
+import { coverSrc, isBookShaped } from "@/lib/covers";
 
 const EDITIONS: Locale[] = ["mr", "hi", "en"];
 const inputClass =
@@ -106,6 +107,9 @@ export default function ProductForm({
           try {
             setSaveState(await saveProductWithFeedback(null, data));
           } catch (error) {
+            // A successful save ends in redirect(), which reaches the browser as
+            // a rejected action; let Next handle it (navigates + remounts the form).
+            unstable_rethrow(error);
             // Page loaded before a deploy: keep the form, ask for a refresh.
             setSaveState({ error: isStaleAction(error) ? NEW_VERSION_TEXT.en : "Saving failed. Please try again." });
           }
@@ -407,10 +411,12 @@ function CoverField({ name, removeName, label, existingUrl, onPreviewChange }: {
   const [removed, setRemoved] = useState(false);
   const [selected, setSelected] = useState<{ name: string; url: string } | null>(null);
   const [error, setError] = useState("");
+  const [shapeNote, setShapeNote] = useState("");
   const shown = selected?.url ?? (removed ? null : existingUrl);
   const cancel = () => {
     if (input.current) input.current.value = "";
     setSelected(null);
+    setShapeNote("");
     onPreviewChange(removed ? null : existingUrl);
   };
   return (
@@ -433,9 +439,21 @@ function CoverField({ name, removeName, label, existingUrl, onPreviewChange }: {
             return;
           }
           setError("");
+          setShapeNote("");
           const url = URL.createObjectURL(file);
           setSelected({ name: file.name, url });
           onPreviewChange(url);
+          // Covers show in 3:4 book-shaped boxes; other shapes get plain
+          // borders when saved (uploadCover), so warn before saving.
+          const probe = new Image();
+          probe.onload = () => {
+            if (!isBookShaped(probe.naturalWidth, probe.naturalHeight)) {
+              setShapeNote(
+                `This picture is ${probe.naturalWidth} × ${probe.naturalHeight}, not book-shaped (3:4). It will be saved with plain borders so nothing is cut off. For the best look use a portrait image, e.g. 1200 × 1600.`,
+              );
+            }
+          };
+          probe.src = url;
         }}
       />
       {shown ? (
@@ -445,6 +463,7 @@ function CoverField({ name, removeName, label, existingUrl, onPreviewChange }: {
         <div className="mb-2 flex h-36 w-28 items-center justify-center rounded-lg border border-dashed border-brand-200 text-[11px] text-brand-400">No cover</div>
       )}
       {selected && <p className="mb-2 truncate text-[11px] font-semibold text-green-600">New: {selected.name}</p>}
+      {selected && shapeNote && <p className="mb-2 max-w-xs text-[11px] font-semibold leading-snug text-amber-700">{shapeNote}</p>}
       {removed && !selected && <p className="mb-2 text-[11px] font-semibold text-amber-700">Cover will be removed when you save.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => input.current?.click()} className={`${smallButton} border-brand-200 text-brand-700 hover:bg-brand-50`}>

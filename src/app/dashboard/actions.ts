@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
 import { purgeFiles, purgePublicPages } from "@/lib/cdn";
 import { COVER_WIDTHS, coverVariantPath } from "@/lib/covers";
+import { toBookShape } from "@/lib/book-shape";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { publishPreview, removePreview } from "@/lib/preview-pdf";
 import { previewPdfPath } from "@/lib/previews";
@@ -81,7 +82,7 @@ async function uploadCover(file: File, slug: string): Promise<string> {
     throw new Error("Cover must be an image under 5 MB");
   }
   const admin = getSupabaseAdmin(ADMIN_UPLOAD_TIMEOUT_MS);
-  const input = Buffer.from(await file.arrayBuffer());
+  const input = await toBookShape(Buffer.from(await file.arrayBuffer()));
   const base = `${slug}-v${Date.now()}`;
   for (const width of COVER_WIDTHS) {
     const output = await sharp(input)

@@ -23,6 +23,15 @@ export function mediaUrl(url: string): string {
   return MEDIA_PROXY ? url.replace(PUBLIC_COVERS_RE, "/media/") : url;
 }
 
+/** Book covers are shown in 3:4 boxes (width / height = 0.75). */
+export const BOOK_RATIO = 3 / 4;
+
+/** True when width × height is close enough to 3:4 to show uncropped (±3 %). */
+export function isBookShaped(width: number, height: number): boolean {
+  if (!width || !height) return true;
+  return Math.abs(width / height - BOOK_RATIO) / BOOK_RATIO <= 0.03;
+}
+
 export function coverVariantPath(base: string, width: number): string {
   return `${base}-${width}.webp`;
 }
