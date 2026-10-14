@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Share2,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import {
@@ -208,6 +209,7 @@ export default function ProductDetail({
               <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
               {t.buyNote}
             </p>
+            <WhatsAppHint text={t.whatsappHint} />
           </div>
 
           {/* chips */}
@@ -300,6 +302,7 @@ export default function ProductDetail({
               <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">
                 <ShieldCheck className="h-3.5 w-3.5 text-green-600" /> {t.securePayment}
               </p>
+              <WhatsAppHint text={t.whatsappHint} />
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {PAYMENT_METHODS.map((method) => (
                   <span key={method} className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
@@ -369,6 +372,17 @@ function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string })
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {title}
     </span>
+  );
+}
+
+/** Under the Buy buttons: Razorpay asks for a mobile number next — say it is
+ *  the WhatsApp number the PDF goes to. */
+function WhatsAppHint({ text }: { text: string }) {
+  return (
+    <p className="font-deva flex items-start justify-center gap-1.5 rounded-lg border border-green-100 bg-green-50 px-3 py-1.5 text-center text-[11px] font-semibold leading-snug text-green-800">
+      <MessageCircle className="mt-px h-3.5 w-3.5 shrink-0 text-green-600" aria-hidden="true" />
+      {text}
+    </p>
   );
 }
 

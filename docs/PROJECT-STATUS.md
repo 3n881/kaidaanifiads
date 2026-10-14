@@ -789,6 +789,8 @@ Trust this file over these where they disagree:
 
 | 10-14 | this commit | **Meta Pixel on**: client gave pixel `1323976956324834` (one of the original site's 5, so both sites report into it); owner set GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS`. Privacy policy got section 4 "Cookies and Ad Measurement (Meta Pixel)" (what is sent; never name/phone/order link; not on /order, /my-books, /dashboard). Still from the client: domain-verification TXT + Conversions API token (server-side Purchase not built yet) |
 
+| 10-14 | this commit | Owner asked to change Razorpay's popup ("पुढे जाण्यासाठी मोबाईल नंबर टाका" / "यासह लॉगिन करा"): that text is Razorpay's own and can't be edited, and the number step must stay (it is the WhatsApp delivery number). Instead the book page shows a green line under both Buy buttons: "पेमेंट करताना तुमचा WhatsApp नंबर टाका — पुस्तक PDF त्याच नंबरवर WhatsApp ला येईल." (+ hi/en, `whatsappHint` in `product-copy.ts`) |
+
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
 variables, fonts, Cloudflare Free-plan limits …).
