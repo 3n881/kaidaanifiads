@@ -886,6 +886,13 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    link check + in-app browser start happen before our page and aren't measured. Shipped `9949bf5`: phones get the
    600 px cover (−33 %). **Nothing to change on the server.** If it comes up again: don't restart/redeploy; re-check
    `curl -sI <page> | grep cf-cache-status` (HIT) and Web Analytics with **P50** and `/dashboard` filtered out.
+   **End-to-end click test (16 Oct, 20:27 IST, Claude's browser, desktop, not logged in to Facebook):** opened the
+   post, pressed **"Order now"** → `l.facebook.com/l.php?u=…` (Facebook's link check, ≈ 0.5 s, no warning page) →
+   straight to our page, **no extra redirect** (redirectCount 0) → first byte 0.65 s → fully loaded 2.6 s →
+   **≈ 3 s total**; book page + language picker shown. All "Order now" / title / image links in the post point to the
+   right URL. Not testable here: the Facebook phone app's own in-app browser.
+   **Verdict: our server, Cloudflare, the link and the page are all fine (clean).** Any remaining delay is the
+   Facebook app on the phone or the mobile network.
    **Waiting on the client** (WhatsApp sent 16 Oct, Marathi): (1) open the link in Chrome — time? (2) Facebook →
    Settings → Browser → Clear browsing data + update the app, try "Order now" again; (3) screen recording from
    "Order now" to page shown if still slow; (4) Ads Manager **Link clicks** vs **Landing page views** (≥ 70–80 % =
@@ -1016,7 +1023,7 @@ Trust this file over these where they disagree:
 | 10-16 | CAPI live | Owner added `META_CAPI_ACCESS_TOKEN` to `/opt/kaf/app.env` (~11:48). Verified read-only: checkouts from 12:12 save fbp/fbc/IP/UA; first paid order after it (#8, 3:37 pm) reached Meta 1 s after payment. Also found: 6 ad visitors 12:12–2:23 left at Razorpay's number screen (1 failed payment → WhatsApp reminder 2:31 pm). The laptop `kaf-keyspp.env` has Razorpay **test** keys, so failure reasons must be read in the Razorpay dashboard |
 | 10-16 | video | **Brand outro video** (HyperFrames, outside the repo: `Desktop\kaf-videos\kaf-outro`): 9:16, 7 s — first version had the emblem assemble from 4 cropped quarters; owner asked for meaning instead → emblem split into layers (badge, scales, two hands) so the scales drop in and balance and the hands meet and shake, then name, tagline, website. Rendered `renders/kaf-outro.mp4` (1080×1920, 3 MB). Details §7d |
 | 10-16 | docs | New **§7c production settings register** (every Cloudflare / server / `app.env` / GitHub / Supabase / Razorpay / Interakt / Meta / monitoring setting, where it lives, state, date); §3, §4 (two-cache note), §5 (Razorpay popup), §6 (3:4 covers), §8, §10 (new rules), §11 item 8 updated |
-| 10-16 | phone cover | Client: ad link takes ~30 s to open. Measured: page itself 0.5–1 s (cache HIT incl. `fbclid`); real-visitor data says FB visitors P75 2.6 s, 1 % 20–38 s (weak networks / Facebook's own step, not our server — 0.1 s). Book page main image now `<picture>`: phones max **600 px** (was 800, −33 % bytes), ≥ 769 px screens up to 800 px; two `preload`s with `media` (`src/lib/covers.ts` PHONE_*/WIDE_*, `ProductGallery.tsx`, `ProductDetail.tsx`). Checked locally at 375 px (only 600 requested) and 1024 px |
+| 10-16 | phone cover | Client: ad link takes ~30 s to open. "Order now" click test end to end ≈ 3 s (FB link check 0.5 s, no extra redirect) — our side clean (§11 4c). Measured: page itself 0.5–1 s (cache HIT incl. `fbclid`); real-visitor data says FB visitors P75 2.6 s, 1 % 20–38 s (weak networks / Facebook's own step, not our server — 0.1 s). Book page main image now `<picture>`: phones max **600 px** (was 800, −33 % bytes), ≥ 769 px screens up to 800 px; two `preload`s with `media` (`src/lib/covers.ts` PHONE_*/WIDE_*, `ProductGallery.tsx`, `ProductDetail.tsx`). Checked locally at 375 px (only 600 requested) and 1024 px |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
