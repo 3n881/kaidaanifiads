@@ -1,7 +1,8 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-16** (live commit `5883955`; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint; new **§7c production
-> settings register** = every setting we changed and where it lives). One place for any developer or AI agent to
+> **Last updated 2026-10-16 evening** (live commit `ebc643f`; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint;
+> 16 Oct: **Meta Conversions API live + verified**, migration 010, **§7c production settings register** = every
+> setting and where it lives, **§7d brand outro video**). One place for any developer or AI agent to
 > understand where the project is: what exists, how it was built, what is live, what is next, and
 > which deeper doc to open for details. Facts were checked against the code, the git history, the
 > live site (`/api/health`) and the production database (read-only) on this date.
@@ -103,9 +104,11 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Stage 6: go-live (Razorpay **live** keys + announce) | 🟡 **Live payments working 2026-10-11**: real ₹99 purchase 14:50 IST (#30) → paid, downloaded, PDF on WhatsApp, webhook saved the phone. Refund that test payment in Razorpay. Not announced yet (Search Console, Instagram bio pending) |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
 | Meta Pixel | ✅ **On since 2026-10-14** (`b9d351b`): pixel `1323976956324834`; checked live — PageView + ViewContent reach Meta from a book page. InitiateCheckout / Purchase not yet seen in Meta Test events (owner to check). Privacy policy §4 explains it |
-| Meta Conversions API (server-side Purchase) | ⬜ Not built. Waiting for the **CAPI access token** from the client (instructions sent 2026-10-15, §11 item 8). Does **not** need domain verification |
+| Meta Conversions API (server-side Purchase) | ✅ **Live 2026-10-16** (`ebc643f`, token in `/opt/kaf/app.env`). First real check: order #8 paid 3:37:16 pm → sent to Meta 3:37:17 pm (Meta OK; IP/UA cleared), WhatsApp + download OK. Every Buy since 12:12 saves `_fbp`/`_fbc` (all ad-click visitors) |
 | Meta domain verification | ⬜ Optional, not blocking ads. Waiting for the client's `facebook-domain-verification=…` line (§11 item 8) |
 | Admin cover uploads | ✅ 2026-10-14 (`8484f3f`): no more false "Saving failed"; non-3:4 covers padded to 3:4; reader shows cover first. #8, #12, #19 covers re-uploaded 5:23–5:24 pm → 800×1067 ✅ |
+| Brand outro video (Reels) | ✅ 2026-10-16: 7 s 9:16 logo-build outro, `Desktop\kaf-videos\kaf-outro\renders\kaf-outro.mp4` — outside the repo, details §7d |
+| Checkout drop-off (watch) | 🟡 16 Oct 12:12–2:23: 6 ad visitors (all with Meta ad-click id) opened Razorpay, 5 left at its mobile-number screen, 1 payment failed (reminder sent). Same pattern as the morning before any change — not a site bug; next sale at 3:37 went through fine. Watch the funnel (`funnel_daily`) |
 | Book page WhatsApp hint | ✅ 2026-10-14 (`5883955`): green line under both Buy buttons — "enter your WhatsApp number while paying" (Razorpay's own popup text can't be changed) |
 
 Production database snapshot (2026-10-13 09:10 IST, read-only): **11 products** — 10 visible at ₹99 (9 original + **new #32 "ग्रामपंचायत: संपूर्ण माहिती"**, slug `book-32`, added by the owner 12 Oct: PDF + cover + 6 reader pages OK, but **no description, category "Other"**, empty `available_locales` (harmless — falls back to `language`)) + **#31 "test book" ₹1 now HIDDEN** ✅. Since live payments (11 Oct 14:30 IST): **20 orders — 8 paid (₹498, incl. the owner's test purchases; ₹0 refunded so far), 11 not paid (mostly the owner's cancelled tries), 1 failed**; 32 orders in total; 1 interested-buyer sign-up (`leads`); 0 contact messages.
@@ -547,7 +550,7 @@ production, add or update its row here in the same session.** ✅ = set and conf
 | Name | State |
 |---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ Mumbai project |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | ✅ **LIVE** since 10-11 |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | ✅ **LIVE** since 10-11 — on the server only. ⚠️ The laptop copy `kaf-keys\app.env` still has the **test** keys (checked 10-16), so scripts on the PC can't read live payments; use the Razorpay dashboard (or the admin order page's "Check with Razorpay") for payment/failure details |
 | `RAZORPAY_WEBHOOK_SECRET` | ✅ = secret of **our** live webhook (also in `kaf-keys\razorpay-live-webhook-secret.txt`) |
 | `ORDER_ACCESS_SECRET` | ✅ generated 10-10 — **never change** (breaks every buyer's link) |
 | `CRON_SECRET` | ✅ (same as in cron-job.org header) |
@@ -560,7 +563,7 @@ production, add or update its row here in the same session.** ✅ = set and conf
 | `PAYMENT_REMINDER_DELAY_MINUTES=10`, `PAYMENT_FAILED_REMINDER_DELAY_MINUTES=10` | ✅ owner set 10-11 (code defaults 30 / 10) |
 | `INTERAKT_LEAD_TEMPLATE_NAME` (+ `_LANGUAGE`) | ⏳ empty = interested-buyer follow-up **off** until a marketing template is approved |
 | `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | ✅ (purge on admin save + after deploys) |
-| `META_CAPI_ACCESS_TOKEN` | ⏳ token received 10-16 (saved in `C:\Users\shivr\kaf-keys\meta-capi-token.txt`); add to `app.env` after the CAPI code is deployed. Empty = CAPI off |
+| `META_CAPI_ACCESS_TOKEN` | ✅ added by the owner **10-16 ~11:48** (copy in `C:\Users\shivr\kaf-keys\meta-capi-token.txt`); verified with a real sale 3:37 pm. Empty = CAPI off |
 | `META_CAPI_TEST_EVENT_CODE` | Only while testing (events go to Test events only, real sales not counted) — **must be removed** after the test |
 | `META_PIXEL_ID` | optional; empty = first of `NEXT_PUBLIC_META_PIXEL_IDS` (`1323976956324834`) |
 After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy.sh` (zero downtime, §7b).
@@ -612,9 +615,9 @@ After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy
 | Pixel `1323976956324834` (one of the original site's 5 → both sites report into it) | Events Manager → Data sources | ✅ on our site; PageView + ViewContent verified live | **10-14** |
 | Privacy policy section 4 "Cookies and Ad Measurement (Meta Pixel)" | `src/app/privacy-policy/page.tsx` | ✅ live | 10-14 |
 | Test events check (InitiateCheckout on Buy, Purchase after paying) | Events Manager → pixel → Test events | ⏳ owner | — |
-| **Conversions API token** | Events Manager → pixel → Settings → Conversions API → *Generate access token* (client) → save to `C:\Users\shivr\kaf-keys\meta-capi-token.txt` (**never in chat**) → server `app.env` | ⏳ asked the client 10-15 (WhatsApp steps sent). **No domain verification needed** | — |
+| **Conversions API token** | Events Manager → pixel → Settings → Conversions API → *Generate access token* (client) → save to `C:\Users\shivr\kaf-keys\meta-capi-token.txt` (**never in chat**) → server `app.env` | ✅ received + saved 10-16; on the server (`app.env`). **No domain verification needed** | 10-16 |
 | Domain verification | Business Settings → Brand safety and suitability → Domains → Add → "Update DNS TXT record" → client sends the line → we add TXT in Cloudflare → client clicks Verify | ⏳ asked 10-15; optional, not blocking ads | — |
-| Server-side Purchase (CAPI) code | not built — plan in §11 item 8 | ⏳ after the token | — |
+| Server-side Purchase (CAPI) code | `src/lib/meta-capi.ts` + checkout signals + migration 010 (§11 item 8) | ✅ live `ebc643f`; first real send order #8, 3:37 pm | 10-16 |
 
 ### Monitoring, cron and other services
 | Setting | Where | State | When |
@@ -626,6 +629,41 @@ After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy
 | Instagram bio / Reel links → new domain | Instagram | ⏳ not done (launch step) | — |
 | Support e-mail on the new domain (current address has no mail server) | Hostinger mail or Cloudflare Email Routing | ⏳ open question | — |
 | Replov test deployment + its Razorpay test webhook | Replov | ⏳ delete ~1 week after launch | — |
+
+## 7d. Marketing assets — brand outro video (2026-10-16)
+
+A 7-second **9:16 brand outro** for the end of Instagram Reels / Shorts / Stories, made with **HyperFrames**
+(HTML + GSAP rendered to video). **Not part of the website repo and not in git** — it lives on the dev PC
+(OneDrive Desktop): `C:\Users\shivr\OneDrive\Desktop\kaf-videos\kaf-outro\`.
+
+| What | Where / value |
+|---|---|
+| Final video | `kaf-outro\renders\kaf-outro.mp4` — 1080×1920, 30 fps, H.264, **7.0 s**, 3.0 MB, **no audio** (the Reel's music plays over it) |
+| Entry file | `index.html` (root, 1080×1920, `data-duration="7"`) mounts `compositions/outro.html` (the whole scene, inside a `<template>`) |
+| Brand assets | `assets/brand/emblem.png` (= website `public/icon-512.png`); layers made from it: `badge.png`, `scales.png`, `hand-left.png`, `hand-right.png`; font `assets/fonts/NotoSansDevanagari.woff2` (the website's old Devanagari font, from git history); URL text uses the bundled Montserrat |
+| Layer script | `tools/split-emblem.cjs` — splits the emblem by colour + connected regions (navy pans/sleeves/hands, gold beam) into transparent layers and fills the empty badge (row-matched white, soft blur). Re-run `node tools/split-emblem.cjs` only if the logo changes |
+| Plan | `shot-plan.json` (category `logo-reveal`, palette = site tokens navy `#0A2342` / gold `#FFD301`) |
+| Unused | `compositions/logo-outro.html` = the original 16:9 registry block it was adapted from (not mounted) |
+
+**What happens (timeline):** 0.25 s empty white badge spins in → 0.75 s the scales (तराजू) drop in and rock until
+level ("weights match") → 1.05 s the two hands slide in from the disc edges (clipped to the disc) → 1.85 s two
+handshake shakes → 2.5 s the finished seal pops, gold ring draws, glow blooms → 2.7–3.45 s कायद्याचं · आणि ·
+फायद्याचं word by word + gold underline → 4.0 s "सोप्या भाषेत कायदे" → 4.25 s top label "मराठी · हिंदी · PDF ई-बुक्स"
+→ 4.6 s website pill `kaydyachaanifayddyacha.com` rises, 5.4 s shine passes → hold with a gentle breathing glow to 7 s.
+**Layout rule:** everything sits inside the Reels safe area (top ≈ 250 px and bottom ≈ 380 px kept clear of
+Instagram's header, caption and buttons).
+
+**Edit / re-render** (Windows, from the `kaf-outro` folder; needs Node, FFmpeg, Chrome — all installed):
+```bash
+npx hyperframes preview --background      # Studio at http://localhost:3002 (live reload)
+npx hyperframes lint . && npx hyperframes check .
+npx hyperframes snapshot . --at 1,2,6.9   # proof frames → .hyperframes/artifacts/snapshots/
+npx hyperframes render . --skill=motion-graphics -q high -o ./renders/kaf-outro.mp4   # ≈ 40 s
+```
+Lessons: don't animate `letterSpacing` (stutters; lint error); in a sub-composition never add a `#root *` reset
+(it overrode the scene's own padding/margins); text changes = edit `compositions/outro.html`; low free RAM on
+this PC — close apps before rendering. Ideas not done: Instagram handle / "Follow" line, background music,
+alternative tagline.
 
 ---
 
@@ -832,6 +870,12 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    Lightsail → kaf-a → Connect using SSH (browser SSH allowed in the SSH firewall rule), or update the
    port-22 rule with the new IP.
 
+4b. **Checkout drop-off at Razorpay (16 Oct):** most ad visitors open Razorpay and leave at its mobile-number
+   screen (text is Razorpay's, can't be changed — our green WhatsApp hint is under the Buy buttons since 14 Oct).
+   Owner: in the Razorpay dashboard (Live) → Orders → `order_ToWBOtLMtX2os9` → its payment → read the failure reason
+   (visitor E, 2:14 pm, book #16). If it says "declined / blocked as risky", that's a Razorpay account setting.
+   Possible later idea (not decided): force Razorpay's popup to English (`config.display.language`).
+
 ### Ideas (not started)
 - Order CSV export (accounts/GST) · nightly WhatsApp sales summary to the owner · move dashboard totals into
   SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
@@ -852,15 +896,18 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
       15 Oct (Business Settings → Brand safety and suitability → Domains → Add → "Update DNS TXT record" → send
       the `facebook-domain-verification=…` line, don't press Verify yet). When it arrives (safe to paste in chat):
       Cloudflare → DNS → Add record → TXT, name `@`, content = the line → then the client presses Verify.
-   3. ⏳ **Conversions API token** (secret): step-by-step WhatsApp message sent to the client 15 Oct (Events
-      Manager → Data sources → pixel → Settings → Conversions API → "Set up direct integration" → Generate access
-      token; needs Full control on the pixel). **Does not need domain verification.** Owner saves it in
-      `C:\Users\shivr\kaf-keys\meta-capi-token.txt` — **never in chat** — and says "token saved".
-   Then build (not in code yet): server-side **Purchase** from the Razorpay webhook (`payment.captured`), sent
-   once per order, `event_id` = our order id (the browser Purchase already sends `eventID` = order id → Meta
-   de-duplicates), value + currency + content_ids, buyer phone **SHA-256 hashed** (`ph`), `action_source:
-   website`; token as `META_CAPI_ACCESS_TOKEN` in `/opt/kaf/app.env` (+ pixel id); never fail the webhook if
-   Meta is down; test with a Test-events code first; update privacy policy §4 (server-side sharing, hashed phone).
+   3. ✅ **Conversions API — LIVE 16 Oct** (`ebc643f`). Token from the client saved in
+      `C:\Users\shivr\kaf-keys\meta-capi-token.txt` (never in chat) and added by the owner as
+      `META_CAPI_ACCESS_TOKEN` in `/opt/kaf/app.env` (~11:48). How it works: `src/lib/meta-capi.ts` sends one
+      server-side **Purchase** per paid order from `onOrderPaid` (webhook `payment.captured` + 10-min check) via
+      `after()`; `event_id` = order id (= browser `eventID` → Meta de-duplicates); value, currency, content_ids,
+      phone/e-mail SHA-256, country; `_fbp`/`_fbc`/IP/user agent saved at checkout (migration 010) and IP/UA
+      cleared after sending; claim column `meta_capi_sent_at` = sent once (reset if Meta refuses, so a retry can
+      send). Never blocks payments or WhatsApp. Verified: order #8 paid 3:37:16 pm → Meta 3:37:17 pm.
+      **How to check it's still working:** read-only query `orders.meta_capi_sent_at` on recent paid orders (filled
+      ≈ 1 s after `paid_at`); server log `[meta-capi] purchase sent` / `[meta-capi] Meta refused …`.
+      A test send from the dev PC with a real order was blocked by the permission system (buyer data leaving the
+      PC) — always verify on production instead. `META_CAPI_TEST_EVENT_CODE` must stay empty in production.
 9. **5 missing books** (PDFs from Ajay) → create them → point their redirects at the real pages.
 10. Hindi versions of both Interakt templates (optional) → `INTERAKT_TEMPLATE_LANGUAGE_HI=hi` etc.
 11. Past buyers of the original site: their old download links stay on the old domain (it isn't moving).
@@ -951,6 +998,8 @@ Trust this file over these where they disagree:
 | 10-14 | server check | Owner re-uploaded covers #8, #12, #19 (5:23–5:24 pm) → saved 800×1067 (3:4) in all sizes; shown on home, /ebooks, /combos and the book pages; no cropping at 375 px |
 | 10-15 | client | Sent the client WhatsApp step lists for the **Meta Conversions API token** (no domain verification needed) and the **domain verification** TXT line (§11 item 8) |
 | 10-16 | CAPI | **Meta Conversions API built** (`src/lib/meta-capi.ts`): server-side Purchase from `onOrderPaid` (webhook `payment.captured` + 10-min check) via `after()`, once per order (`meta_capi_sent_at` claim), `event_id` = order id (= browser eventID → de-duplicated), phone/e-mail SHA-256, country; checkout saves `_fbp`/`_fbc` cookies + IP + user agent (after the response, best effort; IP/UA cleared after sending). Migration **010 applied** to Mumbai. Privacy policy §4 updated. Dry run on a real order OK (payload correct, nothing sent). A real send from the dev PC was blocked by the permission system (buyer data) → verify on production instead. **Off until `META_CAPI_ACCESS_TOKEN` is in `/opt/kaf/app.env`** (token saved in `kaf-keys\meta-capi-token.txt`) |
+| 10-16 | CAPI live | Owner added `META_CAPI_ACCESS_TOKEN` to `/opt/kaf/app.env` (~11:48). Verified read-only: checkouts from 12:12 save fbp/fbc/IP/UA; first paid order after it (#8, 3:37 pm) reached Meta 1 s after payment. Also found: 6 ad visitors 12:12–2:23 left at Razorpay's number screen (1 failed payment → WhatsApp reminder 2:31 pm). The laptop `kaf-keysapp.env` has Razorpay **test** keys, so failure reasons must be read in the Razorpay dashboard |
+| 10-16 | video | **Brand outro video** (HyperFrames, outside the repo: `Desktopkaf-videoskaf-outro`): 9:16, 7 s — first version had the emblem assemble from 4 cropped quarters; owner asked for meaning instead → emblem split into layers (badge, scales, two hands) so the scales drop in and balance and the hands meet and shake, then name, tagline, website. Rendered `renders/kaf-outro.mp4` (1080×1920, 3 MB). Details §7d |
 | 10-16 | docs | New **§7c production settings register** (every Cloudflare / server / `app.env` / GitHub / Supabase / Razorpay / Interakt / Meta / monitoring setting, where it lives, state, date); §3, §4 (two-cache note), §5 (Razorpay popup), §6 (3:4 covers), §8, §10 (new rules), §11 item 8 updated |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
@@ -963,7 +1012,7 @@ variables, fonts, Cloudflare Free-plan limits …).
 
 | Doc | Use it for | Freshness |
 |---|---|---|
-| **`docs/PROJECT-STATUS.md`** | This overview; **§7c = every production setting and where it lives**; §7b = commands | Current |
+| **`docs/PROJECT-STATUS.md`** | This overview; **§7c = every production setting and where it lives**; §7b = commands; §7d = brand outro video | Current |
 | `docs/go-live-plan.md` | Go-live stages 0–7 with checklists, problems log, hosting decision, test tables for Stages 4–6 | Current (minor stale bits, §12) |
 | `docs/ui-match-original.md` | Every UI decision vs the original site (items 1–49 + status) | Current |
 | `docs/HANDOFF.md` | Deep detail: buyer flow, catalog, dashboard, env vars, Interakt templates, Razorpay rules, local dev tips | Detail still right; hosting/DB parts stale (§12) |
