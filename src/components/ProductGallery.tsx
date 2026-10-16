@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { BookOpen, ChevronLeft, ChevronRight, Maximize2, Sparkles } from "lucide-react";
 import type { Product } from "@/data/catalog";
-import { coverSrc, coverSrcSet, coverThumbSrc } from "@/lib/covers";
+import { coverSrc, coverSrcSet, coverThumbSrc, PHONE_COVER_MAX, PHONE_COVER_SIZES, WIDE_COVER_SIZES, WIDE_MEDIA } from "@/lib/covers";
 import { PREVIEW_PAGES } from "@/lib/previews";
 import CoverImage from "./CoverImage";
 import dynamic from "next/dynamic";
@@ -62,25 +62,30 @@ export default function ProductGallery({
   }
 
   const active = images[Math.min(selected, total - 1)];
-  const activeSrcSet = coverSrcSet(active);
+  // Phones max 600 px, larger screens up to 800 px (same as the preloads in ProductDetail).
+  const activeSrcSet = coverSrcSet(active, PHONE_COVER_MAX);
+  const wideSrcSet = coverSrcSet(active);
 
   return (
     <div>
       <div className="rounded-2xl border border-brand-100 bg-white p-2 shadow-[var(--shadow-cardhover)]">
         <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-brand-900" {...swipe}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- Supabase files are pre-sized WebP variants. */}
-          <img
-            src={coverSrc(active)}
-            srcSet={activeSrcSet ?? undefined}
-            sizes="(max-width: 768px) 90vw, 400px"
-            alt={selected === 0 ? product.title : `${product.title} — ${g.page} ${selected + 1}`}
-            width={800}
-            height={1067}
-            loading={selected === 0 ? "eager" : "lazy"}
-            fetchPriority={selected === 0 ? "high" : "auto"}
-            className="absolute inset-0 h-full w-full cursor-pointer object-contain"
-            onClick={() => setReaderAt(readerPages.length || !previewUrl ? selected : 0)}
-          />
+          <picture>
+            {wideSrcSet && <source media={WIDE_MEDIA} srcSet={wideSrcSet} sizes={WIDE_COVER_SIZES} />}
+            {/* Plain <img> on purpose: Supabase files are pre-sized WebP variants. */}
+            <img
+              src={coverSrc(active)}
+              srcSet={activeSrcSet ?? undefined}
+              sizes={PHONE_COVER_SIZES}
+              alt={selected === 0 ? product.title : `${product.title} — ${g.page} ${selected + 1}`}
+              width={800}
+              height={1067}
+              loading={selected === 0 ? "eager" : "lazy"}
+              fetchPriority={selected === 0 ? "high" : "auto"}
+              className="absolute inset-0 h-full w-full cursor-pointer object-contain"
+              onClick={() => setReaderAt(readerPages.length || !previewUrl ? selected : 0)}
+            />
+          </picture>
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white">
             {g.page} {selected + 1} / {total}
           </span>

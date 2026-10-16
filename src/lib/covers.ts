@@ -37,10 +37,22 @@ export function coverVariantPath(base: string, width: number): string {
 }
 
 /** `srcset` for a variant-style cover URL, or null for legacy single images. */
-export function coverSrcSet(url: string): string | null {
+export function coverSrcSet(url: string, maxWidth = 800): string | null {
   if (!VARIANT_RE.test(url)) return null;
-  return COVER_WIDTHS.map((w) => `${mediaUrl(url.replace(VARIANT_RE, `-${w}.webp`))} ${w}w`).join(", ");
+  return COVER_WIDTHS.filter((w) => w <= maxWidth)
+    .map((w) => `${mediaUrl(url.replace(VARIANT_RE, `-${w}.webp`))} ${w}w`)
+    .join(", ");
 }
+
+// Book page main image. Phones (3× screens) would pick the 800 px file for a
+// 90vw slot; 600 px looks the same there and is ~⅓ smaller (112 → 75 KB),
+// which matters on weak mobile data (Cloudflare real-visitor data, 16 Oct:
+// the cover is the element visitors wait for). Larger screens keep 800 px.
+export const PHONE_MEDIA = "(max-width: 768px)";
+export const WIDE_MEDIA = "(min-width: 769px)";
+export const PHONE_COVER_MAX = 600;
+export const PHONE_COVER_SIZES = "90vw";
+export const WIDE_COVER_SIZES = "400px";
 
 /** A sensible default `src` (400 px) for browsers that ignore srcset. */
 export function coverSrc(url: string): string {

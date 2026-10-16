@@ -23,7 +23,7 @@ import {
   localizeProduct,
 } from "@/lib/catalog";
 import { SITE } from "@/data/catalog";
-import { coverSrc, coverSrcSet } from "@/lib/covers";
+import { coverSrc, coverSrcSet, PHONE_COVER_MAX, PHONE_COVER_SIZES, PHONE_MEDIA, WIDE_COVER_SIZES, WIDE_MEDIA } from "@/lib/covers";
 import { previewPdfUrl } from "@/lib/previews";
 import { SITE_URL } from "@/lib/supabase/config";
 import BuyButton from "./BuyButton";
@@ -64,13 +64,29 @@ export default function ProductDetail({
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
   // The cover is this page's LCP element — start fetching it from <head>.
+  // One preload per screen size, matching the <picture> in ProductGallery
+  // (phones max 600 px, larger screens up to 800 px).
   if (product.coverImage) {
-    const srcSet = coverSrcSet(product.coverImage);
-    preload(coverSrc(product.coverImage), {
-      as: "image",
-      fetchPriority: "high",
-      ...(srcSet ? { imageSrcSet: srcSet, imageSizes: "(max-width: 768px) 90vw, 400px" } : {}),
-    });
+    const phoneSet = coverSrcSet(product.coverImage, PHONE_COVER_MAX);
+    const wideSet = coverSrcSet(product.coverImage);
+    if (phoneSet && wideSet) {
+      preload(coverSrc(product.coverImage), {
+        as: "image",
+        fetchPriority: "high",
+        media: PHONE_MEDIA,
+        imageSrcSet: phoneSet,
+        imageSizes: PHONE_COVER_SIZES,
+      });
+      preload(coverSrc(product.coverImage), {
+        as: "image",
+        fetchPriority: "high",
+        media: WIDE_MEDIA,
+        imageSrcSet: wideSet,
+        imageSizes: WIDE_COVER_SIZES,
+      });
+    } else {
+      preload(coverSrc(product.coverImage), { as: "image", fetchPriority: "high" });
+    }
   }
   const pct = discountPercent(product);
   const backHref = product.isCombo ? "/combos" : "/ebooks";
