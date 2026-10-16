@@ -877,6 +877,20 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    (visitor E, 2:14 pm, book #16). If it says "declined / blocked as risky", that's a Razorpay account setting.
    Possible later idea (not decided): force Razorpay's popup to English (`config.display.language`).
 
+4c. **Ad link "30 s to open" (client, 16 Oct) — NOT a server problem.** Checked 16 Oct: the ad (Facebook post
+   `facebook.com/share/1E2NGo1UNx`) links to `/combos/vivah-te-ghatasphot-margdarshika`; that page answers in
+   0.5–1 s (Cloudflare HIT, also with `fbclid`, via http/www/IPv6, FB/Instagram browser user agents); server
+   response P75 0.1 s. Cloudflare Web Analytics (15→16 Oct 19:27, 206 views): FB visitors P75 2.6 s, LCP P75 2.3 s,
+   ~1 % of visits 20–38 s. Those spikes = 1–3 visits per graph point on weak mobile data ("Request" part) or slow
+   phones ("Processing"), or people leaving the page while it loads — DNS/TLS/server stayed fast. Facebook's own
+   link check + in-app browser start happen before our page and aren't measured. Shipped `9949bf5`: phones get the
+   600 px cover (−33 %). **Nothing to change on the server.** If it comes up again: don't restart/redeploy; re-check
+   `curl -sI <page> | grep cf-cache-status` (HIT) and Web Analytics with **P50** and `/dashboard` filtered out.
+   **Waiting on the client** (WhatsApp sent 16 Oct, Marathi): (1) open the link in Chrome — time? (2) Facebook →
+   Settings → Browser → Clear browsing data + update the app, try "Order now" again; (3) screen recording from
+   "Order now" to page shown if still slow; (4) Ads Manager **Link clicks** vs **Landing page views** (≥ 70–80 % =
+   fine); (5) the Meta `facebook-domain-verification=…` line.
+
 ### Ideas (not started)
 - Order CSV export (accounts/GST) · nightly WhatsApp sales summary to the owner · move dashboard totals into
   SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
