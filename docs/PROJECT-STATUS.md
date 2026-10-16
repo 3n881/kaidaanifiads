@@ -1,6 +1,7 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-13** (live commit `3f38d47`; full refresh incl. the commands cheat sheet §7b). One place for any developer or AI agent to
+> **Last updated 2026-10-16** (live commit `5883955`; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint; new **§7c production
+> settings register** = every setting we changed and where it lives). One place for any developer or AI agent to
 > understand where the project is: what exists, how it was built, what is live, what is next, and
 > which deeper doc to open for details. Facts were checked against the code, the git history, the
 > live site (`/api/health`) and the production database (read-only) on this date.
@@ -80,7 +81,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 
 ---
 
-## 3. Status at a glance (2026-10-13)
+## 3. Status at a glance (2026-10-16)
 
 | Area | State |
 |---|---|
@@ -101,7 +102,11 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Stage 5: speed + load tests | 🟡 PageSpeed done (§7a). **k6 Reel spike PASSED** 2026-10-11 from Grafana Cloud Mumbai: 66,825 requests, peak 300 req/s, **0 errors**, p95 17 ms, **100 % from Cloudflare**, server CPU flat. **k6 Server direct** 2026-10-11 (dev PC, `loadtest/origin.js`, 10→60 req/s uncached): 11,028 req, **0 errors**; comfortable up to ≈ 30–40 req/s; **after catalog caching (`4b1fbd2`) all thresholds pass up to 60 req/s** (median ≈ 0.4 s flat, p95 ≤ 1.6 s) vs ~5 req/s needed in a Reel (> 10× headroom). Still to do: WebPageTest, real-phone check |
 | Stage 6: go-live (Razorpay **live** keys + announce) | 🟡 **Live payments working 2026-10-11**: real ₹99 purchase 14:50 IST (#30) → paid, downloaded, PDF on WhatsApp, webhook saved the phone. Refund that test payment in Razorpay. Not announced yet (Search Console, Instagram bio pending) |
 | 5 books missing (#22, 28, 29, 31, 32) | ⬜ Waiting for PDFs from Ajay |
-| Meta Pixel + Conversions API | ⬜ Waiting for the 3 items from the client's Meta account (§11 item 8) |
+| Meta Pixel | ✅ **On since 2026-10-14** (`b9d351b`): pixel `1323976956324834`; checked live — PageView + ViewContent reach Meta from a book page. InitiateCheckout / Purchase not yet seen in Meta Test events (owner to check). Privacy policy §4 explains it |
+| Meta Conversions API (server-side Purchase) | ⬜ Not built. Waiting for the **CAPI access token** from the client (instructions sent 2026-10-15, §11 item 8). Does **not** need domain verification |
+| Meta domain verification | ⬜ Optional, not blocking ads. Waiting for the client's `facebook-domain-verification=…` line (§11 item 8) |
+| Admin cover uploads | ✅ 2026-10-14 (`8484f3f`): no more false "Saving failed"; non-3:4 covers padded to 3:4; reader shows cover first. #8, #12, #19 covers re-uploaded 5:23–5:24 pm → 800×1067 ✅ |
+| Book page WhatsApp hint | ✅ 2026-10-14 (`5883955`): green line under both Buy buttons — "enter your WhatsApp number while paying" (Razorpay's own popup text can't be changed) |
 
 Production database snapshot (2026-10-13 09:10 IST, read-only): **11 products** — 10 visible at ₹99 (9 original + **new #32 "ग्रामपंचायत: संपूर्ण माहिती"**, slug `book-32`, added by the owner 12 Oct: PDF + cover + 6 reader pages OK, but **no description, category "Other"**, empty `available_locales` (harmless — falls back to `language`)) + **#31 "test book" ₹1 now HIDDEN** ✅. Since live payments (11 Oct 14:30 IST): **20 orders — 8 paid (₹498, incl. the owner's test purchases; ₹0 refunded so far), 11 not paid (mostly the owner's cancelled tries), 1 failed**; 32 orders in total; 1 interested-buyer sign-up (`leads`); 0 contact messages.
 
@@ -136,6 +141,13 @@ cron-job.org ─► POST /api/cron/reconcile every 10 min (payment sweep + remin
   seconds, on both hosts, and in the sitemap the same day. (Before 12 Oct: www lists up to 5 min old, sitemap up to
   1 day.)
   Every deploy purges only the **pages** from Cloudflare (`deploy/deploy.sh`; images and build files stay cached).
+- **Two app copies = two caches (known, accepted 2026-10-14):** the ONE server runs the site twice (Docker containers
+  `app1` + `app2`; Caddy alternates visitors between them) for zero-downtime deploys and crash safety. Each copy keeps
+  its own page + catalog cache. An admin save clears only the copy that handled it, so a book page / the home page can
+  show the old version for **~5–15 min** after a save (seen 14 Oct: #19's home card took > 14 min). It fixes itself.
+  Owner is OK with this. If it becomes a problem: after a save, call an internal endpoint on both `http://app1:3000`
+  and `http://app2:3000` (env var in `deploy/docker-compose.yml`) that runs `revalidateTag(CATALOG_TAG, { expire: 0 })`
+  + `revalidatePath` for the public pages, *before* the Cloudflare purge (built and tested once, then removed on request).
 - **Images:** covers and preview pages are stored as 200/400/800 px WebP. With
   `NEXT_PUBLIC_MEDIA_PROXY=true`, they are served as `/media/<path>` from our domain so Cloudflare caches
   them in India (images 1 year, preview PDFs 1 hour). PDFs for buyers come straight from Supabase via
@@ -187,6 +199,13 @@ Full detail: `docs/HANDOFF.md` §3.
    the page sells the edition that exists (`editionLocaleFor`). The order's `locale` = the edition sold
    = the PDF delivered.
 
+**Razorpay's popup (owner asked 14 Oct):** it asks "पुढे जाण्यासाठी मोबाईल नंबर टाका" and shows "यासह लॉगिन करा"
+(Razorpay's Marathi for "Continue"; the OTP is only for Razorpay's saved UPI/cards, no account on our site). That text
+is Razorpay's and **cannot be changed**, and the number step **must stay** (it is the WhatsApp delivery + reminder
+number). Our answer: a green line under both Buy buttons, `whatsappHint` in `src/lib/product-copy.ts` (mr/hi/en, follows
+the edition): "पेमेंट करताना तुमचा WhatsApp नंबर टाका — पुस्तक PDF त्याच नंबरवर WhatsApp ला येईल." Option not taken:
+force Razorpay to English (`config.display.language`).
+
 Deliberate difference from the original site: it asks for name + WhatsApp **before** paying. We don't.
 All FAQ, how-to-buy, policy and order texts describe **our** flow.
 
@@ -225,7 +244,12 @@ git-ignored). Match it to a product by page count and the original site's number
 Alternatively, upload in the dashboard (50 MB limit). The dashboard builds the reader images in the
 browser on upload.
 
-Storage: `pdfs` (private) `<slug>-<locale>-<ts>.pdf` · `covers` (public) `<slug>-<locale>-v<ts>-{200,400,800}.webp`,
+**Covers must be 3:4 (book shape).** Cards fill a 3:4 box and crop anything else. Since 2026-10-14 any upload that
+isn't 3:4 (±3 %) is padded to 3:4 with its own edge colour (`src/lib/book-shape.ts`, used by `uploadCover` for covers
+and preview images), and the dashboard warns when the picked picture isn't 3:4. Best result: upload a portrait image,
+e.g. 1200×1600. Covers replaced on 14 Oct (owner): #8, #12, #19 (square originals → padded, 800×1067).
+
+Storage: `pdfs` (private) `<slug>-<locale>-<ts>.pdf` · `covers` (public) `<slug>-<locale>-v<ts>-{200,400,600,800}.webp`,
 `previews/<slug>-<locale>.pdf` (first 6 pages), reader-page WebPs (200/400/800/1600).
 
 ---
@@ -288,6 +312,7 @@ no anon access to orders) + `onboarding.sql` + migrations:
 | 007 | `reader_pages_mr/hi/en` text[] (sample-reader page images) |
 | 008 | Refund tracking: `refunded_amount` (₹), `refund_status` (partial/full), `refunded_at`, `razorpay_refund_id` — applied to Mumbai 2026-10-11 |
 | 009 | `leads` — interested buyers (phone unique, book, locale, source cancelled/failed, consent time + exact consent text, ip_hash, followup_sent_at, opted_out_at); RLS on, server only — applied to Mumbai 2026-10-11 |
+| 010 | Meta Conversions API: `orders.meta_fbp`, `meta_fbc`, `client_ip`, `client_user_agent` (saved at checkout, IP + browser cleared after sending), `meta_capi_sent_at` (sent once) — applied to Mumbai **2026-10-16** (psql via the session pooler) |
 
 `supabase/checks/verify.sql` = pre-launch checks (written, never formally run).
 
@@ -460,7 +485,7 @@ api '{"files":["https://kaydyachaanifayddyacha.com/media/<file>.webp"]}'  # sing
   (service key from `.env.local`), run as `node --env-file=.env.local <script>.mjs`; keep scripts outside the repo
   (scratchpad) and mask phone numbers in output.
 - **SQL / migrations:** Supabase dashboard → SQL editor, or `psql` with the session-pooler URL `NEW_DB_URL` from
-  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–009 are applied (§7). New ones go in
+  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–010 are applied (§7). New ones go in
   `supabase/migrations/0NN_name.sql` and are applied by hand — the app never runs migrations.
 - `select * from funnel_daily;` = daily visits → checkouts → paid.
 - ⚠️ `.env.local` points at **production**. Every `npm run db:*` script writes live data: use `--dry-run` first.
@@ -481,6 +506,126 @@ api '{"files":["https://kaydyachaanifayddyacha.com/media/<file>.webp"]}'  # sing
   — if first paint comes *after* load, something at hydration delayed it (that is how the picker-blur issue was found).
 - The keyless PageSpeed API (`googleapis.com/pagespeedonline/v5`) hits its daily quota quickly; use the website.
 - Local Lighthouse/Puppeteer numbers on this Windows PC are slower than real Android (Windows font loading).
+
+## 7c. Production settings register — every setting we changed, where it lives (2026-10-16)
+
+One list of **every outside setting** the live store depends on: what it is, where to find it, its state and when it
+was set. Values of secrets are never written here — only where they are kept. **When you change any setting in
+production, add or update its row here in the same session.** ✅ = set and confirmed · ⏳ = to do / not confirmed.
+
+### Domain, DNS and Cloudflare (dash.cloudflare.com → zone `kaydyachaanifayddyacha.com`)
+| Setting | Where | State | When |
+|---|---|---|---|
+| Domain `kaydyachaanifayddyacha.com` (note `fay`**`dd`**`yach`**`a`**) | Hostinger hPanel → Domains | ✅ registered; nameservers → Cloudflare | 10-03 |
+| Plan | Cloudflare | ✅ Free | 10-04 |
+| DNS `A @ → 13.206.92.130` + `CNAME www → apex`, both **Proxied** | Cloudflare → DNS | ✅ | 10-10 |
+| DNS TXT `facebook-domain-verification=…` | Cloudflare → DNS (TXT, `@`) | ⏳ waiting for the line from the client (§11 item 8) | — |
+| SSL Full (strict), Always HTTPS, min TLS 1.2, TLS 1.3 on, 0-RTT off, HTTP/3 on | SSL/TLS + Network | ✅ | 10-04 |
+| Origin certificate (apex + `*.`), valid to 2041 | SSL/TLS → Origin Server; files `origin.pem`/`origin.key` in `kaf-keys\` and `/opt/kaf/certs/` | ✅ | 10-04 |
+| Cache rules `bypass-dynamic`, `static-immutable`, `next-image`, `media`, `public-assets`, `public-html` | Caching → Cache Rules (made via API, token `CLOUDFLARE_RULES_TOKEN`) | ✅ | 10-10 |
+| WAF `allow-razorpay-webhook` (skip) + `block-bad-methods` (block) | Security → WAF → Custom rules | ✅ | 10-10 |
+| Rate limit `checkout-rate-limit`: 30 POST / 10 s per IP → block 10 s | Security → WAF → Rate limiting | ✅ | 10-10 |
+| Transform Rule `strip-tracking-query` (drop `?igsh=`/`fbclid`/`utm_*` on `/`, `/ebooks*`, `/combos*` unless `_rsc=`) | Rules → Transform Rules (owner, by hand) | ✅ — **never strip `_rsc`** | 10-11 |
+| Smart Tiered Cache (upper tiers BOM + SIN) | Caching → Tiered Cache (owner, by hand) | ✅ on | 10-11 |
+| Web Analytics | Analytics (owner decision) | ✅ on | 10-11 |
+| Rocket Loader / Email obfuscation / Bot Fight Mode / Early Hints | Speed / Scrape Shield / Security → Bots | ✅ all **off** | 10-10/11 |
+| API tokens: Cache Purge (`CLOUDFLARE_API_TOKEN`), rules editor (`CLOUDFLARE_RULES_TOKEN`) + Zone ID | My Profile → API Tokens; values in `.env.mumbai` (purge token + zone also in `/opt/kaf/app.env`) | ✅ | 10-04 / 10-10 |
+
+### Server (AWS Lightsail, Mumbai)
+| Setting | Where | State | When |
+|---|---|---|---|
+| Instance `kaf-a`, $12 plan (2 GB / 2 vCPU), Ubuntu 24.04, `ap-south-1a`, automatic snapshots | Lightsail console | ✅ | 10-10 |
+| Static IP `kaf-a-ip` = `13.206.92.130` | Lightsail → Networking | ✅ | 10-10 |
+| Firewall: 80/443 from Cloudflare only; 22 from admin IP + Lightsail browser SSH; GitHub deploy opens 22 for its own IP only while deploying | Lightsail → kaf-a → Networking | ✅ (home IP changed since → laptop SSH blocked; use browser SSH or update the rule) | 10-10 |
+| IAM user `github-deploy` (may only edit Lightsail port rules) | AWS IAM; keys in GitHub Secrets | ✅ | 10-10 |
+| `/opt/kaf/app.env` (runtime secrets, chmod 600) — local copy `C:\Users\shivr\kaf-keys\app.env` | Server | ✅ see §9 + the env table below | 10-10 → 10-11 |
+| `/opt/kaf/app.env.test-keys-backup` (Razorpay **test** keys, emergency rollback) | Server | ✅ | 10-11 |
+| Two app containers `app1` + `app2` behind Caddy (`deploy/docker-compose.yml`, `deploy/Caddyfile`) | Server `/opt/kaf/`, copied from `deploy/` on every deploy | ✅ | 10-10 |
+| Lightsail metric alarms (CPU > 70 %, status check) | Lightsail → Metrics | ⏳ not set | — |
+
+**Runtime settings in `/opt/kaf/app.env`** (names; values only on the server + `kaf-keys\app.env`):
+| Name | State |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Mumbai project |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | ✅ **LIVE** since 10-11 |
+| `RAZORPAY_WEBHOOK_SECRET` | ✅ = secret of **our** live webhook (also in `kaf-keys\razorpay-live-webhook-secret.txt`) |
+| `ORDER_ACCESS_SECRET` | ✅ generated 10-10 — **never change** (breaks every buyer's link) |
+| `CRON_SECRET` | ✅ (same as in cron-job.org header) |
+| `ADMIN_EMAILS` | ✅ (dashboard login; empty = nobody) |
+| `CHECKOUT_DEMO_MODE` | ✅ `false` |
+| `DOWNLOAD_LIMIT` / `WHATSAPP_SEND_LIMIT` | ✅ 30 / 3 (defaults) |
+| `INTERAKT_API_KEY`, `AUTO_WHATSAPP_ON_PAYMENT=true` | ✅ |
+| `INTERAKT_TEMPLATE_*_MR` / `_HI` (`payment_sucess_pdf_v2`, language `mr`, header `document`, body `product`) | ✅ |
+| `INTERAKT_REMINDER_TEMPLATE_NAME=pending_followup_v2`, `_LANGUAGE=mr` | ✅ |
+| `PAYMENT_REMINDER_DELAY_MINUTES=10`, `PAYMENT_FAILED_REMINDER_DELAY_MINUTES=10` | ✅ owner set 10-11 (code defaults 30 / 10) |
+| `INTERAKT_LEAD_TEMPLATE_NAME` (+ `_LANGUAGE`) | ⏳ empty = interested-buyer follow-up **off** until a marketing template is approved |
+| `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | ✅ (purge on admin save + after deploys) |
+| `META_CAPI_ACCESS_TOKEN` | ⏳ token received 10-16 (saved in `C:\Users\shivr\kaf-keys\meta-capi-token.txt`); add to `app.env` after the CAPI code is deployed. Empty = CAPI off |
+| `META_CAPI_TEST_EVENT_CODE` | Only while testing (events go to Test events only, real sales not counted) — **must be removed** after the test |
+| `META_PIXEL_ID` | optional; empty = first of `NEXT_PUBLIC_META_PIXEL_IDS` (`1323976956324834`) |
+After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy.sh` (zero downtime, §7b).
+
+### GitHub (`3n881/kaidaanifiads` → Settings → Secrets and variables → Actions)
+| Setting | Where | State | When |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Mumbai) | **Variables** tab | ✅ | 10-10 |
+| `NEXT_PUBLIC_SITE_URL=https://kaydyachaanifayddyacha.com` | Variables | ✅ | 10-10 |
+| `NEXT_PUBLIC_MEDIA_PROXY=true` | Variables | ✅ | 10-10 |
+| `NEXT_PUBLIC_META_PIXEL_IDS=1323976956324834` | Variables | ✅ owner set; live in `b9d351b` | **10-14** |
+| `DEPLOY_ENABLED=true`, `DEPLOY_HOSTS` (the server's static IP), `DEPLOY_LIGHTSAIL_INSTANCE=kaf-a` | Variables | ✅ (deploys work) | 10-10 |
+| `DEPLOY_SSH_KEY`, `AWS_DEPLOY_ACCESS_KEY_ID`, `AWS_DEPLOY_SECRET_ACCESS_KEY` | **Secrets** tab | ✅ | 10-10 |
+| `RECONCILE_ENABLED` | Variables | ✅ deliberately **unset** (cron-job.org runs the cron) | 10-04 |
+`NEXT_PUBLIC_*` are baked in at build time: change one → push or re-run **Deploy**. Docs-only pushes don't deploy.
+
+### Supabase (production project `ntqwvfksdqdyoyknkprh`, Mumbai, Pro)
+| Setting | Where | State | When |
+|---|---|---|---|
+| Schema + migrations 001–010 | SQL editor / pooler (`NEW_DB_URL` in `.env.mumbai`) | ✅ (§7 table) | 10-04 → **10-16** (010) |
+| Storage buckets `pdfs` (private), `covers` (public) | Storage | ✅ | 10-04 |
+| Admin users (same e-mails as `ADMIN_EMAILS`) | Authentication → Users | ✅ | 10-04 |
+| **Auth → URL Configuration**: Site URL `https://kaydyachaanifayddyacha.com`; redirect URLs apex/**, www/** | Authentication → URL Configuration | ⏳ **never confirmed** (§11 item 2) | — |
+| Old Tokyo project `yjsmebmytltwwihvivbd` (Replov only) | Supabase | ⏳ pause → delete ~1 week after launch | — |
+
+### Razorpay (client's account, shared with the original site — never touch the original's webhook/keys)
+| Setting | Where | State | When |
+|---|---|---|---|
+| Live keys on our server | `/opt/kaf/app.env` | ✅ | 10-11 |
+| **Our** live webhook `https://kaydyachaanifayddyacha.com/api/razorpay/webhook`, events `payment.captured`, `order.paid`, `payment.failed` | Razorpay → Live → Webhooks | ✅ | 10-11 |
+| Same webhook: also tick `refund.created` + `refund.processed` | same | ⏳ owner to do (refund tracking) | — |
+| Test-mode webhook to our domain | Razorpay → Test → Webhooks | ✅ (harmless; delete with Replov's after launch) | 10-10 |
+| Auto-capture ON | Account & Settings → Payment capture | ✅ (payments are captured) | — |
+| Website `kaydyachaanifayddyacha.com` in Website/app details | Account & Settings | ⏳ not confirmed | — |
+| Was the live key regenerated? (if yes, the original site's Vercel needs the new secret) | ask owner | ⏳ not confirmed | — |
+| Popup text ("मोबाईल नंबर टाका", "यासह लॉगिन करा") | Razorpay's own — **not editable**; our hint line explains it (§5) | — | 10-14 |
+
+### WhatsApp (Interakt, client's account; sender "AS Consultancy Services")
+| Setting | Where | State | When |
+|---|---|---|---|
+| Template `payment_sucess_pdf_v2` (sic), Document header = PDF, `{{1}}` book | Interakt → Templates | ✅ approved, used | 10-01 |
+| Template `pending_followup_v2` (`{{1}}` name, `{{2}}` book, `{{3}}` link) | Interakt → Templates | ✅ approved, used | 10-01 |
+| Hindi versions of both | Interakt | ⏳ optional (then `*_LANGUAGE_HI=hi`) | — |
+| Marketing template for interested buyers (`{{1}}` book, `{{2}}` link) | Interakt | ⏳ owner to get approved → `INTERAKT_LEAD_TEMPLATE_NAME` | — |
+
+### Meta (client's Business account)
+| Setting | Where | State | When |
+|---|---|---|---|
+| Pixel `1323976956324834` (one of the original site's 5 → both sites report into it) | Events Manager → Data sources | ✅ on our site; PageView + ViewContent verified live | **10-14** |
+| Privacy policy section 4 "Cookies and Ad Measurement (Meta Pixel)" | `src/app/privacy-policy/page.tsx` | ✅ live | 10-14 |
+| Test events check (InitiateCheckout on Buy, Purchase after paying) | Events Manager → pixel → Test events | ⏳ owner | — |
+| **Conversions API token** | Events Manager → pixel → Settings → Conversions API → *Generate access token* (client) → save to `C:\Users\shivr\kaf-keys\meta-capi-token.txt` (**never in chat**) → server `app.env` | ⏳ asked the client 10-15 (WhatsApp steps sent). **No domain verification needed** | — |
+| Domain verification | Business Settings → Brand safety and suitability → Domains → Add → "Update DNS TXT record" → client sends the line → we add TXT in Cloudflare → client clicks Verify | ⏳ asked 10-15; optional, not blocking ads | — |
+| Server-side Purchase (CAPI) code | not built — plan in §11 item 8 | ⏳ after the token | — |
+
+### Monitoring, cron and other services
+| Setting | Where | State | When |
+|---|---|---|---|
+| cron-job.org: `POST /api/cron/reconcile` every 10 min, header `Authorization: Bearer <CRON_SECRET>` | cron-job.org → job (History should show 200) | ✅ | 10-10 |
+| UptimeRobot HTTPS monitor `/api/health` every 5 min | uptimerobot.com | ✅ | 10-10 |
+| GitHub container registry image `ghcr.io/3n881/kaidaanifiads:<sha>`; server pulls with a `read:packages` token | GitHub → Packages; `docker login` on the server | ✅ | 10-10 |
+| Google Search Console (domain + `/sitemap.xml`) | search.google.com/search-console | ⏳ not done (launch step) | — |
+| Instagram bio / Reel links → new domain | Instagram | ⏳ not done (launch step) | — |
+| Support e-mail on the new domain (current address has no mail server) | Hostinger mail or Cloudflare Email Routing | ⏳ open question | — |
+| Replov test deployment + its Razorpay test webhook | Replov | ⏳ delete ~1 week after launch | — |
 
 ---
 
@@ -515,7 +660,7 @@ api '{"files":["https://kaydyachaanifayddyacha.com/media/<file>.webp"]}'  # sing
 | `media/[...path]` | Proxies the public `covers` bucket (whitelisted names): images 1 year immutable, `previews/*` 1 h at the edge |
 
 ### Dashboard (`/dashboard`, all dynamic; `src/proxy.ts` guards it, fails closed if `ADMIN_EMAILS` empty)
-**Overview = sales dashboard** (2026-10-11, `src/lib/sales.ts` + `components/admin/SalesOverviewView.tsx`): revenue / paid / conversion / failed for today (IST), 7 days, all time — counted from `SALES_START` (live keys, 11 Oct 14:30 IST; test orders excluded; refunds not tracked yet); needs-attention lists (paid > 15 min not downloaded, paid without WhatsApp, unhandled contact messages) with wa.me links; top books 7 days; latest 10 paid orders; one small Setup card (business details still missing). The old setup checklist lives on Launch. Period cards and attention titles link into Orders. **Orders page** (2026-10-11): Today/7 days/All tabs, clickable cards that filter (Paid ₹, Not paid, Failed, Paid-not-downloaded), search (phone — last 10 digits, `pay_…`, order id), book name + language + IST time + wa.me link + downloads + WhatsApp count + Resend; cards on phones, table on desktop; test orders hidden unless `?test=1`; latest 200 matches. **Uploads >10 MB** need `experimental.proxyClientMaxBodySize` (set to 95mb) because `/dashboard` goes through `proxy.ts`. No cover uploaded → the PDF's first page (reader page 1) becomes the cover. **Refunds** (2026-10-11): webhook handles `refund.created` / `refund.processed` (add those events to the live Razorpay webhook); order stays `paid`, revenue = amount − refunded_amount everywhere; Refunded card/filter on Orders; downloads are not revoked by a refund. **Order detail page** `/dashboard/orders/[id]`: summary, timeline, buyer (wa.me), Razorpay ids (payment links to the Razorpay dashboard), actions: Check with Razorpay (`src/lib/refunds.ts` — marks captured-but-unpaid orders paid and pulls refund state; use it for refunds made before the webhook events were added), Resend WhatsApp, Copy buyer's order link · **Products** (per-edition editor `ProductForm`: text, cover, up to 5
+**Overview = sales dashboard** (2026-10-11, `src/lib/sales.ts` + `components/admin/SalesOverviewView.tsx`): revenue / paid / conversion / failed for today (IST), 7 days, all time — counted from `SALES_START` (live keys, 11 Oct 14:30 IST; test orders excluded; refunds not tracked yet); needs-attention lists (paid > 15 min not downloaded, paid without WhatsApp, unhandled contact messages) with wa.me links; top books 7 days; latest 10 paid orders; one small Setup card (business details still missing). The old setup checklist lives on Launch. Period cards and attention titles link into Orders. **Orders page** (2026-10-11): Today/7 days/All tabs, clickable cards that filter (Paid ₹, Not paid, Failed, Paid-not-downloaded), search (phone — last 10 digits, `pay_…`, order id), book name + language + IST time + wa.me link + downloads + WhatsApp count + Resend; cards on phones, table on desktop; test orders hidden unless `?test=1`; latest 200 matches. **Uploads >10 MB** need `experimental.proxyClientMaxBodySize` (set to 95mb) because `/dashboard` goes through `proxy.ts`. No cover uploaded → the PDF's first page (reader page 1) becomes the cover. **Saving a product** (2026-10-14): a good save redirects back with `?saved=1` and the form resets; "Not saved: …" now appears only for a real refusal (before, *every* good save showed "Not saved: Saving failed" because the redirect was caught as an error). Non-3:4 covers are padded (§6). **Refunds** (2026-10-11): webhook handles `refund.created` / `refund.processed` (add those events to the live Razorpay webhook); order stays `paid`, revenue = amount − refunded_amount everywhere; Refunded card/filter on Orders; downloads are not revoked by a refund. **Order detail page** `/dashboard/orders/[id]`: summary, timeline, buyer (wa.me), Razorpay ids (payment links to the Razorpay dashboard), actions: Check with Razorpay (`src/lib/refunds.ts` — marks captured-but-unpaid orders paid and pulls refund state; use it for refunds made before the webhook events were added), Resend WhatsApp, Copy buyer's order link · **Products** (per-edition editor `ProductForm`: text, cover, up to 5
 **Interested buyers** `/dashboard/leads` (2026-10-11, `getLeadsView` in `src/lib/sales.ts`): cards (interested, bought later + %, follow-ups sent, opted out), one card per sign-up (wa.me link, book, date, language, Cancelled/Payment failed chip, Bought later, Follow-up sent, Opted out) and **Remove** (`optOutLead` → `opted_out_at`). Admin menu has 7 items (phones: 4 + 3). Server actions on admin pages recover from deploys (`src/lib/stale-action.ts`, `app/dashboard/error.tsx`).
 preview images, PDF View/Replace/Remove; choosing a PDF renders 6 reader pages **in the browser** with PDF.js
 and uploads them on save) · `products/new` · `products/[id]/pdf` (admin 5-min signed URL) · **Orders** (last 200,
@@ -644,7 +789,17 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
   paint for preloaded fonts (book page first paint 5.9 s → ~1.5 s when removed, 2026-10-11). Don't go back
   to `next/font/google` (flaky build-time download, go-live problem 18).
 - Images: covers / preview / reader pages have 200/400/600/800 px WebP (+1600 for reader pages). New
-  uploads make all sizes; `npm run db:cover-600` backfilled 600 px for older images.
+  uploads make all sizes; `npm run db:cover-600` backfilled 600 px for older images. Only reader pages
+  (`-p<n>-800.webp`) have a 1600 px copy — never derive `-1600` from a cover URL (404).
+- **Server actions called by hand** (`startTransition(async () => { await action() })`, e.g. `ProductForm`): in Next 16
+  an action that ends in `redirect()` *rejects* its promise with the redirect signal. Any client `catch` around it must
+  call `unstable_rethrow(error)` first, or every successful save looks like an error (bug fixed 2026-10-14).
+- **`"use server"` files export only Server Actions.** Every exported function there is a public endpoint — put helpers
+  (e.g. `toBookShape`) in `src/lib/*` instead.
+- **Windows line endings:** most source files are CRLF. String-replace scripts must handle `\r\n` (a script that
+  silently failed on CRLF once duplicated half of `actions.ts`); prefer the Edit tool.
+- **Production settings:** after changing any outside setting (Cloudflare, GitHub variable, `app.env`, Razorpay,
+  Interakt, Meta, Supabase), update its row in **§7c** in the same session.
 
 ---
 
@@ -689,19 +844,23 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    the full PDFs. The client must make that bucket private. Ours is safe (checked).
 7. **Support e-mail:** the site shows `support@kaydyachaanifaydyach.com`, but that domain has **no mail
    server**. Set up mail on the new domain (Hostinger or Cloudflare Email Routing) and switch the address.
-8. **Meta Pixel + Conversions API**: need from the client's Meta Business account:
-   1. **Pixel (dataset) ID** the ads optimise for: Events Manager → Data sources → the pixel → ID (15–16
-      digits). The original loads 5 pixels (~400 KB); use 1, max 2.
-   2. **Domain verification**: Business Settings → Brand safety → Domains → add `kaydyachaanifayddyacha.com`
-      → DNS TXT record → its `facebook-domain-verification=…` value goes in Cloudflare DNS (TXT, `@`) → Verify.
-   3. **Conversions API access token** (secret): Events Manager → the pixel → Settings → Conversions API →
-      Generate access token → save in `kaf-keys/meta-capi-token.txt` (never in chat).
-   Optional: the owner's Facebook account as partner/admin on the pixel (to use Test events).
-   Then: GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS` → deploy; **build** the server-side Purchase via the
-   Conversions API from the Razorpay webhook (not in code yet), deduplicated with the browser Purchase by
-   `event_id` = order id (the browser already sends `eventID` = order id); token in `app.env`; test in
-   Events Manager → Test events (PageView → ViewContent → InitiateCheckout → Purchase ₹99); add Meta
-   tracking to the privacy policy.
+8. **Meta (status 2026-10-16):**
+   1. ✅ **Pixel ID** `1323976956324834` — GitHub variable set by the owner, live 14 Oct (`b9d351b`), privacy
+      policy section 4 added. Verified live: PageView + ViewContent reach Meta. Owner: check InitiateCheckout
+      (tap Buy) and Purchase in Events Manager → Test events. Ads can run and be tracked **now**.
+   2. ⏳ **Domain verification** (optional, not blocking ads): step-by-step WhatsApp message sent to the client
+      15 Oct (Business Settings → Brand safety and suitability → Domains → Add → "Update DNS TXT record" → send
+      the `facebook-domain-verification=…` line, don't press Verify yet). When it arrives (safe to paste in chat):
+      Cloudflare → DNS → Add record → TXT, name `@`, content = the line → then the client presses Verify.
+   3. ⏳ **Conversions API token** (secret): step-by-step WhatsApp message sent to the client 15 Oct (Events
+      Manager → Data sources → pixel → Settings → Conversions API → "Set up direct integration" → Generate access
+      token; needs Full control on the pixel). **Does not need domain verification.** Owner saves it in
+      `C:\Users\shivr\kaf-keys\meta-capi-token.txt` — **never in chat** — and says "token saved".
+   Then build (not in code yet): server-side **Purchase** from the Razorpay webhook (`payment.captured`), sent
+   once per order, `event_id` = our order id (the browser Purchase already sends `eventID` = order id → Meta
+   de-duplicates), value + currency + content_ids, buyer phone **SHA-256 hashed** (`ph`), `action_source:
+   website`; token as `META_CAPI_ACCESS_TOKEN` in `/opt/kaf/app.env` (+ pixel id); never fail the webhook if
+   Meta is down; test with a Test-events code first; update privacy policy §4 (server-side sharing, hashed phone).
 9. **5 missing books** (PDFs from Ajay) → create them → point their redirects at the real pages.
 10. Hindi versions of both Interakt templates (optional) → `INTERAKT_TEMPLATE_LANGUAGE_HI=hi` etc.
 11. Past buyers of the original site: their old download links stay on the old domain (it isn't moving).
@@ -740,6 +899,8 @@ Trust this file over these where they disagree:
 | `go-live-plan.md` Stage 7 | CloudWatch / EC2 wording | We're on Lightsail: use Lightsail → Metrics alarms |
 | `deploy/app.env.example` comment | "Staging: new.…" | No staging host. The main domain is used for testing (decision 10-10) |
 | `setup-steps-ec2.md` | Whole file | Not used (fallback while Lightsail was blocked) |
+| `HANDOFF.md` §8 "Meta Pixel — off", 5 pixel IDs | Pixel off / which ID | **On** since 10-14 with one ID `1323976956324834` (§7c Meta) |
+| `HANDOFF.md` §8 env table | `PAYMENT_REMINDER_DELAY_MINUTES=30`, Replov values | Server uses 10 / 10 minutes; full current list in §7c |
 
 ---
 
@@ -784,12 +945,13 @@ Trust this file over these where they disagree:
 | 10-12 | `6e6123a` `3f38d47` | **My Books showed unpaid attempts** (owner's 4 cancelled ग्रामपंचायत tries) → new `/api/orders/status`; My Books lists only paid orders. Checked live with the owner's 7 saved orders: 1 paid (shown), 2 unpaid + 4 fresh attempts (hidden) |
 | 10-12 | docs | `3f38d47` live: My Books paid-only (first version briefly also showed unpaid attempts < 30 min old as "pending" — dropped, a real payment is marked paid within seconds). `/my-books` and `/api/orders/status` not cached by Cloudflare (DYNAMIC / no-store) |
 | 10-13 | docs | **Full refresh of this doc**: header, §2 (live keys), §3 status + DB snapshot (11 products, #31 hidden, new #32 needs text, 8 paid / ₹498), new **§7b commands cheat sheet** (server, Cloudflare purge, DB, local, speed measuring), code map (`api/orders/status`, `api/leads`), §10 cache rules, §11 open items |
-
-| 10-14 | this commit | **Admin cover fixes.** (1) Every successful product save showed "Not saved: Saving failed" — Next 16 rejects the action promise with the `redirect()` signal and `ProductForm`'s catch swallowed it → `unstable_rethrow` in the catch (reproduced + verified on a temporary local page). (2) Square covers (owner's #8, #12, #19 uploads, 800×800) were cropped in the 3:4 cards → `src/lib/book-shape.ts` pads any non-3:4 cover/preview upload to 3:4 with its edge colour; dashboard warns when a picked cover isn't 3:4. Those 3 covers need re-uploading to get padded. (3) The sample reader skipped the uploaded cover (showed PDF pages 1–6) → reader shows cover + pages 2–6 like the viewer; 1600 px zoom only for `-p<n>-` page images. Known, accepted: after an admin save, pages can lag up to ~15 min because app1/app2 each have their own cache (a save clears only the container that handled it); owner OK with it (fix = ask both containers to revalidate, not built) |
-
-| 10-14 | this commit | **Meta Pixel on**: client gave pixel `1323976956324834` (one of the original site's 5, so both sites report into it); owner set GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS`. Privacy policy got section 4 "Cookies and Ad Measurement (Meta Pixel)" (what is sent; never name/phone/order link; not on /order, /my-books, /dashboard). Still from the client: domain-verification TXT + Conversions API token (server-side Purchase not built yet) |
-
-| 10-14 | this commit | Owner asked to change Razorpay's popup ("पुढे जाण्यासाठी मोबाईल नंबर टाका" / "यासह लॉगिन करा"): that text is Razorpay's own and can't be edited, and the number step must stay (it is the WhatsApp delivery number). Instead the book page shows a green line under both Buy buttons: "पेमेंट करताना तुमचा WhatsApp नंबर टाका — पुस्तक PDF त्याच नंबरवर WhatsApp ला येईल." (+ hi/en, `whatsappHint` in `product-copy.ts`) |
+| 10-14 | `8484f3f` | **Admin cover fixes.** (1) Every successful product save showed "Not saved: Saving failed" — Next 16 rejects the action promise with the `redirect()` signal and `ProductForm`'s catch swallowed it → `unstable_rethrow` in the catch (reproduced + verified on a temporary local page). (2) Square covers (owner's #8, #12, #19 uploads, 800×800) were cropped in the 3:4 cards → `src/lib/book-shape.ts` pads any non-3:4 cover/preview upload to 3:4 with its edge colour; dashboard warns when a picked cover isn't 3:4. Those 3 covers need re-uploading to get padded. (3) The sample reader skipped the uploaded cover (showed PDF pages 1–6) → reader shows cover + pages 2–6 like the viewer; 1600 px zoom only for `-p<n>-` page images. Known, accepted: after an admin save, pages can lag up to ~15 min because app1/app2 each have their own cache (a save clears only the container that handled it); owner OK with it (fix = ask both containers to revalidate, not built) |
+| 10-14 | `b9d351b` | **Meta Pixel on**: client gave pixel `1323976956324834` (one of the original site's 5, so both sites report into it); owner set GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS`. Privacy policy got section 4 "Cookies and Ad Measurement (Meta Pixel)" (what is sent; never name/phone/order link; not on /order, /my-books, /dashboard). Still from the client: domain-verification TXT + Conversions API token (server-side Purchase not built yet) |
+| 10-14 | `5883955` | Owner asked to change Razorpay's popup ("पुढे जाण्यासाठी मोबाईल नंबर टाका" / "यासह लॉगिन करा"): that text is Razorpay's own and can't be edited, and the number step must stay (it is the WhatsApp delivery number). Instead the book page shows a green line under both Buy buttons: "पेमेंट करताना तुमचा WhatsApp नंबर टाका — पुस्तक PDF त्याच नंबरवर WhatsApp ला येईल." (+ hi/en, `whatsappHint` in `product-copy.ts`) |
+| 10-14 | server check | Owner re-uploaded covers #8, #12, #19 (5:23–5:24 pm) → saved 800×1067 (3:4) in all sizes; shown on home, /ebooks, /combos and the book pages; no cropping at 375 px |
+| 10-15 | client | Sent the client WhatsApp step lists for the **Meta Conversions API token** (no domain verification needed) and the **domain verification** TXT line (§11 item 8) |
+| 10-16 | CAPI | **Meta Conversions API built** (`src/lib/meta-capi.ts`): server-side Purchase from `onOrderPaid` (webhook `payment.captured` + 10-min check) via `after()`, once per order (`meta_capi_sent_at` claim), `event_id` = order id (= browser eventID → de-duplicated), phone/e-mail SHA-256, country; checkout saves `_fbp`/`_fbc` cookies + IP + user agent (after the response, best effort; IP/UA cleared after sending). Migration **010 applied** to Mumbai. Privacy policy §4 updated. Dry run on a real order OK (payload correct, nothing sent). A real send from the dev PC was blocked by the permission system (buyer data) → verify on production instead. **Off until `META_CAPI_ACCESS_TOKEN` is in `/opt/kaf/app.env`** (token saved in `kaf-keys\meta-capi-token.txt`) |
+| 10-16 | docs | New **§7c production settings register** (every Cloudflare / server / `app.env` / GitHub / Supabase / Razorpay / Interakt / Meta / monitoring setting, where it lives, state, date); §3, §4 (two-cache note), §5 (Razorpay popup), §6 (3:4 covers), §8, §10 (new rules), §11 item 8 updated |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
@@ -801,7 +963,7 @@ variables, fonts, Cloudflare Free-plan limits …).
 
 | Doc | Use it for | Freshness |
 |---|---|---|
-| **`docs/PROJECT-STATUS.md`** | This overview | Current |
+| **`docs/PROJECT-STATUS.md`** | This overview; **§7c = every production setting and where it lives**; §7b = commands | Current |
 | `docs/go-live-plan.md` | Go-live stages 0–7 with checklists, problems log, hosting decision, test tables for Stages 4–6 | Current (minor stale bits, §12) |
 | `docs/ui-match-original.md` | Every UI decision vs the original site (items 1–49 + status) | Current |
 | `docs/HANDOFF.md` | Deep detail: buyer flow, catalog, dashboard, env vars, Interakt templates, Razorpay rules, local dev tips | Detail still right; hosting/DB parts stale (§12) |

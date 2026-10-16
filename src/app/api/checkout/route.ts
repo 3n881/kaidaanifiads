@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
 import {
@@ -11,8 +11,15 @@ import {
 import { getDeliverableItems, orderPagePath } from "@/lib/orders";
 import { localizedTitle, normalizeLocale } from "@/lib/i18n";
 import { editionLocaleFor } from "@/lib/catalog";
+import { collectMetaSignals } from "@/lib/meta-capi";
 
 export const runtime = "nodejs";
+
+/** Meta's pixel cookies look like `fb.1.<time>.<id>`; anything else is ignored. */
+function cookieValue(req: NextRequest, name: string): string | null {
+  const value = req.cookies.get(name)?.value ?? "";
+  return /^fb\.\d\.\d+\.[\w.-]{1,400}$/.test(value) ? value : null;
+}
 
 // Shown in the Buy modal when Supabase or Razorpay is down/slow. We never take
 // money while we can't record or deliver the order.
@@ -151,6 +158,28 @@ async function handle(req: NextRequest) {
   if (error) {
     console.error("[checkout] order insert failed", error);
     return NextResponse.json({ error: BUSY_MESSAGE, retryable: true }, { status: 503 });
+  }
+
+  // Meta Conversions API (src/lib/meta-capi.ts): keep Meta's cookies + browser
+  // details so the server-side Purchase can be matched to the ad. Saved after
+  // the response, best effort — never slows or fails a checkout.
+  if (collectMetaSignals) {
+    const signals = {
+      meta_fbp: cookieValue(req, "_fbp"),
+      meta_fbc: cookieValue(req, "_fbc"),
+      client_ip:
+        (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0] ?? "")
+          .trim()
+          .slice(0, 64) || null,
+      client_user_agent: req.headers.get("user-agent")?.slice(0, 400) || null,
+    };
+    after(async () => {
+      const { error: signalError } = await admin.from("orders").update(signals).eq("id", orderId);
+      // 42703 = migration 010 not applied yet: the Purchase is still sent, with the phone only.
+      if (signalError && signalError.code !== "42703") {
+        console.error("[checkout] meta signals not saved", orderId, signalError.message);
+      }
+    });
   }
 
   return NextResponse.json({

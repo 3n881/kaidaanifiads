@@ -4,6 +4,8 @@ import { SITE_URL } from "./supabase/config";
 import { isInteraktConfigured, sendWhatsAppDelivery, templateAttachesPdf } from "./interakt";
 import { getDeliverableItems, normalizePhone, orderPageUrl } from "./orders";
 import { localizedTitle, normalizeLocale } from "./i18n";
+import { after } from "next/server";
+import { sendMetaPurchase } from "./meta-capi";
 
 // Signed URLs are minted per click by /api/download and only need to survive
 // the redirect, so they expire quickly — a forwarded link is useless.
@@ -116,6 +118,13 @@ export async function sendOrderOnWhatsApp(
  * skips orders that already got WhatsApp (e.g. via the order page popup).
  */
 export async function onOrderPaid(orderId: string): Promise<void> {
+  // Meta Conversions API Purchase: after the response (Razorpay's webhook gets
+  // its answer without waiting for Meta). Sent once per order; never throws.
+  try {
+    after(() => sendMetaPurchase(orderId));
+  } catch {
+    await sendMetaPurchase(orderId); // called outside a request (scripts)
+  }
   if (!AUTO_WHATSAPP_ON_PAYMENT) return;
   try {
     await sendOrderOnWhatsApp(orderId, { skipIfDelivered: true });
