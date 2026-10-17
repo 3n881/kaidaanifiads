@@ -308,7 +308,7 @@ const TONES = {
   red: { bg: "from-red-50/80", icon: "bg-red-100 text-danger-600", ghost: "text-red-100" },
 } as const;
 
-function KpiCard({ label, value, icon: Icon, tone, foot, valueClass = "text-brand-900", className = "" }: {
+export function KpiCard({ label, value, icon: Icon, tone, foot, valueClass = "text-brand-900", className = "" }: {
   label: string;
   value: string;
   icon: React.ElementType;
@@ -333,7 +333,7 @@ function KpiCard({ label, value, icon: Icon, tone, foot, valueClass = "text-bran
   );
 }
 
-function Trend({ value }: { value: number | null }) {
+export function Trend({ value }: { value: number | null }) {
   if (value === null) return <span className="text-brand-400">no earlier data</span>;
   const up = value >= 0;
   const Icon = up ? TrendingUp : TrendingDown;
@@ -378,7 +378,7 @@ const BADGES = {
   partial: ["PART REFUND", "bg-purple-100 text-purple-700"],
 } as const;
 
-function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct }) {
+export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct }) {
   const phone = o.buyer_contact || o.whatsapp_number;
   const kind = o.refund_status === "full" ? "refunded" : o.refund_status === "partial" ? "partial" : (dropOffKind(o) ?? "paid");
   const [badge, badgeClass] = BADGES[kind];

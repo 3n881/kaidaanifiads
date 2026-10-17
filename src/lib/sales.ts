@@ -39,6 +39,9 @@ export interface PeriodStats {
   refundedAmount: number;
   /** paid ÷ checkouts, null when there were no checkouts. */
   conversion: number | null;
+  /** % change vs the comparison period (null: nothing to compare). */
+  revenueChange: number | null;
+  paidChange: number | null;
 }
 
 export interface SalesOverview {
@@ -46,26 +49,37 @@ export interface SalesOverview {
   week: PeriodStats;
   all: PeriodStats;
   /** Paid > 15 min ago, never downloaded — follow up on WhatsApp. */
-  paidNotDownloaded: SalesOrder[];
+  paidNotDownloaded: OrderRow[];
   /** Paid > 5 min ago, no WhatsApp message sent. */
-  whatsappMissing: SalesOrder[];
+  whatsappMissing: OrderRow[];
+  /** Failed payments today whose buyer hasn't paid for that book since (they have a phone number). */
+  failedToday: OrderRow[];
   newMessages: number;
   /** Interested buyers (leads) still subscribed, and new ones in 7 days. */
   interested: { active: number; newWeek: number };
   topBooksWeek: Array<{ productId: number | null; paid: number; revenue: number }>;
-  latestPaid: SalesOrder[];
+  /** Last 14 IST days, oldest first: paid orders and net ₹ by the day they were paid. */
+  daily: Array<{ date: string; paid: number; revenue: number }>;
+  latestPaid: OrderRow[];
+  readAt: string;
 }
 
-function stats(rows: SalesOrder[]): PeriodStats {
+function stats(rows: SalesOrder[], before?: SalesOrder[]): PeriodStats {
+  const net = (r: SalesOrder) => Number(r.amount || 0) - Number(r.refunded_amount || 0);
   const paidRows = rows.filter((r) => r.status === "paid");
+  const revenue = paidRows.reduce((sum, r) => sum + net(r), 0);
+  const prevPaid = before?.filter((r) => r.status === "paid");
+  const pctChange = (now: number, then: number) => (then > 0 ? ((now - then) / then) * 100 : null);
   return {
     checkouts: rows.length,
     paid: paidRows.length,
     failed: rows.filter((r) => r.status === "failed").length,
-    revenue: paidRows.reduce((sum, r) => sum + Number(r.amount || 0) - Number(r.refunded_amount || 0), 0),
+    revenue,
     refunds: paidRows.filter((r) => Number(r.refunded_amount || 0) > 0).length,
     refundedAmount: paidRows.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0),
     conversion: rows.length ? paidRows.length / rows.length : null,
+    revenueChange: prevPaid ? pctChange(revenue, prevPaid.reduce((sum, r) => sum + net(r), 0)) : null,
+    paidChange: prevPaid ? pctChange(paidRows.length, prevPaid.length) : null,
   };
 }
 
@@ -73,6 +87,9 @@ function stats(rows: SalesOrder[]): PeriodStats {
 function startOfTodayIst(now: number): number {
   return Math.floor((now + IST_OFFSET_MS) / DAY_MS) * DAY_MS - IST_OFFSET_MS;
 }
+
+/** YYYY-MM-DD of a timestamp in India. */
+const istDate = (ms: number) => new Date(ms + IST_OFFSET_MS).toISOString().slice(0, 10);
 
 /** Admin-only: the sales numbers on the dashboard overview. */
 export async function getSalesOverview(): Promise<SalesOverview> {
@@ -85,7 +102,9 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
   const [ordersRes, messagesRes, leadsRes] = await Promise.all([
     admin
       .from("orders")
-      .select("id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status")
+      .select(
+        "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status, razorpay_payment_id, whatsapp_number, checkout_closed_at",
+      )
       .gte("created_at", SALES_START)
       .order("created_at", { ascending: false })
       .limit(20000),
@@ -93,12 +112,17 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
     admin.from("leads").select("created_at").is("opted_out_at", null).limit(20000),
   ]);
   if (ordersRes.error) throw new Error(ordersRes.error.message);
-  const rows = (ordersRes.data ?? []) as SalesOrder[];
+  const rows = (ordersRes.data ?? []) as OrderRow[];
 
   const now = Date.now();
   const todayStart = startOfTodayIst(now);
   const weekStart = now - 7 * DAY_MS;
-  const since = (t: number) => rows.filter((r) => Date.parse(r.created_at) >= t);
+  const between = (from: number, to: number) =>
+    rows.filter((r) => {
+      const t = Date.parse(r.created_at);
+      return t >= from && t < to;
+    });
+  const since = (t: number) => between(t, Infinity);
   const paid = rows.filter((r) => r.status === "paid");
   const paidAgo = (r: SalesOrder, ms: number) => Date.parse(r.paid_at ?? r.created_at) < now - ms;
 
@@ -111,19 +135,36 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
     byBook.set(r.product_id, entry);
   }
 
+  // Last 14 days by the IST day the order was paid.
+  const daily = Array.from({ length: 14 }, (_, i) => ({ date: istDate(todayStart - (13 - i) * DAY_MS), paid: 0, revenue: 0 }));
+  const dayIndex = new Map(daily.map((d, i) => [d.date, i]));
+  for (const r of paid) {
+    const i = dayIndex.get(istDate(Date.parse(r.paid_at ?? r.created_at)));
+    if (i === undefined) continue;
+    daily[i].paid += 1;
+    daily[i].revenue += Number(r.amount || 0) - Number(r.refunded_amount || 0);
+  }
+
+  // A failed attempt is settled once the same phone paid for the same book afterwards.
+  const paidLater = (f: OrderRow) =>
+    paid.some((p) => p.buyer_contact && p.buyer_contact === f.buyer_contact && p.product_id === f.product_id && p.created_at >= f.created_at);
+
   return {
-    today: stats(since(todayStart)),
-    week: stats(since(weekStart)),
+    today: stats(since(todayStart), between(todayStart - DAY_MS, now - DAY_MS)),
+    week: stats(since(weekStart), between(now - 14 * DAY_MS, weekStart)),
     all: stats(rows),
     paidNotDownloaded: paid.filter((r) => !r.download_count && paidAgo(r, 15 * 60 * 1000)).slice(0, 20),
     whatsappMissing: paid.filter((r) => !r.whatsapp_sends && paidAgo(r, 5 * 60 * 1000)).slice(0, 20),
+    failedToday: since(todayStart).filter((r) => r.status === "failed" && !paidLater(r)).slice(0, 20),
     newMessages: messagesRes.count ?? 0,
     interested: {
       active: (leadsRes.data ?? []).length,
       newWeek: ((leadsRes.data ?? []) as Array<{ created_at: string }>).filter((l) => Date.parse(l.created_at) >= weekStart).length,
     },
     topBooksWeek: [...byBook.values()].sort((a, b) => b.paid - a.paid).slice(0, 5),
-    latestPaid: paid.slice(0, 10),
+    daily,
+    latestPaid: paid.slice(0, 5),
+    readAt: new Date(now).toISOString(),
   };
 }
 
