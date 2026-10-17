@@ -1,6 +1,7 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-16 night** (ad-link speed check + 600 px phone cover) (live commit `ebc643f`; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint;
+> **Last updated 2026-10-18** (live commit `4c74717`; 17 Oct: **admin Orders + Overview pages redesigned** like the client's
+> original dashboard, migration 011, CSV export; 16 Oct night: ad-link speed check + 600 px phone cover; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint;
 > 16 Oct: **Meta Conversions API live + verified**, migration 010, **§7c production settings register** = every
 > setting and where it lives, **§7d brand outro video**). One place for any developer or AI agent to
 > understand where the project is: what exists, how it was built, what is live, what is next, and
@@ -82,13 +83,13 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 
 ---
 
-## 3. Status at a glance (2026-10-16)
+## 3. Status at a glance (2026-10-18)
 
 | Area | State |
 |---|---|
 | Store code (catalog, book pages, checkout, order page, downloads, My Books) | ✅ Working end to end with **live** Razorpay payments (2026-10-11) |
 | WhatsApp delivery (PDF after payment) + payment reminder | ✅ Working (tested 2026-10-01; seen again in 10-10 test orders) |
-| Admin dashboard | ✅ Rebuilt 2026-10-11: **sales Overview**, **Orders** with filters + **order detail page**, **refund tracking**, readable save errors, PDF uploads > 10 MB fixed, works on phone / tablet / desktop (§8 Dashboard) |
+| Admin dashboard | ✅ Rebuilt 2026-10-11 (order detail page, refund tracking, readable save errors, PDF uploads > 10 MB) and **redesigned 2026-10-17** to look like the client's original dashboard: **Orders** (KPIs, drop-off, Recent Sales, CSV) and **Overview** (period cards, needs attention, 14-day chart, top books, latest orders). **Owner checked both live on 18 Oct: "all good"** (§8 Dashboard) |
 | Didn't-pay flow (failed → help screen; cancelled → WhatsApp offers sign-up) | ✅ 2026-10-11, live in `99050fb` (tested locally with a fake checkout; not yet tried on the live site). Interested buyers page `/dashboard/leads`. Next-day follow-up **off** until an Interakt marketing template is approved (§11 item 4) |
 | Multilingual UI (Marathi / Hindi / English) + first-visit language picker | ✅ 2026-10-10 |
 | UI matched to the original site | ✅ 49 tracked items done. 3 wait for an owner decision (§11) |
@@ -695,6 +696,8 @@ alternative tagline.
 | `api/download/[orderId]` | Token + paid → `record_order_download` (cap 30) → 302 to a 5-min signed URL named `<slug>-<locale>.pdf`; bilingual error page |
 | `api/orders/contact` | Order-page popup: save a WhatsApp number + send the PDF (cap 3 via `claim_whatsapp_send`) |
 | `api/orders/status` | My Books: POST up to 30 `{orderId, token}` → `paid` / `pending` (unpaid < 30 min) / `unpaid`; tokens verified (HMAC), `no-store` (2026-10-12) |
+| `api/orders/closed` | BuyButton `ondismiss` (buyer closed Razorpay without paying): order id + access token → sets `orders.checkout_closed_at` once on an unpaid order (migration 011, 2026-10-17). Only feeds the admin drop-off numbers; fire-and-forget, never blocks the buyer |
+| `dashboard/orders/export` | Admin CSV of the Orders page's current filters (≤ 5,000 rows, BOM for Excel Devanagari; needs admin login) |
 | `api/leads` | Didn't-pay WhatsApp sign-up (consent required, honeypot, 5/hour per IP hash) → `leads` |
 | `api/auth/login` | Admin password login (checks `ADMIN_EMAILS`) |
 | `api/auth/magic-link`, `auth/callback` | **Unused** by the UI (login page is password-only) |
@@ -702,7 +705,7 @@ alternative tagline.
 | `media/[...path]` | Proxies the public `covers` bucket (whitelisted names): images 1 year immutable, `previews/*` 1 h at the edge |
 
 ### Dashboard (`/dashboard`, all dynamic; `src/proxy.ts` guards it, fails closed if `ADMIN_EMAILS` empty)
-**Overview = sales dashboard** (2026-10-11, `src/lib/sales.ts` + `components/admin/SalesOverviewView.tsx`): revenue / paid / conversion / failed for today (IST), 7 days, all time — counted from `SALES_START` (live keys, 11 Oct 14:30 IST; test orders excluded; refunds not tracked yet); needs-attention lists (paid > 15 min not downloaded, paid without WhatsApp, unhandled contact messages) with wa.me links; top books 7 days; latest 10 paid orders; one small Setup card (business details still missing). The old setup checklist lives on Launch. Period cards and attention titles link into Orders. **Orders page** (2026-10-11): Today/7 days/All tabs, clickable cards that filter (Paid ₹, Not paid, Failed, Paid-not-downloaded), search (phone — last 10 digits, `pay_…`, order id), book name + language + IST time + wa.me link + downloads + WhatsApp count + Resend; cards on phones, table on desktop; test orders hidden unless `?test=1`; latest 200 matches. **Uploads >10 MB** need `experimental.proxyClientMaxBodySize` (set to 95mb) because `/dashboard` goes through `proxy.ts`. No cover uploaded → the PDF's first page (reader page 1) becomes the cover. **Saving a product** (2026-10-14): a good save redirects back with `?saved=1` and the form resets; "Not saved: …" now appears only for a real refusal (before, *every* good save showed "Not saved: Saving failed" because the redirect was caught as an error). Non-3:4 covers are padded (§6). **Refunds** (2026-10-11): webhook handles `refund.created` / `refund.processed` (add those events to the live Razorpay webhook); order stays `paid`, revenue = amount − refunded_amount everywhere; Refunded card/filter on Orders; downloads are not revoked by a refund. **Order detail page** `/dashboard/orders/[id]`: summary, timeline, buyer (wa.me), Razorpay ids (payment links to the Razorpay dashboard), actions: Check with Razorpay (`src/lib/refunds.ts` — marks captured-but-unpaid orders paid and pulls refund state; use it for refunds made before the webhook events were added), Resend WhatsApp, Copy buyer's order link · **Products** (per-edition editor `ProductForm`: text, cover, up to 5
+**Redesign 2026-10-17 (supersedes the 10-11 description below where they differ):** **Orders** = `app/dashboard/orders/page.tsx` (loads) + `components/admin/OrdersView.tsx` (view; also exports `KpiCard`, `Trend`, `OrderCard`) + `OrdersClientBits.tsx` (refresh, "Xm old", copy, custom dates, tab loading bar). URL filters `?period=today|week|month|2m|3m|all|custom&from&to` · `status=all|paid|pending|failed|cancelled|refunded|notdownloaded` · `q=` (phone, short order no. `#3F9A2C` = first 6 hex of the id, searched as a uuid range, `pay_…`, full id) · `test=1`; old `7d`/`created` still accepted. Pending = unpaid, window not closed; Cancelled = closed the Razorpay window (`checkout_closed_at`); Failed = Razorpay `payment.failed`. Tabs/search/dates keep the scroll position (`scroll={false}`, `next/form`). Cards show the phone (no buyer names: no form before paying). **Overview** = `computeSalesOverview` (period stats with % vs previous period, `failedToday`, `daily` 14 IST days, latest 5 paid as `OrderRow`) + `SalesOverviewView.tsx`. Older description: **Overview = sales dashboard** (2026-10-11, `src/lib/sales.ts` + `components/admin/SalesOverviewView.tsx`): revenue / paid / conversion / failed for today (IST), 7 days, all time — counted from `SALES_START` (live keys, 11 Oct 14:30 IST; test orders excluded; refunds not tracked yet); needs-attention lists (paid > 15 min not downloaded, paid without WhatsApp, unhandled contact messages) with wa.me links; top books 7 days; latest 10 paid orders; one small Setup card (business details still missing). The old setup checklist lives on Launch. Period cards and attention titles link into Orders. **Orders page** (2026-10-11): Today/7 days/All tabs, clickable cards that filter (Paid ₹, Not paid, Failed, Paid-not-downloaded), search (phone — last 10 digits, `pay_…`, order id), book name + language + IST time + wa.me link + downloads + WhatsApp count + Resend; cards on phones, table on desktop; test orders hidden unless `?test=1`; latest 200 matches. **Uploads >10 MB** need `experimental.proxyClientMaxBodySize` (set to 95mb) because `/dashboard` goes through `proxy.ts`. No cover uploaded → the PDF's first page (reader page 1) becomes the cover. **Saving a product** (2026-10-14): a good save redirects back with `?saved=1` and the form resets; "Not saved: …" now appears only for a real refusal (before, *every* good save showed "Not saved: Saving failed" because the redirect was caught as an error). Non-3:4 covers are padded (§6). **Refunds** (2026-10-11): webhook handles `refund.created` / `refund.processed` (add those events to the live Razorpay webhook); order stays `paid`, revenue = amount − refunded_amount everywhere; Refunded card/filter on Orders; downloads are not revoked by a refund. **Order detail page** `/dashboard/orders/[id]`: summary, timeline, buyer (wa.me), Razorpay ids (payment links to the Razorpay dashboard), actions: Check with Razorpay (`src/lib/refunds.ts` — marks captured-but-unpaid orders paid and pulls refund state; use it for refunds made before the webhook events were added), Resend WhatsApp, Copy buyer's order link · **Products** (per-edition editor `ProductForm`: text, cover, up to 5
 **Interested buyers** `/dashboard/leads` (2026-10-11, `getLeadsView` in `src/lib/sales.ts`): cards (interested, bought later + %, follow-ups sent, opted out), one card per sign-up (wa.me link, book, date, language, Cancelled/Payment failed chip, Bought later, Follow-up sent, Opted out) and **Remove** (`optOutLead` → `opted_out_at`). Admin menu has 7 items (phones: 4 + 3). Server actions on admin pages recover from deploys (`src/lib/stale-action.ts`, `app/dashboard/error.tsx`).
 preview images, PDF View/Replace/Remove; choosing a PDF renders 6 reader pages **in the browser** with PDF.js
 and uploads them on save) · `products/new` · `products/[id]/pdf` (admin 5-min signed URL) · **Orders** (last 200,
@@ -901,8 +904,10 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    "Order now" to page shown if still slow; (4) Ads Manager **Link clicks** vs **Landing page views** (≥ 70–80 % =
    fine); (5) the Meta `facebook-domain-verification=…` line.
 
+4d. **Watch the new drop-off numbers (from 17 Oct):** Orders → Drop-off Analysis. "Closed payment window" started at 0 (the 102 older unpaid orders all count as "left without closing") and fills as buyers close Razorpay without paying. If most drop-offs are "closed" at the number screen, revisit 4b (e.g. Razorpay popup in English).
+
 ### Ideas (not started)
-- Order CSV export (accounts/GST) · nightly WhatsApp sales summary to the owner · move dashboard totals into
+- ~~Order CSV export~~ ✅ 17 Oct (Orders page download button) · nightly WhatsApp sales summary to the owner · move dashboard totals into
   SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
   block downloads for fully refunded orders (today a refund does not revoke access).
 
@@ -1030,6 +1035,7 @@ Trust this file over these where they disagree:
 | 10-17 | orders page | **Orders page redesign** to match the client's original dashboard (§3 row), phone-first; migration **011** `checkout_closed_at` applied; `/api/orders/closed`; CSV export; old links `?period=7d` / `?status=created` still work (aliases) |
 | 10-17 | `497f77e` | Orders page: tabs, search and custom dates no longer jump to the top (`scroll={false}`, `next/form`); loading bar under the tapped tab; drop-off cards jump to the list |
 | 10-17 | overview | **Overview page redesign** (§3 row): period cards with % change, Needs attention tiles, 14-day sales chart, top books with covers, latest paid order cards, 2×2 tiles |
+| 10-18 | owner check | Owner opened the live Orders and Overview pages (`4c74717`) with real data on the phone: **"all good"**. Doc refreshed (header, §3, §8 code map: `api/orders/closed`, CSV export, dashboard files/filters; §11 4d) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
