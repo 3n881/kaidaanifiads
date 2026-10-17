@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import ResendButton from "@/components/admin/ResendButton";
-import { CopyButton, CustomRange, FreshnessBadge, RefreshButton } from "@/components/admin/OrdersClientBits";
+import { CopyButton, CustomRange, FreshnessBadge, PendingHint, RefreshButton } from "@/components/admin/OrdersClientBits";
 import type { AdminProduct } from "@/lib/admin";
 import { coverThumbSrc } from "@/lib/covers";
 import {
@@ -68,7 +69,8 @@ const waLink = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "").repl
 type Filters = { period: string; from: string; to: string; status: OrderStatusFilter; q: string; test: string };
 
 /** The Orders page (layout follows the client's original dashboard; phone first). */
-export default function OrdersView({ view, products }: { view: OrdersViewData; products: AdminProduct[] }) {
+/** `basePath` = this page's address (only changed by local layout previews). */
+export default function OrdersView({ view, products, basePath = "/dashboard/orders" }: { view: OrdersViewData; products: AdminProduct[]; basePath?: string }) {
   const byId = new Map(products.map((p) => [p.id, p]));
 
   // Links keep the other filters and change one.
@@ -88,8 +90,10 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
   };
   const href = (change: Partial<Filters>) => {
     const qs = query(change);
-    return `/dashboard/orders${qs ? `?${qs}` : ""}`;
+    return `${basePath}${qs ? `?${qs}` : ""}`;
   };
+  // Cards above the list jump down to it; tabs and search keep the scroll position.
+  const toList = (change: Partial<Filters>) => `${href(change)}#recent-sales`;
   const exportHref = `/dashboard/orders/export${query({}) ? `?${query({})}` : ""}`;
   const k = view.kpis;
   const periodName = PERIODS.find(([p]) => p === view.period)?.[1] ?? "All";
@@ -120,7 +124,7 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
 
       <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1fr_2fr]">
         {/* Recovery opportunity */}
-        <Link href={href({ status: "pending" })} className="block">
+        <Link href={toList({ status: "pending" })} className="block">
           <KpiCard
             label="Recovery opp."
             value={rupees(k.recoveryAmount)}
@@ -141,9 +145,9 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
             <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">{k.recoveryCount} not paid</span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-            <DropTile href={href({ status: "cancelled" })} icon={LogOut} value={view.dropOff.cancelled} label="Closed payment window" tone="amber" />
-            <DropTile href={href({ status: "failed" })} icon={CreditCard} value={view.dropOff.failed} label="Payment failed" tone="red" />
-            <DropTile href={href({ status: "pending" })} icon={UserX} value={view.dropOff.pending} label="Left without closing" tone="purple" className="col-span-2 sm:col-span-1" />
+            <DropTile href={toList({ status: "cancelled" })} icon={LogOut} value={view.dropOff.cancelled} label="Closed payment window" tone="amber" />
+            <DropTile href={toList({ status: "failed" })} icon={CreditCard} value={view.dropOff.failed} label="Payment failed" tone="red" />
+            <DropTile href={toList({ status: "pending" })} icon={UserX} value={view.dropOff.pending} label="Left without closing" tone="purple" className="col-span-2 sm:col-span-1" />
           </div>
           <p className="mt-3 text-[11px] leading-snug text-amber-800/80">
             Failed payments have the buyer&apos;s number (WhatsApp reminder goes out after 10 min). Razorpay shares no number when the window is closed before paying.
@@ -152,12 +156,12 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
           {(k.refunded > 0 || k.notDownloaded > 0) && (
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
               {k.notDownloaded > 0 && (
-                <Link href={href({ status: "notdownloaded" })} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-amber-800 ring-1 ring-amber-200">
+                <Link href={toList({ status: "notdownloaded" })} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-amber-800 ring-1 ring-amber-200">
                   <Download className="h-3.5 w-3.5" aria-hidden="true" /> {k.notDownloaded} paid, not downloaded
                 </Link>
               )}
               {k.refunded > 0 && (
-                <Link href={href({ status: "refunded" })} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-purple-700 ring-1 ring-purple-200">
+                <Link href={toList({ status: "refunded" })} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-purple-700 ring-1 ring-purple-200">
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> {k.refunded} refunded (−{rupees(k.refundedAmount)})
                 </Link>
               )}
@@ -167,7 +171,7 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
       </div>
 
       {/* Recent sales */}
-      <section className="mt-5 rounded-2xl border border-brand-100 bg-white p-4 shadow-[var(--shadow-card)] sm:mt-6 sm:p-6">
+      <section id="recent-sales" className="mt-5 scroll-mt-36 rounded-2xl border border-brand-100 bg-white p-4 shadow-[var(--shadow-card)] sm:mt-6 sm:p-6">
         <h2 className="text-xl font-extrabold text-brand-900 sm:text-2xl">Recent Sales</h2>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-brand-500">
           <span>
@@ -184,16 +188,20 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
               <Link
                 key={value}
                 href={href({ period: value })}
+                scroll={false}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-bold transition sm:px-4 ${active ? "bg-white text-brand-900 shadow-sm" : "text-brand-500 hover:text-brand-800"}`}
+                className={`relative shrink-0 rounded-lg px-3.5 py-2 text-sm font-bold transition sm:px-4 ${active ? "bg-white text-brand-900 shadow-sm" : "text-brand-500 hover:text-brand-800"}`}
               >
                 {label}
+                <PendingHint />
               </Link>
             );
           })}
         </nav>
         {view.period === "custom" && (
           <CustomRange
+            action={basePath}
+            key={`${view.from}|${view.to}|${view.readAt}`}
             from={view.from}
             to={view.to}
             hidden={Object.fromEntries(
@@ -203,7 +211,7 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
         )}
 
         {/* Search */}
-        <form action="/dashboard/orders" className="relative mt-3">
+        <Form action={basePath} scroll={false} className="relative mt-3">
           {view.period !== "all" && <input type="hidden" name="period" value={view.period} />}
           {view.period === "custom" && view.from && <input type="hidden" name="from" value={view.from} />}
           {view.period === "custom" && view.to && <input type="hidden" name="to" value={view.to} />}
@@ -217,7 +225,7 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
             placeholder="Search phone or order no."
             className="h-12 w-full rounded-2xl border border-brand-200 bg-white pl-12 pr-4 text-base outline-none placeholder:text-brand-400 focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/15"
           />
-        </form>
+        </Form>
 
         {/* Status tabs + CSV */}
         <div className="mt-3 flex items-center gap-2">
@@ -230,10 +238,12 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
                 <Link
                   key={value}
                   href={href({ status: value })}
+                  scroll={false}
                   aria-current={active ? "page" : undefined}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold transition ${active ? "bg-white text-brand-900 shadow-sm" : "text-brand-500 hover:text-brand-800"}`}
+                  className={`relative shrink-0 rounded-lg px-3 py-2 text-sm font-bold transition ${active ? "bg-white text-brand-900 shadow-sm" : "text-brand-500 hover:text-brand-800"}`}
                 >
                   {label} <span className={`text-xs ${active ? "text-brand-500" : "text-brand-400"}`}>{count}</span>
+                  <PendingHint />
                 </Link>
               );
             })}
@@ -252,7 +262,7 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
             {view.q && (
               <>
                 Search: <b>{view.q}</b> ·{" "}
-                <Link href={href({ q: "" })} className="font-bold text-brand-teal">
+                <Link href={href({ q: "" })} scroll={false} className="font-bold text-brand-teal">
                   clear
                 </Link>
               </>
@@ -275,7 +285,7 @@ export default function OrdersView({ view, products }: { view: OrdersViewData; p
         {view.truncated && <p className="mt-3 text-xs text-brand-500">Showing the latest {view.rows.length}. Pick a shorter period, a tab or search — or download the CSV for all.</p>}
 
         <div className="mt-4 border-t border-brand-50 pt-3 text-right">
-          <Link href={href({ test: view.includeTest ? "" : "1" })} className="text-xs font-semibold text-brand-500 underline underline-offset-2">
+          <Link href={href({ test: view.includeTest ? "" : "1" })} scroll={false} className="text-xs font-semibold text-brand-500 underline underline-offset-2">
             {view.includeTest ? "Hide test orders" : "Show test orders (before 11 Oct)"}
           </Link>
         </div>

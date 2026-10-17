@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Form from "next/form";
+import { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 
@@ -17,6 +19,17 @@ export function RefreshButton() {
     >
       <RefreshCw className={`h-5 w-5 ${pending ? "animate-spin" : ""}`} aria-hidden="true" />
     </button>
+  );
+}
+
+/** Thin bar under a tab while its list loads (place inside the <Link>). */
+export function PendingHint() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-x-2 bottom-0.5 h-0.5 rounded-full bg-brand-teal transition-opacity ${pending ? "animate-pulse opacity-100" : "opacity-0"}`}
+    />
   );
 }
 
@@ -66,10 +79,10 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 /** Custom date range (IST) — opens under the period tabs. */
-export function CustomRange({ from, to, hidden }: { from: string; to: string; hidden: Record<string, string> }) {
+export function CustomRange({ from, to, hidden, action }: { from: string; to: string; hidden: Record<string, string>; action: string }) {
   const [busy, setBusy] = useState(false);
   return (
-    <form action="/dashboard/orders" onSubmit={() => setBusy(true)} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-brand-100 bg-brand-50/50 p-3">
+    <Form action={action} scroll={false} onSubmit={() => setBusy(true)} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-brand-100 bg-brand-50/50 p-3">
       <input type="hidden" name="period" value="custom" />
       {Object.entries(hidden).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
@@ -85,6 +98,6 @@ export function CustomRange({ from, to, hidden }: { from: string; to: string; hi
       <button type="submit" className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand-teal px-4 text-sm font-bold text-white">
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />} Show
       </button>
-    </form>
+    </Form>
   );
 }
