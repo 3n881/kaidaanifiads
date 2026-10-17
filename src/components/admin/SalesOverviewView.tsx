@@ -23,7 +23,7 @@ export default function SalesOverviewView({ sales, products, setupWaiting, sales
       {/* Sales: today / 7 days / all time */}
       <div className="grid gap-3 md:grid-cols-3">
         <PeriodCard title="Today" stats={sales.today} href="/dashboard/orders?period=today" highlight />
-        <PeriodCard title="Last 7 days" stats={sales.week} href="/dashboard/orders?period=7d" />
+        <PeriodCard title="Last 7 days" stats={sales.week} href="/dashboard/orders?period=week" />
         <PeriodCard title="All time" stats={sales.all} href="/dashboard/orders" />
       </div>
 

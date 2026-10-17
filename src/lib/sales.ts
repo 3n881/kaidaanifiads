@@ -128,95 +128,223 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
 }
 
 // ---------------------------------------------------------------------------
-// Orders page: filters from the URL (?period=today|7d|all &status=… &q=… &test=1)
+// Orders page: filters from the URL
+//   ?period=today|week|month|2m|3m|all|custom (&from=&to= YYYY-MM-DD, IST)
+//   &status=all|paid|pending|failed|cancelled|refunded|notdownloaded &q=… &test=1
 // ---------------------------------------------------------------------------
 
-export type OrderPeriod = "today" | "7d" | "all";
-export type OrderStatusFilter = "all" | "paid" | "created" | "failed" | "notdownloaded" | "refunded";
+export const ORDER_PERIODS = ["today", "week", "month", "2m", "3m", "all", "custom"] as const;
+export type OrderPeriod = (typeof ORDER_PERIODS)[number];
+export const ORDER_STATUSES = ["all", "paid", "pending", "failed", "cancelled", "refunded", "notdownloaded"] as const;
+export type OrderStatusFilter = (typeof ORDER_STATUSES)[number];
+
+const PERIOD_DAYS: Partial<Record<OrderPeriod, number>> = { week: 7, month: 30, "2m": 60, "3m": 90 };
+// Old links (Overview page, bookmarks) → new names.
+const PERIOD_ALIASES: Record<string, OrderPeriod> = { "7d": "week" };
+const STATUS_ALIASES: Record<string, OrderStatusFilter> = { created: "pending" };
 
 export interface OrderRow extends SalesOrder {
   razorpay_payment_id: string | null;
   whatsapp_number: string | null;
+  checkout_closed_at: string | null;
+}
+
+/** Short order number shown on cards and searchable: first 6 characters of the id, e.g. #3F9A2C. */
+export function shortOrderId(id: string): string {
+  return id.replace(/-/g, "").slice(0, 6).toUpperCase();
+}
+
+/** Drop-off group of an unpaid order (migration 011). */
+export function dropOffKind(o: Pick<OrderRow, "status" | "checkout_closed_at">): "failed" | "cancelled" | "pending" | null {
+  if (o.status === "paid") return null;
+  if (o.status === "failed") return "failed";
+  return o.checkout_closed_at ? "cancelled" : "pending";
 }
 
 export interface OrdersView {
   period: OrderPeriod;
+  from: string;
+  to: string;
   status: OrderStatusFilter;
   q: string;
   includeTest: boolean;
-  /** Counts for the cards — the whole period, whatever status is picked. */
-  counts: { all: number; paid: number; revenue: number; created: number; failed: number; notDownloaded: number; refunded: number; refundedAmount: number };
+  /** Numbers for the whole period, whatever status tab is picked. */
+  kpis: {
+    revenue: number;
+    paid: number;
+    /** % change vs the previous period of the same length (null: no comparison). */
+    revenueChange: number | null;
+    paidChange: number | null;
+    avgOrder: number | null;
+    /** paid ÷ all attempts. */
+    conversion: number | null;
+    attempts: number;
+    /** ₹ and count of unpaid attempts (failed + pending + cancelled). */
+    recoveryAmount: number;
+    recoveryCount: number;
+    refunded: number;
+    refundedAmount: number;
+    notDownloaded: number;
+  };
+  dropOff: { cancelled: number; failed: number; pending: number };
+  /** Rows per status tab (for the tab labels). */
+  tabCounts: Record<OrderStatusFilter, number>;
   rows: OrderRow[];
   /** true when more rows matched than are shown. */
   truncated: boolean;
+  /** When this was read (the page shows "updated …"). */
+  readAt: string;
 }
 
 const ROW_LIMIT = 200;
+export const EXPORT_LIMIT = 5000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseOrderFilters(params: Record<string, string | string[] | undefined>) {
   const one = (k: string) => (Array.isArray(params[k]) ? params[k]?.[0] : params[k]) ?? "";
-  const period = (["today", "7d", "all"] as const).find((p) => p === one("period")) ?? "all";
-  const status = (["all", "paid", "created", "failed", "notdownloaded", "refunded"] as const).find((s) => s === one("status")) ?? "all";
-  return { period, status, q: one("q").trim().slice(0, 80), includeTest: one("test") === "1" };
+  const rawPeriod = PERIOD_ALIASES[one("period")] ?? one("period");
+  const rawStatus = STATUS_ALIASES[one("status")] ?? one("status");
+  const period = ORDER_PERIODS.find((p) => p === rawPeriod) ?? "all";
+  const status = ORDER_STATUSES.find((s) => s === rawStatus) ?? "all";
+  const from = DATE_RE.test(one("from")) ? one("from") : "";
+  const to = DATE_RE.test(one("to")) ? one("to") : "";
+  return {
+    period,
+    from,
+    to,
+    status,
+    q: one("q").trim().slice(0, 80),
+    includeTest: one("test") === "1",
+  };
 }
 
-/** Admin-only: the Orders page list + its summary cards. */
-export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters>): Promise<OrdersView> {
+/** Midnight IST of a YYYY-MM-DD date, as epoch ms. */
+const istMidnight = (date: string) => Date.parse(`${date}T00:00:00+05:30`);
+
+/** [start, end) of the chosen period and of the one before it (same length), epoch ms. */
+function periodRange(f: ReturnType<typeof parseOrderFilters>, now: number) {
+  const today = startOfTodayIst(now);
+  if (f.period === "today") return { start: today, end: now, prevStart: today - DAY_MS, prevEnd: now - DAY_MS };
+  const days = PERIOD_DAYS[f.period];
+  if (days) return { start: now - days * DAY_MS, end: now, prevStart: now - 2 * days * DAY_MS, prevEnd: now - days * DAY_MS };
+  if (f.period === "custom" && (f.from || f.to)) {
+    const start = f.from ? istMidnight(f.from) : Date.parse(SALES_START);
+    const end = f.to ? istMidnight(f.to) + DAY_MS : now;
+    return { start, end, prevStart: start - (end - start), prevEnd: start };
+  }
+  return { start: null, end: null, prevStart: null, prevEnd: null };
+}
+
+const change = (now: number, before: number) => (before > 0 ? ((now - before) / before) * 100 : null);
+
+type SummaryRow = Pick<OrderRow, "status" | "amount" | "download_count" | "refunded_amount" | "checkout_closed_at">;
+
+/** Admin-only: the Orders page (KPIs, drop-off, tabs, list). `rowLimit` is raised for the CSV export. */
+export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters>, rowLimit = ROW_LIMIT): Promise<OrdersView> {
   await requireAdmin();
   const admin = getSupabaseAdmin();
   const now = Date.now();
-  const periodStart =
-    filters.period === "today" ? new Date(startOfTodayIst(now)).toISOString()
-    : filters.period === "7d" ? new Date(now - 7 * DAY_MS).toISOString()
-    : null;
-  // The later of the period start and go-live (unless test orders are wanted).
-  const floor = [periodStart, filters.includeTest ? null : SALES_START]
-    .filter((v): v is string => Boolean(v))
-    .sort()
-    .pop();
+  const range = periodRange(filters, now);
+  // Test orders (before live payments) stay out unless asked for.
+  const floorMs = filters.includeTest ? null : Date.parse(SALES_START);
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const lower = (ms: number | null) => {
+    const v = [ms, floorMs].filter((x): x is number => x !== null);
+    return v.length ? iso(Math.max(...v)) : null;
+  };
+  const start = lower(range.start);
+  const end = range.end !== null ? iso(range.end) : null;
 
-  const COLUMNS = "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status";
+  const COLUMNS =
+    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at";
+  const SUMMARY = "status, amount, download_count, refunded_amount, checkout_closed_at";
 
-  let summary = admin.from("orders").select("status, amount, download_count, refunded_amount").limit(50000);
-  if (floor) summary = summary.gte("created_at", floor);
+  let summary = admin.from("orders").select(SUMMARY).limit(50000);
+  if (start) summary = summary.gte("created_at", start);
+  if (end) summary = summary.lt("created_at", end);
 
-  let list = admin.from("orders").select(COLUMNS).order("created_at", { ascending: false }).limit(ROW_LIMIT + 1);
-  if (floor) list = list.gte("created_at", floor);
+  let previous = null;
+  if (range.prevStart !== null && range.prevEnd !== null) {
+    const prevStart = lower(range.prevStart)!;
+    const prevEnd = iso(range.prevEnd);
+    previous = prevStart < prevEnd
+      ? admin.from("orders").select("status, amount, refunded_amount").gte("created_at", prevStart).lt("created_at", prevEnd).limit(50000)
+      : null;
+  }
+
+  let list = admin.from("orders").select(COLUMNS).order("created_at", { ascending: false }).limit(rowLimit + 1);
+  if (start) list = list.gte("created_at", start);
+  if (end) list = list.lt("created_at", end);
   if (filters.status === "notdownloaded") list = list.eq("status", "paid").eq("download_count", 0);
   else if (filters.status === "refunded") list = list.gt("refunded_amount", 0);
+  else if (filters.status === "pending") list = list.eq("status", "created").is("checkout_closed_at", null);
+  else if (filters.status === "cancelled") list = list.eq("status", "created").not("checkout_closed_at", "is", null);
   else if (filters.status !== "all") list = list.eq("status", filters.status);
   if (filters.q) {
-    const term = filters.q.replace(/[^0-9a-zA-Z_+-]/g, "");
+    const term = filters.q.replace(/^#/, "").replace(/[^0-9a-zA-Z_+-]/g, "");
     // Phones are stored as 10 digits: "+91 98765 43210" → "9876543210".
     const digits = term.replace(/\D/g, "");
     const phone = digits.length > 10 ? digits.slice(-10) : digits;
     if (UUID_RE.test(term)) list = list.eq("id", term);
     else if (/^pay_/i.test(term)) list = list.ilike("razorpay_payment_id", `%${term}%`);
-    else if (phone.length >= 3) list = list.or(`buyer_contact.ilike.%${phone}%,whatsapp_number.ilike.%${phone}%`);
+    else if (/^[0-9a-f]{4,8}$/i.test(term) && /[a-f]/i.test(term)) {
+      // Short order number (#3F9A2C): ids starting with it, as a uuid range.
+      const hex = term.toLowerCase();
+      const pad = (c: string) => (hex + c.repeat(32)).slice(0, 32).replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+      list = list.gte("id", pad("0")).lte("id", pad("f"));
+    } else if (phone.length >= 3) list = list.or(`buyer_contact.ilike.%${phone}%,whatsapp_number.ilike.%${phone}%`);
     else if (term) list = list.ilike("razorpay_payment_id", `%${term}%`);
   }
 
-  const [summaryRes, listRes] = await Promise.all([summary, list]);
+  const [summaryRes, previousRes, listRes] = await Promise.all([summary, previous, list]);
   if (summaryRes.error) throw new Error(summaryRes.error.message);
+  if (previousRes?.error) throw new Error(previousRes.error.message);
   if (listRes.error) throw new Error(listRes.error.message);
-  const s = (summaryRes.data ?? []) as Array<{ status: string; amount: number; download_count: number | null; refunded_amount: number | null }>;
+
+  const s = (summaryRes.data ?? []) as SummaryRow[];
+  const net = (r: Pick<SummaryRow, "amount" | "refunded_amount">) => Number(r.amount || 0) - Number(r.refunded_amount || 0);
   const paid = s.filter((r) => r.status === "paid");
+  const revenue = paid.reduce((sum, r) => sum + net(r), 0);
+  const unpaid = s.filter((r) => r.status !== "paid");
+  const dropOff = { cancelled: 0, failed: 0, pending: 0 };
+  for (const r of unpaid) dropOff[dropOffKind(r) ?? "pending"] += 1;
+
+  const prev = previousRes ? ((previousRes.data ?? []) as Array<Pick<SummaryRow, "status" | "amount" | "refunded_amount">>) : null;
+  const prevPaid = prev?.filter((r) => r.status === "paid") ?? [];
+  const refundedRows = paid.filter((r) => Number(r.refunded_amount || 0) > 0);
+  const notDownloaded = paid.filter((r) => !r.download_count).length;
+
   const rows = (listRes.data ?? []) as OrderRow[];
   return {
     ...filters,
-    counts: {
+    kpis: {
+      revenue,
+      paid: paid.length,
+      revenueChange: prev ? change(revenue, prevPaid.reduce((sum, r) => sum + net(r), 0)) : null,
+      paidChange: prev ? change(paid.length, prevPaid.length) : null,
+      avgOrder: paid.length ? Math.round(revenue / paid.length) : null,
+      conversion: s.length ? paid.length / s.length : null,
+      attempts: s.length,
+      recoveryAmount: unpaid.reduce((sum, r) => sum + Number(r.amount || 0), 0),
+      recoveryCount: unpaid.length,
+      refunded: refundedRows.length,
+      refundedAmount: refundedRows.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0),
+      notDownloaded,
+    },
+    dropOff,
+    tabCounts: {
       all: s.length,
       paid: paid.length,
-      revenue: paid.reduce((sum, r) => sum + Number(r.amount || 0) - Number(r.refunded_amount || 0), 0),
-      created: s.filter((r) => r.status === "created").length,
-      failed: s.filter((r) => r.status === "failed").length,
-      notDownloaded: paid.filter((r) => !r.download_count).length,
-      refunded: paid.filter((r) => Number(r.refunded_amount || 0) > 0).length,
-      refundedAmount: paid.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0),
+      pending: dropOff.pending,
+      failed: dropOff.failed,
+      cancelled: dropOff.cancelled,
+      refunded: refundedRows.length,
+      notdownloaded: notDownloaded,
     },
-    rows: rows.slice(0, ROW_LIMIT),
-    truncated: rows.length > ROW_LIMIT,
+    rows: rows.slice(0, rowLimit),
+    truncated: rows.length > rowLimit,
+    readAt: new Date(now).toISOString(),
   };
 }
 

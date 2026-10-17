@@ -250,6 +250,13 @@ function BuyModal({
           },
           modal: {
             ondismiss: () => {
+              // Admin drop-off numbers only (closed the window vs left); fire and forget.
+              void fetch("/api/orders/closed", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: data.orderId, token: data.accessToken }),
+                keepalive: true,
+              }).catch(() => undefined);
               if (failedRef.current) {
                 setStep("failed");
               } else {

@@ -109,6 +109,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Admin cover uploads | ✅ 2026-10-14 (`8484f3f`): no more false "Saving failed"; non-3:4 covers padded to 3:4; reader shows cover first. #8, #12, #19 covers re-uploaded 5:23–5:24 pm → 800×1067 ✅ |
 | Brand outro video (Reels) | ✅ 2026-10-16: 7 s 9:16 logo-build outro, `Desktop\kaf-videos\kaf-outro\renders\kaf-outro.mp4` — outside the repo, details §7d |
 | Checkout drop-off (watch) | 🟡 16 Oct 12:12–2:23: 6 ad visitors (all with Meta ad-click id) opened Razorpay, 5 left at its mobile-number screen, 1 payment failed (reminder sent). Same pattern as the morning before any change — not a site bug; next sale at 3:37 went through fine. Watch the funnel (`funnel_daily`) |
+| Admin **Orders page redesign** (client's original dashboard look) | ✅ 2026-10-17: KPI cards Revenue / Paid orders (± % vs previous period), Avg order, Conversion (paid ÷ attempts), Recovery opp. (₹ unpaid), **Drop-off Analysis** (Closed payment window / Payment failed / Left without closing, migration 011), **Recent Sales** with Today / Week / Month / 2M / 3M / All / Custom dates, "N records found" + "Xm old" + refresh button, search by phone / short order no. `#3F9A2C` / `pay_…`, status tabs All / Paid / Pending / Failed / Cancelled (+ Refunded, Not downloaded), **CSV download** (`/dashboard/orders/export`, current filters, ≤ 5,000 rows), order cards (cover, phone, badge, time · #no, book, ₹, copy phone, WhatsApp, Resend, details). Names: we have none (no form before paying, owner's choice) → cards show the phone Razorpay gives us (all paid + failed orders have it; closed-before-paying ones never do). Code: `src/components/admin/OrdersView.tsx`, `OrdersClientBits.tsx`, `src/lib/sales.ts` (`getOrdersView`). Checked at 320 / 375 / 768 / 1280 px with made-up orders (temporary local page, deleted); live queries tested read-only |
 | Ad link "30 s to open" (client, 16 Oct) | 🟡 Checked: the ad's page (`/combos/vivah-te-ghatasphot-margdarshika`) answers in 0.5–1 s from Cloudflare cache with `fbclid`, via http/www/IPv6 and Facebook/Instagram browsers. Cloudflare Web Analytics (24 h, 206 views): m.facebook.com visitors P75 2.6 s, that page P75 1.9 s, LCP P50 1.4 s / P75 2.3 s / P90 4.2 s / **P99 26.7 s** (≈ 1 in 100 on weak data). Facebook's link check + in-app browser start run *before* our page and aren't measured. Fix shipped: phones get the 600 px book cover instead of 800 px (112 → 75 KB) — `<picture>` + per-screen preloads. Client to test in Chrome / clear FB browser data / compare Landing page views vs Link clicks |
 | Book page WhatsApp hint | ✅ 2026-10-14 (`5883955`): green line under both Buy buttons — "enter your WhatsApp number while paying" (Razorpay's own popup text can't be changed) |
 
@@ -317,6 +318,7 @@ no anon access to orders) + `onboarding.sql` + migrations:
 | 008 | Refund tracking: `refunded_amount` (₹), `refund_status` (partial/full), `refunded_at`, `razorpay_refund_id` — applied to Mumbai 2026-10-11 |
 | 009 | `leads` — interested buyers (phone unique, book, locale, source cancelled/failed, consent time + exact consent text, ip_hash, followup_sent_at, opted_out_at); RLS on, server only — applied to Mumbai 2026-10-11 |
 | 010 | Meta Conversions API: `orders.meta_fbp`, `meta_fbc`, `client_ip`, `client_user_agent` (saved at checkout, IP + browser cleared after sending), `meta_capi_sent_at` (sent once) — applied to Mumbai **2026-10-16** (psql via the session pooler) |
+| 011 | `orders.checkout_closed_at` — buyer closed the Razorpay window without paying (BuyButton `ondismiss` → `POST /api/orders/closed`, needs the order's access token; set once, unpaid only). Unpaid without it = left without closing (or before 17 Oct) — applied to Mumbai **2026-10-17** (psql) |
 
 `supabase/checks/verify.sql` = pre-launch checks (written, never formally run).
 
@@ -489,7 +491,7 @@ api '{"files":["https://kaydyachaanifayddyacha.com/media/<file>.webp"]}'  # sing
   (service key from `.env.local`), run as `node --env-file=.env.local <script>.mjs`; keep scripts outside the repo
   (scratchpad) and mask phone numbers in output.
 - **SQL / migrations:** Supabase dashboard → SQL editor, or `psql` with the session-pooler URL `NEW_DB_URL` from
-  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–010 are applied (§7). New ones go in
+  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–011 are applied (§7). New ones go in
   `supabase/migrations/0NN_name.sql` and are applied by hand — the app never runs migrations.
 - `select * from funnel_daily;` = daily visits → checkouts → paid.
 - ⚠️ `.env.local` points at **production**. Every `npm run db:*` script writes live data: use `--dry-run` first.
@@ -584,7 +586,7 @@ After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy
 ### Supabase (production project `ntqwvfksdqdyoyknkprh`, Mumbai, Pro)
 | Setting | Where | State | When |
 |---|---|---|---|
-| Schema + migrations 001–010 | SQL editor / pooler (`NEW_DB_URL` in `.env.mumbai`) | ✅ (§7 table) | 10-04 → **10-16** (010) |
+| Schema + migrations 001–011 | SQL editor / pooler (`NEW_DB_URL` in `.env.mumbai`) | ✅ (§7 table) | 10-04 → **10-16** (010) |
 | Storage buckets `pdfs` (private), `covers` (public) | Storage | ✅ | 10-04 |
 | Admin users (same e-mails as `ADMIN_EMAILS`) | Authentication → Users | ✅ | 10-04 |
 | **Auth → URL Configuration**: Site URL `https://kaydyachaanifayddyacha.com`; redirect URLs apex/**, www/** | Authentication → URL Configuration | ⏳ **never confirmed** (§11 item 2) | — |
@@ -1024,6 +1026,7 @@ Trust this file over these where they disagree:
 | 10-16 | video | **Brand outro video** (HyperFrames, outside the repo: `Desktop\kaf-videos\kaf-outro`): 9:16, 7 s — first version had the emblem assemble from 4 cropped quarters; owner asked for meaning instead → emblem split into layers (badge, scales, two hands) so the scales drop in and balance and the hands meet and shake, then name, tagline, website. Rendered `renders/kaf-outro.mp4` (1080×1920, 3 MB). Details §7d |
 | 10-16 | docs | New **§7c production settings register** (every Cloudflare / server / `app.env` / GitHub / Supabase / Razorpay / Interakt / Meta / monitoring setting, where it lives, state, date); §3, §4 (two-cache note), §5 (Razorpay popup), §6 (3:4 covers), §8, §10 (new rules), §11 item 8 updated |
 | 10-16 | phone cover | Client: ad link takes ~30 s to open. "Order now" click test end to end ≈ 3 s (FB link check 0.5 s, no extra redirect) — our side clean (§11 4c). Measured: page itself 0.5–1 s (cache HIT incl. `fbclid`); real-visitor data says FB visitors P75 2.6 s, 1 % 20–38 s (weak networks / Facebook's own step, not our server — 0.1 s). Book page main image now `<picture>`: phones max **600 px** (was 800, −33 % bytes), ≥ 769 px screens up to 800 px; two `preload`s with `media` (`src/lib/covers.ts` PHONE_*/WIDE_*, `ProductGallery.tsx`, `ProductDetail.tsx`). Checked locally at 375 px (only 600 requested) and 1024 px |
+| 10-17 | orders page | **Orders page redesign** to match the client's original dashboard (§3 row), phone-first; migration **011** `checkout_closed_at` applied; `/api/orders/closed`; CSV export; old links `?period=7d` / `?status=created` still work (aliases) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
