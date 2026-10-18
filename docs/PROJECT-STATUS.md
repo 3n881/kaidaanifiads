@@ -1,6 +1,6 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-18 evening** (payment reminders: **2 per unpaid attempt** — right away + 1 h later; `937230d` Buy popup keyboard fix live + **owner checked it on the phone: all good**; then **one required box** instead of two (never pre-ticked) — check `/api/health` for the latest sha; 18 Oct: **Buy flow asks Name + WhatsApp number before Razorpay** (prefilled + locked in Razorpay), migration 012, **owner's live ₹99 test passed 2:52 pm** (on `c29e379`); 17 Oct: **admin Orders + Overview pages redesigned** like the client's
+> **Last updated 2026-10-18 evening** (latest push `bc3920c` = 2 reminders, deploying when written — `ba12cc8` (4 reminders) was live briefly before it; payment reminders: **2 per unpaid attempt** — right away + 1 h later; `937230d` Buy popup keyboard fix live + **owner checked it on the phone: all good**; then **one required box** instead of two (never pre-ticked) — check `/api/health` for the latest sha; 18 Oct: **Buy flow asks Name + WhatsApp number before Razorpay** (prefilled + locked in Razorpay), migration 012, **owner's live ₹99 test passed 2:52 pm** (on `c29e379`); 17 Oct: **admin Orders + Overview pages redesigned** like the client's
 > original dashboard, migration 011, CSV export; 16 Oct night: ad-link speed check + 600 px phone cover; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint;
 > 16 Oct: **Meta Conversions API live + verified**, migration 010, **§7c production settings register** = every
 > setting and where it lives, **§7d brand outro video**). One place for any developer or AI agent to
@@ -920,6 +920,17 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
    fine); (5) the Meta `facebook-domain-verification=…` line.
 
 4d. **Watch the new drop-off numbers (from 17 Oct):** Orders → Drop-off Analysis. "Closed payment window" started at 0 (the 102 older unpaid orders all count as "left without closing") and fills as buyers close Razorpay without paying. If most drop-offs are "closed" at the number screen, revisit 4b (e.g. Razorpay popup in English).
+
+4f. **Owner's open checks after the 18 Oct buy-flow work (one list):**
+   1. Reminder test once `bc3920c` is live (`/api/health`): on a book this number has NOT bought, Buy → fill the form →
+      tick the box → close Razorpay → 1st WhatsApp within ~1 min, 2nd ~1 h later; Dashboard → Orders → that order's page
+      shows "Payment reminders sent on WhatsApp: 2×".
+   2. Note what Razorpay's number screen shows with the prefill (skipped, or filled in and one tap).
+   3. One iPhone purchase (Safari + Instagram in-app): popup above the keyboard, PDF on WhatsApp.
+   4. Refund the ₹99 test payments in Razorpay (#7393D7 and earlier), then "Check with Razorpay" on those orders.
+   5. Watch the Interakt number's quality rating for a few days (more reminder messages now).
+   6. Optional: Hindi version of `pending_followup_v2` in Interakt for Hindi books (#27, #30), then
+      `INTERAKT_REMINDER_TEMPLATE_LANGUAGE_HI=hi` in `/opt/kaf/app.env`.
 
 4e. **Buy flow: Name + WhatsApp number BEFORE Razorpay (client request, decided 2026-10-18, all recommended options) — ✅ BUILT 18 Oct, live check by the owner pending (last bullet).**
    Supersedes the older owner decision "no form before paying" (§5).
