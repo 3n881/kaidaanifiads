@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown };
+  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown; agreed?: unknown; form?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -57,8 +57,13 @@ async function handle(req: NextRequest) {
   const sentDetails = body.name !== undefined || body.phone !== undefined;
   const buyerName = cleanBuyerName(body.name);
   const buyerPhone = cleanIndianMobile(body.phone);
-  if (sentDetails && (!buyerName || !buyerPhone)) {
-    return NextResponse.json({ error: "details", field: !buyerName ? "name" : "phone" }, { status: 400 });
+  // agreed = the required "Terms + Privacy + WhatsApp messages" box. Required
+  // from the popup that shows it (form: 2); the 18 Oct morning popup (no box)
+  // may still be open in some tabs for a while, so it isn't refused.
+  const needsAgreement = body.form === 2;
+  if (sentDetails && (!buyerName || !buyerPhone || (needsAgreement && body.agreed !== true))) {
+    const field = !buyerName ? "name" : !buyerPhone ? "phone" : "agree";
+    return NextResponse.json({ error: "details", field }, { status: 400 });
   }
 
   if (!hasServiceRole) {

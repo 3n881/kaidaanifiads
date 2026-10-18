@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
+import { Check, Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
@@ -51,7 +51,7 @@ interface CheckoutData {
   productTitle?: string;
   prefill?: { name: string; contact: string } | null;
   error?: string;
-  field?: "name" | "phone";
+  field?: "name" | "phone" | "agree";
 }
 
 type RazorpayCtor = new (options: RazorpayOptions) => {
@@ -162,9 +162,12 @@ function BuyModal({
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
   // Name + WhatsApp number (remembered on this device, src/lib/buyer.ts).
-  const [buyer, setBuyer] = useState({ name: "", phone: "", offers: false });
-  const [fieldError, setFieldError] = useState<"name" | "phone" | null>(null);
+  const [buyer, setBuyer] = useState({ name: "", phone: "", offers: false, agreed: false });
+  const [errors, setErrors] = useState<{ name?: boolean; phone?: boolean; agree?: boolean }>({});
+  const [touched, setTouched] = useState({ name: false, phone: false });
   const [editing, setEditing] = useState(true);
+  // Visible part of the screen (shrinks when the phone keyboard opens).
+  const [view, setView] = useState<{ top: number; height: number; keyboard: boolean; narrow: boolean } | null>(null);
   // Set when Razorpay reports a failed attempt (bank/UPI declined). Razorpay
   // keeps its window open for a retry; when the buyer then closes it, we know
   // it was a failure (help screen), not a plain cancel (stay-in-touch box).
@@ -178,7 +181,8 @@ function BuyModal({
     // Read after mount (localStorage), so server and first client render match.
     const id = window.setTimeout(() => {
       if (saved.name || saved.phone) {
-        setBuyer((current) => ({ ...current, name: saved.name, phone: saved.phone }));
+        // Name + number are only saved after the agreement box was ticked.
+        setBuyer((current) => ({ ...current, name: saved.name, phone: saved.phone, agreed: Boolean(saved.name && saved.phone) }));
         // A returning buyer with both details sees a one-tap summary.
         if (saved.name && saved.phone) setEditing(false);
       }
@@ -190,6 +194,28 @@ function BuyModal({
       document.body.style.overflow = "";
     };
   }, [product.id, product.price, product.title]);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      // Never taller than the window (some browsers resize the window without a visualViewport event).
+      const height = Math.min(vv.height, window.innerHeight);
+      // narrow = phone layout (< 640 px, Tailwind "sm"); computers never cap the card's height.
+      setView({ top: vv.offsetTop, height, keyboard: window.innerHeight - vv.height > 150, narrow: window.innerWidth < 640 });
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
 
   const fail = useCallback((message: string) => {
     setError(message);
@@ -212,6 +238,8 @@ function BuyModal({
             name: details.name,
             phone: details.phone,
             offersConsent: details.offers,
+            agreed: true,
+            form: 2, // popup with the required agreement box (server checks it)
           }),
         });
 
@@ -225,7 +253,7 @@ function BuyModal({
           if (data.error === "details") {
             started.current = false;
             setEditing(true);
-            setFieldError(data.field ?? "phone");
+            setErrors({ [data.field === "name" ? "name" : data.field === "agree" ? "agree" : "phone"]: true });
             setStep("details");
             return;
           }
@@ -318,53 +346,80 @@ function BuyModal({
   const notPaid = NOT_PAID_COPY[locale];
   const form = BUY_FORM_COPY[locale];
 
+  const nameOk = Boolean(cleanBuyerName(buyer.name));
+  const phoneOk = Boolean(cleanIndianMobile(buyer.phone));
+  // Errors show once a field was left (or on Continue), never while typing the first time.
+  const showName = errors.name || (touched.name && !nameOk);
+  const showPhone = errors.phone || (touched.phone && !phoneOk);
+  const showAgree = errors.agree && !buyer.agreed;
+  // Keyboard open: shorter header, no extra lines, so fields + pay button fit above it.
+  const compact = step === "details" && Boolean(view?.keyboard);
+
+  const keepInView = (event: React.FocusEvent<HTMLElement>) => {
+    const target = event.currentTarget;
+    // After the keyboard has opened (visual viewport resized), keep the field visible.
+    window.setTimeout(() => target.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+  };
+
   const submitDetails = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = cleanBuyerName(buyer.name);
     const phone = cleanIndianMobile(buyer.phone);
-    if (!name) {
+    const next = { name: !name, phone: !phone, agree: !buyer.agreed };
+    setErrors(next);
+    setTouched({ name: true, phone: true });
+    if (next.name || next.phone) {
       setEditing(true);
-      return setFieldError("name");
+      // Move to the first wrong field (the buyer pressed Continue, so the keyboard may open).
+      window.setTimeout(() => document.getElementById(next.name ? "buyer-name" : "buyer-phone")?.focus(), 0);
+      return;
     }
-    if (!phone) {
-      setEditing(true);
-      return setFieldError("phone");
+    if (next.agree) {
+      document.getElementById("buyer-agree")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
     }
-    setFieldError(null);
     saveBuyer(name, phone);
     void beginCheckout({ name, phone, offers: buyer.offers });
   };
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      // Phones: bottom sheet that scrolls inside itself (keyboard). Computers: a
+      // card with no inner scrollbar; only a very short window scrolls the backdrop.
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-start sm:overflow-y-auto sm:p-4 sm:py-8"
+      // Follow the visible part of the screen: with the phone keyboard open the
+      // popup sits right above it instead of hiding behind it (Android + iPhone).
+      style={view ? { top: view.top, height: view.height, bottom: "auto" } : undefined}
       onClick={step === "processing" ? undefined : onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-md animate-fade-in-up overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl sm:pb-5"
+        className="no-scrollbar max-h-[92dvh] w-full max-w-md animate-fade-in-up overflow-y-auto overscroll-contain rounded-t-2xl bg-white px-5 pt-5 shadow-2xl sm:my-auto sm:max-h-none sm:overflow-visible sm:rounded-2xl"
+        style={view?.narrow ? { maxHeight: Math.max(view.height - (view.keyboard ? 4 : 24), 260) } : undefined}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="checkout-title"
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
+        <div className={`flex items-start justify-between gap-3 ${compact ? "mb-2" : "mb-4"}`}>
+          <div className="min-w-0">
             <h3
               id="checkout-title"
-              className="font-deva line-clamp-2 text-base font-bold text-brand-900"
+              className={`font-deva font-bold text-brand-900 ${compact ? "line-clamp-1 text-sm" : "line-clamp-2 text-base"}`}
             >
               {product.title}
             </h3>
-            <div className="mt-1">
-              <PriceTag product={product} />
-            </div>
+            {!compact && (
+              <div className="mt-1">
+                <PriceTag product={product} />
+              </div>
+            )}
           </div>
           {step !== "processing" && (
             <button
               type="button"
               onClick={onClose}
               aria-label={copy.close}
-              className="rounded-full p-1 text-brand-400 hover:bg-brand-50 hover:text-brand-700"
+              className="shrink-0 rounded-full p-1 text-brand-400 hover:bg-brand-50 hover:text-brand-700"
             >
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -372,119 +427,175 @@ function BuyModal({
         </div>
 
         {step === "details" && (
-          <form onSubmit={submitDetails} noValidate className="space-y-4">
-            <p className="font-deva -mt-1 text-sm font-semibold text-brand-700">{form.heading}</p>
+          <form onSubmit={submitDetails} noValidate>
+            <div className={compact ? "space-y-3" : "space-y-4"}>
+              {!compact && <p className="font-deva -mt-1 text-sm font-semibold text-brand-700">{form.heading}</p>}
 
-            {!editing ? (
-              // Returning buyer: details from last time, one tap to pay.
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="font-deva truncate text-sm font-bold text-brand-900">{buyer.name}</p>
-                  <p className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
-                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> +91 {buyer.phone.replace(/^(\d{5})(\d{5})$/, "$1 $2")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  className="font-deva inline-flex shrink-0 items-center gap-1 rounded-lg border border-green-300 bg-white px-2.5 py-1.5 text-xs font-bold text-green-800"
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> {form.edit}
-                </button>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label htmlFor="buyer-name" className="font-deva mb-1.5 block text-sm font-bold text-brand-900">
-                    {form.name}
-                  </label>
-                  <input
-                    id="buyer-name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    enterKeyHint="next"
-                    maxLength={60}
-                    autoFocus={!buyer.name}
-                    value={buyer.name}
-                    onChange={(e) => {
-                      setBuyer({ ...buyer, name: e.target.value });
-                      if (fieldError === "name") setFieldError(null);
-                    }}
-                    placeholder={form.namePlaceholder}
-                    aria-invalid={fieldError === "name"}
-                    aria-describedby={fieldError === "name" ? "buyer-name-error" : undefined}
-                    className={`font-deva h-12 w-full rounded-xl border bg-white px-4 text-base text-brand-900 outline-none placeholder:text-brand-300 focus:ring-2 ${
-                      fieldError === "name" ? "border-danger-500 focus:ring-danger-500/20" : "border-brand-200 focus:border-brand-teal focus:ring-brand-teal/15"
-                    }`}
-                  />
-                  {fieldError === "name" && (
-                    <p id="buyer-name-error" role="alert" className="font-deva mt-1 text-xs font-semibold text-danger-600">{form.badName}</p>
-                  )}
-                </div>
-
-                {/* WhatsApp number — highlighted: the PDF is sent here */}
-                <div className="rounded-2xl border-2 border-green-500/70 bg-green-50/70 p-3">
-                  <label htmlFor="buyer-phone" className="font-deva mb-1.5 flex items-center gap-1.5 text-sm font-bold text-green-800">
-                    <WhatsAppGlyph className="h-4 w-4" /> {form.whatsapp}
-                  </label>
-                  <div
-                    className={`flex h-12 items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2 ${
-                      fieldError === "phone" ? "border-danger-500 focus-within:ring-danger-500/20" : "border-green-300 focus-within:border-green-600 focus-within:ring-green-600/15"
-                    }`}
-                  >
-                    <span className="flex h-full items-center border-r border-green-200 bg-green-50 px-3 text-base font-bold text-green-800" aria-hidden="true">
-                      +91
-                    </span>
-                    <input
-                      id="buyer-phone"
-                      name="phone"
-                      type="tel"
-                      inputMode="numeric"
-                      autoComplete="tel-national"
-                      enterKeyHint="go"
-                      maxLength={14}
-                      autoFocus={Boolean(buyer.name) && !buyer.phone}
-                      value={buyer.phone}
-                      onChange={(e) => {
-                        setBuyer({ ...buyer, phone: e.target.value.replace(/[^\d\s+-]/g, "") });
-                        if (fieldError === "phone") setFieldError(null);
-                      }}
-                      placeholder={form.phonePlaceholder}
-                      aria-invalid={fieldError === "phone"}
-                      aria-describedby={fieldError === "phone" ? "buyer-phone-error" : "buyer-phone-hint"}
-                      className="h-full min-w-0 flex-1 bg-transparent px-3 text-lg font-semibold tracking-wide text-brand-900 outline-none placeholder:font-normal placeholder:text-brand-300"
-                    />
-                  </div>
-                  {fieldError === "phone" ? (
-                    <p id="buyer-phone-error" role="alert" className="font-deva mt-1.5 text-xs font-semibold text-danger-600">{form.badPhone}</p>
-                  ) : (
-                    <p id="buyer-phone-hint" className="font-deva mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-green-800">
-                      <span aria-hidden="true">📲</span> {form.whatsappHint}
+              {!editing ? (
+                // Returning buyer: details from last time, one tap to pay.
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-deva truncate text-sm font-bold text-brand-900">{buyer.name}</p>
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
+                      <WhatsAppGlyph className="h-4 w-4 shrink-0" /> +91 {buyer.phone.replace(/^(\d{5})(\d{5})$/, "$1 $2")}
                     </p>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="font-deva inline-flex shrink-0 items-center gap-1 rounded-lg border border-green-300 bg-white px-2.5 py-1.5 text-xs font-bold text-green-800"
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> {form.edit}
+                  </button>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div>
+                    <label htmlFor="buyer-name" className="font-deva mb-1.5 block text-sm font-bold text-brand-900">
+                      {form.name} <span className="text-danger-600" aria-hidden="true">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="buyer-name"
+                        name="name"
+                        type="text"
+                        autoComplete="name"
+                        autoCapitalize="words"
+                        enterKeyHint="next"
+                        required
+                        maxLength={60}
+                        value={buyer.name}
+                        onFocus={keepInView}
+                        onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                        onChange={(e) => {
+                          setBuyer({ ...buyer, name: e.target.value });
+                          if (errors.name) setErrors((er) => ({ ...er, name: false }));
+                        }}
+                        onKeyDown={(e) => {
+                          // Keyboard "Next" → WhatsApp number.
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            document.getElementById("buyer-phone")?.focus();
+                          }
+                        }}
+                        placeholder={form.namePlaceholder}
+                        aria-invalid={showName}
+                        aria-describedby={showName ? "buyer-name-error" : undefined}
+                        className={`font-deva h-12 w-full rounded-xl border bg-white pl-4 pr-10 text-base text-brand-900 outline-none placeholder:text-brand-300 focus:ring-2 ${
+                          showName ? "border-danger-500 focus:ring-danger-500/20" : "border-brand-200 focus:border-brand-teal focus:ring-brand-teal/15"
+                        }`}
+                      />
+                      {nameOk && <Check className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-green-600" aria-hidden="true" />}
+                    </div>
+                    {showName && (
+                      <p id="buyer-name-error" role="alert" className="font-deva mt-1 text-xs font-semibold text-danger-600">{form.badName}</p>
+                    )}
+                  </div>
 
-            {/* Offers: unticked by default; the exact sentence is stored with the consent */}
-            <label className="font-deva flex cursor-pointer items-start gap-2.5 text-xs leading-snug text-brand-600">
-              <input
-                type="checkbox"
-                checked={buyer.offers}
-                onChange={(e) => setBuyer({ ...buyer, offers: e.target.checked })}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-green-600"
-              />
-              <span>{LEAD_CONSENT_TEXT[locale]}</span>
-            </label>
+                  {/* WhatsApp number — highlighted: the PDF is sent here */}
+                  <div className="rounded-2xl border-2 border-green-500/70 bg-green-50/70 p-3">
+                    <label htmlFor="buyer-phone" className="font-deva mb-1.5 flex items-center gap-1.5 text-sm font-bold text-green-800">
+                      <WhatsAppGlyph className="h-4 w-4" /> {form.whatsapp} <span className="text-danger-600" aria-hidden="true">*</span>
+                    </label>
+                    <div
+                      className={`flex h-12 items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2 ${
+                        showPhone ? "border-danger-500 focus-within:ring-danger-500/20" : "border-green-300 focus-within:border-green-600 focus-within:ring-green-600/15"
+                      }`}
+                    >
+                      <span className="flex h-full items-center border-r border-green-200 bg-green-50 px-3 text-base font-bold text-green-800" aria-hidden="true">
+                        +91
+                      </span>
+                      <input
+                        id="buyer-phone"
+                        name="phone"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        enterKeyHint="go"
+                        required
+                        maxLength={14}
+                        value={buyer.phone}
+                        onFocus={keepInView}
+                        onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+                        onChange={(e) => {
+                          setBuyer({ ...buyer, phone: e.target.value.replace(/[^\d\s+-]/g, "") });
+                          if (errors.phone) setErrors((er) => ({ ...er, phone: false }));
+                        }}
+                        placeholder={form.phonePlaceholder}
+                        aria-invalid={showPhone}
+                        aria-describedby={showPhone ? "buyer-phone-error" : "buyer-phone-hint"}
+                        className="h-full min-w-0 flex-1 bg-transparent px-3 text-lg font-semibold tracking-wide text-brand-900 outline-none placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-brand-300"
+                      />
+                      {phoneOk && <Check className="mr-3 h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />}
+                    </div>
+                    {showPhone ? (
+                      <p id="buyer-phone-error" role="alert" className="font-deva mt-1.5 text-xs font-semibold text-danger-600">{form.badPhone}</p>
+                    ) : (
+                      <p id="buyer-phone-hint" className="font-deva mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-green-800">
+                        <span aria-hidden="true">📲</span> {form.whatsappHint}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
 
-            <button
-              type="submit"
-              className="font-deva flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 text-base font-extrabold text-brand-teal shadow-[var(--shadow-gold)] transition hover:brightness-95 active:scale-[0.98]"
-            >
-              {form.pay(product.price)}
-            </button>
-            <p className="font-deva -mt-1 text-center text-[11px] text-brand-400">{form.privacy}</p>
+              {/* Offers: optional, unticked by default; the exact sentence is stored with the consent */}
+              <label className="font-deva flex cursor-pointer items-start gap-2.5 text-xs leading-snug text-brand-600">
+                <input
+                  type="checkbox"
+                  checked={buyer.offers}
+                  onChange={(e) => setBuyer({ ...buyer, offers: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-green-600"
+                />
+                <span>{LEAD_CONSENT_TEXT[locale]}</span>
+              </label>
+            </div>
+
+            {/* Pinned to the bottom of the popup: the required agreement + pay button stay visible while typing */}
+            <div className="sticky bottom-0 -mx-5 mt-3 border-t border-brand-100 bg-white px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_16px_-12px_rgba(10,35,66,0.25)] sm:pb-5">
+              <label
+                id="buyer-agree"
+                className={`font-deva mb-2.5 flex cursor-pointer items-start gap-2.5 rounded-lg text-xs leading-snug ${showAgree ? "bg-danger-500/5 p-2 text-danger-600 ring-1 ring-danger-500/40" : "text-brand-700"}`}
+              >
+                <input
+                  type="checkbox"
+                  required
+                  checked={buyer.agreed}
+                  onChange={(e) => {
+                    setBuyer({ ...buyer, agreed: e.target.checked });
+                    if (e.target.checked) setErrors((er) => ({ ...er, agree: false }));
+                  }}
+                  aria-invalid={showAgree}
+                  aria-describedby={showAgree ? "buyer-agree-error" : undefined}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-brand-teal"
+                />
+                <span>
+                  {form.agree[0]}
+                  <a href="/terms" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-bold underline underline-offset-2">
+                    {form.agree[1]}
+                  </a>
+                  {form.agree[2]}
+                  <a href="/privacy-policy" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-bold underline underline-offset-2">
+                    {form.agree[3]}
+                  </a>
+                  {form.agree[4]} <span className="text-danger-600" aria-hidden="true">*</span>
+                </span>
+              </label>
+              {showAgree && (
+                <p id="buyer-agree-error" role="alert" className="font-deva -mt-1 mb-2 text-xs font-semibold text-danger-600">{form.needAgree}</p>
+              )}
+              <button
+                type="submit"
+                className="font-deva flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 text-base font-extrabold text-brand-teal shadow-[var(--shadow-gold)] transition hover:brightness-95 active:scale-[0.98]"
+              >
+                {form.pay(product.price)}
+              </button>
+              {!compact && (
+                <p className="font-deva mt-2 flex items-start justify-center gap-1 text-center text-[11px] leading-snug text-brand-400">
+                  <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {form.privacy}
+                </p>
+              )}
+            </div>
           </form>
         )}
 
@@ -565,9 +676,11 @@ function BuyModal({
           </div>
         )}
 
-        <p className="mt-4 flex items-center justify-center gap-1.5 border-t border-brand-100 pt-3 text-center text-[10px] leading-relaxed text-brand-400">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure Razorpay payment · No account required
-        </p>
+        {step !== "details" && (
+          <p className="mt-4 flex items-center justify-center gap-1.5 border-t border-brand-100 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 text-center text-[10px] leading-relaxed text-brand-400 sm:pb-5">
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure Razorpay payment · No account required
+          </p>
+        )}
       </div>
     </div>,
     document.body,

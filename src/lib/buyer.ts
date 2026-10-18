@@ -2,25 +2,35 @@
 // (name + WhatsApp number, 2026-10-18). The popup and /api/checkout use the
 // same rules, so what the buyer sees accepted is what the server accepts.
 
+// Obviously made-up numbers (also the form's placeholder).
+const FAKE_NUMBERS = new Set(["9876543210", "9123456789", "9012345678", "8765432109", "7654321098", "6789012345"]);
+
 /** Indian mobile → 10 digits (6–9 first), or "" when it isn't one. Accepts "+91 98765 43210", "098765…", "91…". */
 export function cleanIndianMobile(raw: unknown): string {
   let digits = String(raw ?? "").replace(/\D/g, "");
   if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
   else if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
-  return /^[6-9]\d{9}$/.test(digits) ? digits : "";
+  if (!/^[6-9]\d{9}$/.test(digits)) return "";
+  // Made-up: a known fake, or one digit repeated 7+ times in a row (9999999999, 9000000000).
+  if (FAKE_NUMBERS.has(digits) || /(\d)\1{6}/.test(digits)) return "";
+  return digits;
 }
 
 export const NAME_MIN = 2;
 export const NAME_MAX = 60;
 
-/** Trimmed name with single spaces, or "" when it has fewer than 2 letters (any script). */
+/**
+ * Trimmed name with single spaces, or "" when it isn't a proper name: only
+ * letters of any script (Marathi / Hindi / English, with their vowel signs),
+ * spaces and . ' - ; no digits or symbols; at least 2 letters.
+ */
 export function cleanBuyerName(raw: unknown): string {
   const name = String(raw ?? "")
     .normalize("NFC")
-    .replace(/[\u0000-\u001f<>]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, NAME_MAX);
+  if (!/^[\p{L}\p{M} .'-]+$/u.test(name)) return "";
   const letters = name.match(/\p{L}/gu)?.length ?? 0;
   return letters >= NAME_MIN ? name : "";
 }
