@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import Image from "next/image";
 import { BookOpen, ClipboardCheck, ExternalLink, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings, ShoppingBag, Users } from "lucide-react";
 import { signOutAction } from "@/app/dashboard/actions";

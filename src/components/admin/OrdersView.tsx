@@ -1,5 +1,5 @@
 import Form from "next/form";
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import {
   AlertCircle,
   AlertTriangle,

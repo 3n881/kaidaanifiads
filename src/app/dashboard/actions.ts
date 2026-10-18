@@ -5,6 +5,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { CATALOG_TAG } from "@/lib/products";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_DATA_TAG } from "@/lib/sales";
 import { ADMIN_UPLOAD_TIMEOUT_MS, getSupabaseAdmin } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/supabase/ssr-server";
 import { nextProductId } from "@/lib/admin";
@@ -415,6 +416,7 @@ export async function setMessageHandled(id: string, handled: boolean) {
   await requireAdmin();
   const { error } = await getSupabaseAdmin().from("contact_messages").update({ handled }).eq("id", id);
   if (error) throw new Error(error.message);
+  updateTag(ADMIN_DATA_TAG);
   revalidatePath("/dashboard/messages");
 }
 
@@ -476,6 +478,7 @@ export async function resendDelivery(orderId: string) {
   const admin = await requireAdmin();
   const { sendOrderOnWhatsApp } = await import("@/lib/delivery");
   await sendOrderOnWhatsApp(orderId, { force: true, by: admin.email ?? "admin" });
+  updateTag(ADMIN_DATA_TAG);
   revalidatePath("/dashboard/orders");
 }
 
@@ -497,9 +500,16 @@ export async function sendRemindersAction(orderIds: string[]): Promise<{ sent: n
     if (result === "sent") sent++;
     else skipped[result] = (skipped[result] ?? 0) + 1;
   }
+  updateTag(ADMIN_DATA_TAG);
   revalidatePath("/dashboard/orders");
   revalidatePath("/dashboard/whatsapp");
   return { sent, skipped };
+}
+
+/** Refresh button on Overview / Orders: drop the 30-second dashboard cache, then the page re-reads. */
+export async function refreshAdminData() {
+  await requireAdmin();
+  updateTag(ADMIN_DATA_TAG);
 }
 
 /** Admin "Check with Razorpay" on an order: payment + refund state. */
@@ -507,6 +517,7 @@ export async function syncOrderAction(orderId: string): Promise<{ ok: boolean; m
   await requireAdmin();
   const { syncOrderWithRazorpay } = await import("@/lib/refunds");
   const result = await syncOrderWithRazorpay(orderId);
+  updateTag(ADMIN_DATA_TAG);
   revalidatePath(`/dashboard/orders/${orderId}`);
   revalidatePath("/dashboard/orders");
   revalidatePath("/dashboard");
@@ -521,6 +532,7 @@ export async function optOutLead(leadId: string) {
     .update({ opted_out_at: new Date().toISOString() })
     .eq("id", leadId);
   if (error) throw new Error(error.message);
+  updateTag(ADMIN_DATA_TAG);
   revalidatePath("/dashboard/leads");
 }
 

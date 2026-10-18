@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import { unstable_rethrow } from "next/navigation";
 import {
   AlertTriangle,

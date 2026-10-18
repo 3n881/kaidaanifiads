@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import { Plus, Pencil, BookOpen, Package, CheckCircle2, AlertCircle } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import DeleteProductButton from "@/components/admin/DeleteProductButton";

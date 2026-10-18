@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase/ssr-server";
 
 /** Emails allowed into the admin dashboard (from ADMIN_EMAILS env, comma-sep). */
@@ -18,15 +19,19 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return allow.includes(email.toLowerCase());
 }
 
-/** Returns the signed-in admin user, or null. Use to guard server actions/pages. */
-export async function getAdminUser() {
+/**
+ * Returns the signed-in admin user, or null. Use to guard server actions/pages.
+ * Remembered for the rest of the request (React cache): a dashboard page calls
+ * several admin data functions, each guarded — one Supabase Auth call, not 3–5.
+ */
+export const getAdminUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user || !isAdminEmail(user.email)) return null;
   return user;
-}
+});
 
 /** Throws if the caller is not an authenticated admin. Use at the top of every
  *  admin server action before touching the service-role client. */

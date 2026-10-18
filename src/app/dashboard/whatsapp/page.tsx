@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Form from "next/form";
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import { BellRing, CheckCircle2, FileDown, Megaphone, MessageCircle, Search, UserRound, XCircle } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import { getAdminProducts } from "@/lib/admin";

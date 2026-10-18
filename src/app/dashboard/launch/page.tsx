@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import AdminShell from "@/components/admin/AdminShell";
 import { AlertTriangle, CheckCircle2, ChevronRight, Circle } from "lucide-react";
 import { SectionCard } from "@/components/admin/OnboardingUI";

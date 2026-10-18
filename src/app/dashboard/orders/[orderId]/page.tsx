@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, MessageCircle } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";

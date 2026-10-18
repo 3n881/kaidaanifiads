@@ -1,6 +1,17 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabase/server";
 import { requireAdmin } from "./auth";
+
+/**
+ * Dashboard numbers are kept for 30 s on the server (per app container), so
+ * opening the Overview / Orders again, or two admins at once, doesn't re-read
+ * every order each time. The Refresh button and admin actions (reminders,
+ * resend, Check with Razorpay, messages) clear it with updateTag(ADMIN_DATA_TAG).
+ * The "Xm old" badge shows the age (readAt is set when the data was read).
+ */
+export const ADMIN_DATA_TAG = "admin-data";
+const ADMIN_CACHE_SECONDS = 30;
 
 /**
  * Sales are counted from the moment live Razorpay keys went in
@@ -94,8 +105,13 @@ const istDate = (ms: number) => new Date(ms + IST_OFFSET_MS).toISOString().slice
 /** Admin-only: the sales numbers on the dashboard overview. */
 export async function getSalesOverview(): Promise<SalesOverview> {
   await requireAdmin();
-  return computeSalesOverview(getSupabaseAdmin());
+  return cachedSalesOverview();
 }
+
+const cachedSalesOverview = unstable_cache(() => computeSalesOverview(getSupabaseAdmin()), ["admin-sales-overview-v1"], {
+  revalidate: ADMIN_CACHE_SECONDS,
+  tags: [ADMIN_DATA_TAG],
+});
 
 /** The calculation itself (no auth check — callers must be admin-guarded). */
 export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseAdmin>): Promise<SalesOverview> {
@@ -289,6 +305,18 @@ type SummaryRow = Pick<OrderRow, "status" | "amount" | "download_count" | "refun
 /** Admin-only: the Orders page (KPIs, drop-off, tabs, list). `rowLimit` is raised for the CSV export. */
 export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters>, rowLimit = ROW_LIMIT): Promise<OrdersView> {
   await requireAdmin();
+  // The page's list is cached briefly (key = filters); the CSV export always reads live.
+  return rowLimit === ROW_LIMIT ? cachedOrdersView(filters) : readOrdersView(filters, rowLimit);
+}
+
+const cachedOrdersView = unstable_cache(
+  (filters: ReturnType<typeof parseOrderFilters>) => readOrdersView(filters, ROW_LIMIT),
+  ["admin-orders-view-v1"],
+  { revalidate: ADMIN_CACHE_SECONDS, tags: [ADMIN_DATA_TAG] },
+);
+
+/** The Orders page data itself (no auth check — callers must be admin-guarded). */
+async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, rowLimit: number): Promise<OrdersView> {
   const admin = getSupabaseAdmin();
   const now = Date.now();
   const range = periodRange(filters, now);

@@ -5,8 +5,10 @@ import Form from "next/form";
 import { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
+import { refreshAdminData } from "@/app/dashboard/actions";
+import { isStaleAction, reloadForNewVersion } from "@/lib/stale-action";
 
-/** Round refresh button (re-reads the orders without a full page load). */
+/** Round refresh button: clears the 30-second dashboard cache, then re-reads the page. */
 export function RefreshButton() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -14,7 +16,16 @@ export function RefreshButton() {
     <button
       type="button"
       aria-label="Refresh orders"
-      onClick={() => startTransition(() => router.refresh())}
+      onClick={() =>
+        startTransition(async () => {
+          try {
+            await refreshAdminData();
+          } catch (error) {
+            if (isStaleAction(error) && reloadForNewVersion()) return;
+          }
+          router.refresh();
+        })
+      }
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand-100 bg-white text-brand-800 shadow-[var(--shadow-card)] transition hover:bg-brand-50 active:scale-95"
     >
       <RefreshCw className={`h-5 w-5 ${pending ? "animate-spin" : ""}`} aria-hidden="true" />

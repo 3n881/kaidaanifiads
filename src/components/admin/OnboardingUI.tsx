@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/admin/AdminLink";
 import { CheckCircle2, Circle, ChevronRight } from "lucide-react";
 
 export const fieldClass = "w-full rounded-xl border border-brand-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/15";
