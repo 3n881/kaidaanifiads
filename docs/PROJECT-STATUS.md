@@ -1,6 +1,6 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-18** (live commit `4c74717`; 17 Oct: **admin Orders + Overview pages redesigned** like the client's
+> **Last updated 2026-10-18** (18 Oct: **Buy flow asks Name + WhatsApp number before Razorpay** (prefilled + locked in Razorpay), migration 012; 17 Oct: **admin Orders + Overview pages redesigned** like the client's
 > original dashboard, migration 011, CSV export; 16 Oct night: ad-link speed check + 600 px phone cover; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint;
 > 16 Oct: **Meta Conversions API live + verified**, migration 010, **§7c production settings register** = every
 > setting and where it lives, **§7d brand outro video**). One place for any developer or AI agent to
@@ -111,6 +111,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Brand outro video (Reels) | ✅ 2026-10-16: 7 s 9:16 logo-build outro, `Desktop\kaf-videos\kaf-outro\renders\kaf-outro.mp4` — outside the repo, details §7d |
 | Checkout drop-off (watch) | 🟡 16 Oct 12:12–2:23: 6 ad visitors (all with Meta ad-click id) opened Razorpay, 5 left at its mobile-number screen, 1 payment failed (reminder sent). Same pattern as the morning before any change — not a site bug; next sale at 3:37 went through fine. Watch the funnel (`funnel_daily`) |
 | Admin **Orders page redesign** (client's original dashboard look) | ✅ 2026-10-17: KPI cards Revenue / Paid orders (± % vs previous period), Avg order, Conversion (paid ÷ attempts), Recovery opp. (₹ unpaid), **Drop-off Analysis** (Closed payment window / Payment failed / Left without closing, migration 011), **Recent Sales** with Today / Week / Month / 2M / 3M / All / Custom dates, "N records found" + "Xm old" + refresh button, search by phone / short order no. `#3F9A2C` / `pay_…`, status tabs All / Paid / Pending / Failed / Cancelled (+ Refunded, Not downloaded), **CSV download** (`/dashboard/orders/export`, current filters, ≤ 5,000 rows), order cards (cover, phone, badge, time · #no, book, ₹, copy phone, WhatsApp, Resend, details). Names: we have none (no form before paying, owner's choice) → cards show the phone Razorpay gives us (all paid + failed orders have it; closed-before-paying ones never do). Code: `src/components/admin/OrdersView.tsx`, `OrdersClientBits.tsx`, `src/lib/sales.ts` (`getOrdersView`). Checked at 320 / 375 / 768 / 1280 px with made-up orders (temporary local page, deleted); live queries tested read-only |
+| **Buy flow: Name + WhatsApp first** (client request) | ✅ Built 2026-10-18, see §11 item 4e. Popup (`BuyButton.tsx` details step, texts `src/lib/buy-copy.ts`, rules `src/lib/buyer.ts`) → `/api/checkout` saves `name`, `whatsapp_number`, `buyer_contact` → Razorpay `prefill` + `readonly.contact` + `hidden.email`. Offers box → lead `source='checkout'` (migration **012** applied). Closers now get the 10-min reminder. Admin cards/CSV/order page show the name; search by name. Meta CAPI + hashed first name. Privacy policy, how-to-buy, FAQ, hint under Buy buttons updated. Header logo slightly smaller below 360 px (320 px phones scrolled sideways). Tested: 17 name/phone rule cases, server refuses bad details (400, no DB write), popup at 320/375/1280 px in mr/hi/en with a stand-in server + Razorpay (sent `9876543210`, Razorpay got `+919876543210` locked, e-mail hidden), returning-buyer one-tap view, cancel → retry. **Owner to confirm live with a real ₹99 purchase (Android + iPhone): what Razorpay shows, PDF on the typed number, name in Orders** |
 | Admin **Overview page redesign** (same style as Orders) | ✅ 2026-10-17: (1) Today / Last 7 days / All time cards with ± % (today vs yesterday same time, week vs the week before), paid, conversion, failed; refresh + "Xm old"; (2) **Needs attention** tiles: Paid not downloaded, WhatsApp not sent, **Failed today** (not paid since), New messages — or a green "All good"; (3) **Sales, last 14 days** bar chart (₹ per IST day, tap/hover a bar, table view); (4) Top books 7 days with covers + share bars; (5) latest 5 paid orders as the Orders-page cards; (6) tiles Interested buyers / Messages / Setup / Products (2×2 on phones). Data: `computeSalesOverview` in `src/lib/sales.ts`; view `SalesOverviewView.tsx` (reuses `KpiCard`, `Trend`, `OrderCard` from `OrdersView.tsx`). Checked at 320 / 375 / 768 / 1280 px with made-up numbers (temporary local page, deleted). Orders page tabs/search/dates keep the scroll position (`497f77e`) |
 | Ad link "30 s to open" (client, 16 Oct) | 🟡 Checked: the ad's page (`/combos/vivah-te-ghatasphot-margdarshika`) answers in 0.5–1 s from Cloudflare cache with `fbclid`, via http/www/IPv6 and Facebook/Instagram browsers. Cloudflare Web Analytics (24 h, 206 views): m.facebook.com visitors P75 2.6 s, that page P75 1.9 s, LCP P50 1.4 s / P75 2.3 s / P90 4.2 s / **P99 26.7 s** (≈ 1 in 100 on weak data). Facebook's link check + in-app browser start run *before* our page and aren't measured. Fix shipped: phones get the 600 px book cover instead of 800 px (112 → 75 KB) — `<picture>` + per-screen preloads. Client to test in Chrome / clear FB browser data / compare Landing page views vs Link clicks |
 | Book page WhatsApp hint | ✅ 2026-10-14 (`5883955`): green line under both Buy buttons — "enter your WhatsApp number while paying" (Razorpay's own popup text can't be changed) |
@@ -170,8 +171,11 @@ cron-job.org ─► POST /api/cron/reconcile every 10 min (payment sweep + remin
 Full detail: `docs/HANDOFF.md` §3.
 
 1. Visitor opens `/ebooks/<slug>` or `/combos/<slug>` (cached).
-2. **आत्ताच डाऊनलोड करा** → `POST /api/checkout` (price read from the DB, never from the browser) →
-   the order is saved on the device (localStorage) → the Razorpay popup opens. **No form on our site.**
+2. **आत्ताच डाऊनलोड करा** → **our popup asks Name + WhatsApp number** (since 2026-10-18, client request; remembered
+   on the device, unticked offers box) → `POST /api/checkout` (price read from the DB, never from the browser; name +
+   number checked again and saved on the order) → the order is saved on the device (localStorage) → the Razorpay popup
+   opens with the number **pre-filled and locked** (`prefill`, `readonly.contact`, `hidden.email`). Pages opened before
+   that release still check out as "Guest" (Razorpay asks the number), so nobody gets stuck mid-deploy.
 3. Paid → `POST /api/checkout/confirm` verifies the signature, then an atomic `created → paid` update
    → same-tab redirect to `/order/<id>?t=<HMAC token>`.
 4. The order page **auto-downloads once**. Download buttons mint a new 5-min signed URL per click
@@ -213,7 +217,7 @@ number). Our answer: a green line under both Buy buttons, `whatsappHint` in `src
 the edition): "पेमेंट करताना तुमचा WhatsApp नंबर टाका — पुस्तक PDF त्याच नंबरवर WhatsApp ला येईल." Option not taken:
 force Razorpay to English (`config.display.language`).
 
-Deliberate difference from the original site: it asks for name + WhatsApp **before** paying. We don't.
+Until 2026-10-18 we deliberately did not ask for name + WhatsApp before paying (the original site does). **Now we do** (client request, §11 item 4e) — but Razorpay no longer asks the number a second time.
 All FAQ, how-to-buy, policy and order texts describe **our** flow.
 
 ---
@@ -321,6 +325,7 @@ no anon access to orders) + `onboarding.sql` + migrations:
 | 009 | `leads` — interested buyers (phone unique, book, locale, source cancelled/failed, consent time + exact consent text, ip_hash, followup_sent_at, opted_out_at); RLS on, server only — applied to Mumbai 2026-10-11 |
 | 010 | Meta Conversions API: `orders.meta_fbp`, `meta_fbc`, `client_ip`, `client_user_agent` (saved at checkout, IP + browser cleared after sending), `meta_capi_sent_at` (sent once) — applied to Mumbai **2026-10-16** (psql via the session pooler) |
 | 011 | `orders.checkout_closed_at` — buyer closed the Razorpay window without paying (BuyButton `ondismiss` → `POST /api/orders/closed`, needs the order's access token; set once, unpaid only). Unpaid without it = left without closing (or before 17 Oct) — applied to Mumbai **2026-10-17** (psql) |
+| 012 | `leads.source` also allows `'checkout'` (ticked offers box in the Buy popup) — applied to Mumbai **2026-10-18** (psql) |
 
 `supabase/checks/verify.sql` = pre-launch checks (written, never formally run).
 
@@ -493,7 +498,7 @@ api '{"files":["https://kaydyachaanifayddyacha.com/media/<file>.webp"]}'  # sing
   (service key from `.env.local`), run as `node --env-file=.env.local <script>.mjs`; keep scripts outside the repo
   (scratchpad) and mask phone numbers in output.
 - **SQL / migrations:** Supabase dashboard → SQL editor, or `psql` with the session-pooler URL `NEW_DB_URL` from
-  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–011 are applied (§7). New ones go in
+  `.env.mumbai` (put it in a temp file, delete after). Migrations 001–012 are applied (§7). New ones go in
   `supabase/migrations/0NN_name.sql` and are applied by hand — the app never runs migrations.
 - `select * from funnel_daily;` = daily visits → checkouts → paid.
 - ⚠️ `.env.local` points at **production**. Every `npm run db:*` script writes live data: use `--dry-run` first.
@@ -588,7 +593,7 @@ After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy
 ### Supabase (production project `ntqwvfksdqdyoyknkprh`, Mumbai, Pro)
 | Setting | Where | State | When |
 |---|---|---|---|
-| Schema + migrations 001–011 | SQL editor / pooler (`NEW_DB_URL` in `.env.mumbai`) | ✅ (§7 table) | 10-04 → **10-16** (010) |
+| Schema + migrations 001–012 | SQL editor / pooler (`NEW_DB_URL` in `.env.mumbai`) | ✅ (§7 table) | 10-04 → **10-16** (010) |
 | Storage buckets `pdfs` (private), `covers` (public) | Storage | ✅ | 10-04 |
 | Admin users (same e-mails as `ADMIN_EMAILS`) | Authentication → Users | ✅ | 10-04 |
 | **Auth → URL Configuration**: Site URL `https://kaydyachaanifayddyacha.com`; redirect URLs apex/**, www/** | Authentication → URL Configuration | ⏳ **never confirmed** (§11 item 2) | — |
@@ -689,7 +694,7 @@ alternative tagline.
 ### API / handlers
 | Route | What |
 |---|---|
-| `api/checkout` | DB price, edition fallback, 409 if nothing deliverable, inserts order ("Guest"), creates Razorpay order (8 s timeout + 1 retry), returns HMAC token + order URL; 503 "busy" on DB/Razorpay errors |
+| `api/checkout` | Name + WhatsApp from the Buy popup (`src/lib/buyer.ts` rules; 400 `{error:"details",field}` if bad; omitted by pre-release pages → "Guest"), ticked offers box → lead `checkout`; DB price, edition fallback, 409 if nothing deliverable, inserts order (name, `whatsapp_number`, `buyer_contact`), creates Razorpay order (8 s timeout + 1 retry), returns HMAC token + order URL; 503 "busy" on DB/Razorpay errors |
 | `api/checkout/confirm` | Verify signature → `markOrderPaid` (atomic) → order URL; 503 + URL on DB outage |
 | `api/razorpay/webhook` | HMAC on raw body; `payment.failed` → failed + save phone; `payment.captured`/`order.paid` → amount check, save phone/email, mark paid; `onOrderPaid` (auto-WhatsApp) only on `payment.captured`; 503 on DB errors so Razorpay redelivers; unknown orders (original site's) → 200 |
 | `api/cron/reconcile` | POST, Bearer `CRON_SECRET` (timing-safe) → `reconcileRecentOrders` (created/failed, last 48 h) + `sendPaymentReminders` |
@@ -906,6 +911,27 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 
 4d. **Watch the new drop-off numbers (from 17 Oct):** Orders → Drop-off Analysis. "Closed payment window" started at 0 (the 102 older unpaid orders all count as "left without closing") and fills as buyers close Razorpay without paying. If most drop-offs are "closed" at the number screen, revisit 4b (e.g. Razorpay popup in English).
 
+4e. **Buy flow: Name + WhatsApp number BEFORE Razorpay (client request, decided 2026-10-18, all recommended options) — ✅ BUILT 18 Oct, live check by the owner pending (last bullet).**
+   Supersedes the older owner decision "no form before paying" (§5).
+   - **New flow:** Buy → our popup asks **Name** (required, ≥ 2 letters) + **WhatsApp number** (+91 fixed, 10 digits 6–9,
+     highlighted "the PDF comes to this WhatsApp number"), remembered on the device for next time, plus an **unticked**
+     "send me offers / new books on WhatsApp" box → Continue → Razorpay opens with `prefill.contact` (+91…),
+     `prefill.name`, `readonly.contact: true` (same number, can't change), `hidden.email: true` → pay → PDF on that
+     WhatsApp number (delivery already prefers `whatsapp_number`).
+   - **Server:** `/api/checkout` takes name + phone (+ consent), validates again, saves `name`, `whatsapp_number`
+     and `buyer_contact` on the order before Razorpay opens (no new order columns). Webhook keeps that number
+     (only fills `buyer_contact` when empty) and still saves the e-mail if Razorpay sends one.
+   - **Reminders:** buyers who close Razorpay now have a number → they get the same ONE reminder after 10 min
+     (`PAYMENT_REMINDER_DELAY_MINUTES=10`), never if they paid since, once per phone + book per day.
+   - **Offers consent:** the box in the popup replaces the after-cancel sign-up; ticked → saved as a lead with
+     source `checkout` (migration 012 widens `leads.source`). The "didn't pay" screen no longer asks for a number.
+   - **Admin:** order cards show the name (phone under it); search by name; name in CSV and on the order page.
+   - **Meta CAPI:** also sends the hashed first name (`fn`) → better ad matching. Privacy policy updated.
+   - **Texts:** privacy policy, how-to-buy / FAQ steps, the green hint under Buy buttons (now in the popup).
+   - **To confirm live (owner, ₹99 + refund, Android + iPhone):** does Razorpay skip its own number screen with the
+     prefill, or show it filled in (one tap)? PDF arrives on the typed number; closing Razorpay shows name + number
+     in Orders; reminder arrives ~10–20 min later.
+
 ### Ideas (not started)
 - ~~Order CSV export~~ ✅ 17 Oct (Orders page download button) · nightly WhatsApp sales summary to the owner · move dashboard totals into
   SQL once orders reach thousands/week (each dashboard view now reads all orders since go-live) · optional:
@@ -1036,6 +1062,7 @@ Trust this file over these where they disagree:
 | 10-17 | `497f77e` | Orders page: tabs, search and custom dates no longer jump to the top (`scroll={false}`, `next/form`); loading bar under the tapped tab; drop-off cards jump to the list |
 | 10-17 | overview | **Overview page redesign** (§3 row): period cards with % change, Needs attention tiles, 14-day sales chart, top books with covers, latest paid order cards, 2×2 tiles |
 | 10-18 | owner check | Owner opened the live Orders and Overview pages (`4c74717`) with real data on the phone: **"all good"**. Doc refreshed (header, §3, §8 code map: `api/orders/closed`, CSV export, dashboard files/filters; §11 4d) |
+| 10-18 | buy flow | **Name + WhatsApp number asked in our Buy popup before Razorpay** (client request; plan §11 4e, all recommended options): popup step, server validation + save, Razorpay prefill/readonly/hidden e-mail, offers consent → lead `checkout` (migration **012** applied to Mumbai), reminders also for closers, admin name display/search/CSV, Meta `fn`, privacy policy + how-to-buy + FAQ texts; after-cancel sign-up box removed (`LeadCapture.tsx` deleted; `/api/leads` kept for pages opened before the release); header logo h-7 below 360 px |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build

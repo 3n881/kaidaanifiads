@@ -55,7 +55,9 @@ export default function Navbar({ products }: { products: SearchItem[] }) {
             width={276}
             height={48}
             loading="eager"
-            className="h-9 w-auto object-contain transition-transform group-hover:scale-105 sm:h-11 lg:h-10 xl:h-11"
+            // Very small phones (< 360 px, e.g. 320 px): a slightly smaller logo so the
+            // language, search and menu icons fit without sideways scrolling.
+            className="h-7 w-auto object-contain transition-transform group-hover:scale-105 min-[360px]:h-9 sm:h-11 lg:h-10 xl:h-11"
           />
         </Link>
 

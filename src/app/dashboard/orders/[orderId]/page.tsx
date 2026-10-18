@@ -79,6 +79,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
             </div>
 
             <dl className="mt-5 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              <Fact label="Buyer name">{order.name && order.name !== "Guest" ? <span className="font-deva">{order.name}</span> : "—"}</Fact>
               <Fact label="Buyer phone">
                 {phone ? <a href={waLink(phone)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-green-700"><MessageCircle className="h-3.5 w-3.5" /> {phone}</a> : "—"}
               </Fact>

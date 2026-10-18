@@ -32,15 +32,20 @@ async function applyPayment(order: PendingOrder, payment: RazorpayPayment): Prom
     orderId: order.id,
   });
   if (!result) return false;
-  if (payment.contact || payment.email) {
+  // Never overwrite: since 2026-10-18 the number usually comes from our Buy popup.
+  if (normalizePhone(payment.contact)) {
     await getSupabaseAdmin()
       .from("orders")
-      .update({
-        buyer_contact: normalizePhone(payment.contact) || null,
-        buyer_email: payment.email ? String(payment.email).slice(0, 200) : null,
-      })
+      .update({ buyer_contact: normalizePhone(payment.contact) })
       .eq("id", order.id)
       .is("buyer_contact", null);
+  }
+  if (payment.email) {
+    await getSupabaseAdmin()
+      .from("orders")
+      .update({ buyer_email: String(payment.email).slice(0, 200) })
+      .eq("id", order.id)
+      .is("buyer_email", null);
   }
   if (result.newlyPaid) {
     console.error("[reconcile] recovered paid order", order.id);

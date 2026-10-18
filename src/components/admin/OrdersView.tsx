@@ -222,7 +222,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
             name="q"
             type="search"
             defaultValue={view.q}
-            placeholder="Search phone or order no."
+            placeholder="Search name, phone or order no."
             className="h-12 w-full rounded-2xl border border-brand-200 bg-white pl-12 pr-4 text-base outline-none placeholder:text-brand-400 focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/15"
           />
         </Form>
@@ -380,6 +380,8 @@ const BADGES = {
 
 export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct }) {
   const phone = o.buyer_contact || o.whatsapp_number;
+  // Name from the Buy popup (2026-10-18); older orders were "Guest".
+  const buyerName = o.name && o.name !== "Guest" && o.name !== "Customer" ? o.name : null;
   const kind = o.refund_status === "full" ? "refunded" : o.refund_status === "partial" ? "partial" : (dropOffKind(o) ?? "paid");
   const [badge, badgeClass] = BADGES[kind];
   const locale = (o.locale ?? "mr") as "mr" | "hi" | "en";
@@ -402,11 +404,12 @@ export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct 
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <Link href={detail} className="min-w-0 truncate text-base font-extrabold text-brand-900 hover:underline">
-              {phone ?? <span className="font-semibold text-brand-400">No number</span>}
+            <Link href={detail} className="font-deva min-w-0 truncate text-base font-extrabold text-brand-900 hover:underline">
+              {buyerName ?? phone ?? <span className="font-semibold text-brand-400">No number</span>}
             </Link>
             <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-extrabold tracking-wide ${badgeClass}`}>{badge}</span>
           </div>
+          {buyerName && phone && <p className="text-sm font-semibold text-green-700">{phone}</p>}
           <p className="mt-0.5 text-xs text-brand-500">
             {istTime(o.paid_at ?? o.created_at)} · <span className="font-mono">#{shortOrderId(o.id)}</span>
           </p>

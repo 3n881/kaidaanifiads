@@ -40,6 +40,7 @@ type PaidOrder = {
   product_id: number | null;
   buyer_contact: string | null;
   buyer_email: string | null;
+  name?: string | null;
   meta_fbp?: string | null;
   meta_fbc?: string | null;
   client_ip?: string | null;
@@ -48,7 +49,7 @@ type PaidOrder = {
 };
 
 const BASE_COLUMNS =
-  "id, status, amount, paid_at, product_id, buyer_contact, buyer_email, products(slug, is_combo, title)";
+  "id, status, amount, paid_at, product_id, buyer_contact, buyer_email, name, products(slug, is_combo, title)";
 const SIGNAL_COLUMNS = "meta_fbp, meta_fbc, client_ip, client_user_agent";
 
 /**
@@ -117,6 +118,9 @@ async function postPurchase(order: PaidOrder): Promise<boolean> {
   const userData: Record<string, unknown> = { country: [sha256("in")] };
   if (order.buyer_contact) userData.ph = [sha256(`91${order.buyer_contact}`)];
   if (order.buyer_email) userData.em = [sha256(order.buyer_email.trim().toLowerCase())];
+  // First name from the Buy popup (2026-10-18): Meta's format = lowercase, no punctuation, hashed.
+  const firstName = (order.name && order.name !== "Guest" ? order.name : "").trim().split(/\s+/)[0]?.toLowerCase().replace(/[^\p{L}]/gu, "");
+  if (firstName) userData.fn = [sha256(firstName)];
   if (order.meta_fbp) userData.fbp = order.meta_fbp;
   if (order.meta_fbc) userData.fbc = order.meta_fbc;
   if (order.client_ip) userData.client_ip_address = order.client_ip;

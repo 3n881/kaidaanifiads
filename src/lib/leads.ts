@@ -20,7 +20,7 @@ export async function saveLead(input: {
   phone: string;
   productId: number | null;
   locale: Locale;
-  source: "cancelled" | "failed";
+  source: "cancelled" | "failed" | "checkout";
   ipHash: string | null;
 }): Promise<"saved" | "rate_limited"> {
   const admin = getSupabaseAdmin();

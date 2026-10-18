@@ -103,7 +103,7 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
     admin
       .from("orders")
       .select(
-        "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status, razorpay_payment_id, whatsapp_number, checkout_closed_at",
+        "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status, razorpay_payment_id, whatsapp_number, checkout_closed_at, name",
       )
       .gte("created_at", SALES_START)
       .order("created_at", { ascending: false })
@@ -188,6 +188,8 @@ export interface OrderRow extends SalesOrder {
   razorpay_payment_id: string | null;
   whatsapp_number: string | null;
   checkout_closed_at: string | null;
+  /** From the Buy popup since 2026-10-18; "Guest" before. */
+  name: string | null;
 }
 
 /** Short order number shown on cards and searchable: first 6 characters of the id, e.g. #3F9A2C. */
@@ -298,7 +300,7 @@ export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters
   const end = range.end !== null ? iso(range.end) : null;
 
   const COLUMNS =
-    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at";
+    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name";
   const SUMMARY = "status, amount, download_count, refunded_amount, checkout_closed_at";
 
   let summary = admin.from("orders").select(SUMMARY).limit(50000);
@@ -335,7 +337,11 @@ export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters
       const pad = (c: string) => (hex + c.repeat(32)).slice(0, 32).replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
       list = list.gte("id", pad("0")).lte("id", pad("f"));
     } else if (phone.length >= 3) list = list.or(`buyer_contact.ilike.%${phone}%,whatsapp_number.ilike.%${phone}%`);
-    else if (term) list = list.ilike("razorpay_payment_id", `%${term}%`);
+    else if (/\p{L}{2,}/u.test(filters.q)) {
+      // Buyer name (Marathi / Hindi / English), from the Buy popup.
+      const name = filters.q.replace(/[%_*,()"\\]/g, " ").replace(/\s+/g, " ").trim();
+      list = list.ilike("name", `%${name}%`);
+    } else if (term) list = list.ilike("razorpay_payment_id", `%${term}%`);
   }
 
   const [summaryRes, previousRes, listRes] = await Promise.all([summary, previous, list]);
@@ -422,7 +428,7 @@ export interface LeadView {
   phone: string;
   product_id: number | null;
   locale: string;
-  source: "cancelled" | "failed";
+  source: "cancelled" | "failed" | "checkout";
   consent_at: string;
   followup_sent_at: string | null;
   opted_out_at: string | null;

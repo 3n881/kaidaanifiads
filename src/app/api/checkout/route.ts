@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import crypto, { randomUUID } from "crypto";
 import { after, NextResponse, type NextRequest } from "next/server";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { hasServiceRole } from "@/lib/supabase/config";
@@ -12,6 +12,8 @@ import { getDeliverableItems, orderPagePath } from "@/lib/orders";
 import { localizedTitle, normalizeLocale } from "@/lib/i18n";
 import { editionLocaleFor } from "@/lib/catalog";
 import { collectMetaSignals } from "@/lib/meta-capi";
+import { cleanBuyerName, cleanIndianMobile } from "@/lib/buyer";
+import { saveLead } from "@/lib/leads";
 
 export const runtime = "nodejs";
 
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  let body: { slug?: string; locale?: string };
+  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -48,6 +50,15 @@ async function handle(req: NextRequest) {
   const locale = normalizeLocale(body.locale);
   if (!slug) {
     return NextResponse.json({ error: "product is required" }, { status: 400 });
+  }
+  // Name + WhatsApp number from the Buy popup (2026-10-18). Pages opened before
+  // that release don't send them — those still check out as "Guest" and
+  // Razorpay asks for the number, as before.
+  const sentDetails = body.name !== undefined || body.phone !== undefined;
+  const buyerName = cleanBuyerName(body.name);
+  const buyerPhone = cleanIndianMobile(body.phone);
+  if (sentDetails && (!buyerName || !buyerPhone)) {
+    return NextResponse.json({ error: "details", field: !buyerName ? "name" : "phone" }, { status: 400 });
   }
 
   if (!hasServiceRole) {
@@ -104,8 +115,11 @@ async function handle(req: NextRequest) {
   const orderId = randomUUID();
   const guestOrder = {
     id: orderId,
-    name: "Guest",
-    whatsapp_number: "",
+    name: buyerName || "Guest",
+    // PDF delivery prefers whatsapp_number; reminders, My Books and Meta use
+    // buyer_contact. The webhook only fills buyer_contact when it is empty.
+    whatsapp_number: buyerPhone,
+    buyer_contact: buyerPhone || null,
     product_id: product.id,
     amount: product.price,
     locale: orderLocale,
@@ -160,6 +174,20 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: BUSY_MESSAGE, retryable: true }, { status: 503 });
   }
 
+  // Ticked "send me offers" box in the Buy popup → interested buyer (migration
+  // 012, source 'checkout'). After the response; never blocks a checkout.
+  if (buyerPhone && body.offersConsent === true) {
+    const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
+    const ipHash = ip ? crypto.createHash("sha256").update(ip).digest("hex") : null;
+    after(async () => {
+      try {
+        await saveLead({ phone: buyerPhone, productId: product.id, locale: orderLocale, source: "checkout", ipHash });
+      } catch (leadError) {
+        console.error("[checkout] offers consent not saved", orderId, leadError instanceof Error ? leadError.message : leadError);
+      }
+    });
+  }
+
   // Meta Conversions API (src/lib/meta-capi.ts): keep Meta's cookies + browser
   // details so the server-side Purchase can be matched to the ad. Saved after
   // the response, best effort — never slows or fails a checkout.
@@ -191,5 +219,7 @@ async function handle(req: NextRequest) {
     accessToken: createOrderAccessToken(orderId),
     orderUrl: orderPagePath(orderId),
     productTitle,
+    // Razorpay pre-fill (readonly) so the buyer doesn't type the number again.
+    prefill: buyerPhone ? { name: buyerName, contact: `+91${buyerPhone}` } : null,
   });
 }

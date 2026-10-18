@@ -19,10 +19,11 @@ export async function GET(req: NextRequest) {
   const [view, products] = await Promise.all([getOrdersView(filters, EXPORT_LIMIT), getAdminProducts()]);
   const titles = new Map(products.map((p) => [p.id, p.title_mr || p.title || p.title_hi || p.title_en || ""]));
 
-  const header = ["Order no", "Created (IST)", "Paid (IST)", "Status", "Book ID", "Book", "Language", "Amount ₹", "Refunded ₹", "Phone", "Razorpay payment", "Downloads", "WhatsApp sends", "Order ID"];
+  const header = ["Order no", "Name", "Created (IST)", "Paid (IST)", "Status", "Book ID", "Book", "Language", "Amount ₹", "Refunded ₹", "Phone", "Razorpay payment", "Downloads", "WhatsApp sends", "Order ID"];
   const lines = view.rows.map((o) =>
     [
       `#${shortOrderId(o.id)}`,
+      o.name && o.name !== "Guest" ? o.name : "",
       ist(o.created_at),
       ist(o.paid_at),
       o.refund_status ? `refunded (${o.refund_status})` : (dropOffKind(o) ?? "paid"),

@@ -69,7 +69,7 @@ async function handle(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { data: order, error: lookupError } = await admin
     .from("orders")
-    .select("id, amount, status, buyer_contact")
+    .select("id, amount, status, buyer_contact, buyer_email")
     .eq("razorpay_order_id", rzpOrderId)
     .maybeSingle();
   if (lookupError) throw new DatabaseUnavailableError("webhook order lookup", lookupError);
@@ -127,15 +127,13 @@ async function handle(req: NextRequest) {
   }
 
   // Keep Razorpay's contact details so a buyer who closed the browser can
-  // still recover the book (My Books → WhatsApp). Never overwrite.
-  if (!order.buyer_contact && (payment.contact || payment.email)) {
-    await admin
-      .from("orders")
-      .update({
-        buyer_contact: normalizePhone(payment.contact) || null,
-        buyer_email: payment.email ? String(payment.email).slice(0, 200) : null,
-      })
-      .eq("id", order.id);
+  // still recover the book (My Books → WhatsApp). Never overwrite: since
+  // 2026-10-18 the number usually comes from our Buy popup already.
+  const contactUpdate: { buyer_contact?: string; buyer_email?: string } = {};
+  if (!order.buyer_contact && normalizePhone(payment.contact)) contactUpdate.buyer_contact = normalizePhone(payment.contact);
+  if (!order.buyer_email && payment.email) contactUpdate.buyer_email = String(payment.email).slice(0, 200);
+  if (Object.keys(contactUpdate).length) {
+    await admin.from("orders").update(contactUpdate).eq("id", order.id);
   }
 
   const result = payment.id

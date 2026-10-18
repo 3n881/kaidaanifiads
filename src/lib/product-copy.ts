@@ -19,7 +19,7 @@ export const PRODUCT_COPY = {
     noRefund: "⚠️ एकदा PDF डाउनलोड केल्यानंतर परतावा (Refund) शक्य नाही.",
     buyNote: "सुरक्षित पेमेंट | UPI, Card, Netbanking · Login / Account ची गरज नाही",
     // Razorpay's popup asks for a mobile number in its own words; say why first.
-    whatsappHint: "पेमेंट करताना तुमचा WhatsApp नंबर टाका — पुस्तक PDF त्याच नंबरवर WhatsApp ला येईल.",
+    whatsappHint: "पुस्तकाची PDF तुमच्या WhatsApp नंबरवर लगेच येईल.",
     pages: "पाने",
     instantDownload: "लगेच डाउनलोड",
     howToBuy: "खरेदी करण्याची पद्धत / How to Buy",
@@ -39,7 +39,7 @@ export const PRODUCT_COPY = {
     relatedBody: "आमची इतर काही महत्वाची पुस्तके पहा",
     viewAll: "सर्व पहा",
     faq: [
-      { q: "हे पुस्तक मला कसे मिळेल?", a: "पेमेंट यशस्वी झाल्यानंतर तुम्हाला लगेच Download Button दिसेल आणि PDF डाउनलोड होईल. पेमेंट करताना दिलेल्या मोबाईल नंबरवर पुस्तक PDF स्वरूपात WhatsApp वरही पाठवले जाते. ही लिंक याच मोबाईलवर ‘माझी पुस्तके’ मध्ये जतन राहते, त्यामुळे नंतरही पुन्हा डाउनलोड करता येते." },
+      { q: "हे पुस्तक मला कसे मिळेल?", a: "पेमेंट यशस्वी झाल्यानंतर तुम्हाला लगेच Download Button दिसेल आणि PDF डाउनलोड होईल. खरेदी करताना दिलेल्या WhatsApp नंबरवर पुस्तक PDF स्वरूपात WhatsApp वरही पाठवले जाते. ही लिंक याच मोबाईलवर ‘माझी पुस्तके’ मध्ये जतन राहते, त्यामुळे नंतरही पुन्हा डाउनलोड करता येते." },
       { q: "पेमेंट सुरक्षित आहे का?", a: "हो, Razorpay 100% सुरक्षित आहे. GooglePay, PhonePe, Paytm किंवा कार्डद्वारे पेमेंट करा." },
       { q: "मोबाईलवर वाचता येते का?", a: "हो! PDF फाइल कोणत्याही मोबाईल, लॅपटॉप किंवा टॅब्लेटवर वाचता येते." },
       { q: "हे Physical पुस्तक आहे का?", a: "नाही. हे पूर्णपणे Digital PDF E-Book आहे. कोणतीही Printed / Hard Copy पाठवली जात नाही." },
@@ -60,7 +60,7 @@ export const PRODUCT_COPY = {
     digitalOnly: "📄 यह केवल Digital PDF E-Book है — कोई Physical / Printed प्रति नहीं भेजी जाती।",
     noRefund: "⚠️ PDF डाउनलोड के बाद Refund संभव नहीं है।",
     buyNote: "सुरक्षित भुगतान | UPI, Card, Netbanking · Login / Account की ज़रूरत नहीं",
-    whatsappHint: "भुगतान करते समय अपना WhatsApp नंबर डालें — किताब की PDF उसी नंबर पर WhatsApp पर आएगी।",
+    whatsappHint: "किताब की PDF आपके WhatsApp नंबर पर तुरंत आएगी।",
     pages: "पृष्ठ",
     instantDownload: "तुरंत डाउनलोड",
     howToBuy: "खरीदने की प्रक्रिया / How to Buy",
@@ -80,7 +80,7 @@ export const PRODUCT_COPY = {
     relatedBody: "हमारी कुछ और महत्वपूर्ण किताबें देखें",
     viewAll: "सभी देखें",
     faq: [
-      { q: "यह पुस्तक मुझे कैसे मिलेगी?", a: "भुगतान सफल होते ही आपको Download बटन दिखेगा और PDF डाउनलोड हो जाएगी। भुगतान के समय दिए गए मोबाइल नंबर पर पुस्तक PDF के रूप में WhatsApp पर भी भेजी जाती है। यह लिंक इसी मोबाइल पर ‘मेरी किताबें’ में सेव रहती है, इसलिए बाद में भी दोबारा डाउनलोड कर सकते हैं।" },
+      { q: "यह पुस्तक मुझे कैसे मिलेगी?", a: "भुगतान सफल होते ही आपको Download बटन दिखेगा और PDF डाउनलोड हो जाएगी। खरीदते समय दिए गए WhatsApp नंबर पर पुस्तक PDF के रूप में WhatsApp पर भी भेजी जाती है। यह लिंक इसी मोबाइल पर ‘मेरी किताबें’ में सेव रहती है, इसलिए बाद में भी दोबारा डाउनलोड कर सकते हैं।" },
       { q: "क्या भुगतान सुरक्षित है?", a: "हाँ, Razorpay 100% सुरक्षित है। GooglePay, PhonePe, Paytm या कार्ड से भुगतान करें।" },
       { q: "क्या मोबाइल पर पढ़ा जा सकता है?", a: "हाँ! PDF फाइल किसी भी मोबाइल, लैपटॉप या टैबलेट पर पढ़ी जा सकती है।" },
       { q: "क्या यह Physical पुस्तक है?", a: "नहीं। यह पूरी तरह Digital PDF E-Book है। कोई Printed / Hard Copy नहीं भेजी जाती।" },
@@ -101,7 +101,7 @@ export const PRODUCT_COPY = {
     digitalOnly: "📄 This is a digital PDF e-book only — no physical / printed copy is shipped.",
     noRefund: "⚠️ Refunds are not possible once the PDF has been downloaded.",
     buyNote: "Secure payment | UPI, Card, Netbanking · No login / account needed",
-    whatsappHint: "Enter your WhatsApp number while paying — the book PDF is sent to that number on WhatsApp.",
+    whatsappHint: "The book PDF arrives on your WhatsApp number right away.",
     pages: "pages",
     instantDownload: "Instant download",
     howToBuy: "How to Buy",
@@ -121,7 +121,7 @@ export const PRODUCT_COPY = {
     relatedBody: "See some of our other important books",
     viewAll: "View all",
     faq: [
-      { q: "How will I get this book?", a: "As soon as the payment succeeds you see a Download button and the PDF downloads. The PDF is also sent on WhatsApp to the mobile number you used while paying. The link is saved under ‘My Books’ on this phone, so you can download it again later." },
+      { q: "How will I get this book?", a: "As soon as the payment succeeds you see a Download button and the PDF downloads. The PDF is also sent to the WhatsApp number you enter when buying. The link is saved under ‘My Books’ on this phone, so you can download it again later." },
       { q: "Is the payment safe?", a: "Yes, Razorpay is 100% secure. Pay with Google Pay, PhonePe, Paytm or a card." },
       { q: "Can I read it on my phone?", a: "Yes! The PDF opens on any phone, laptop or tablet." },
       { q: "Is this a physical book?", a: "No. It is a fully digital PDF e-book. No printed / hard copy is shipped." },

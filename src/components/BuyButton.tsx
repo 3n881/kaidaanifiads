@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Loader2, MessageCircle, ShieldCheck, X } from "lucide-react";
+import { Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
@@ -11,10 +11,12 @@ import { UI_COPY, type Locale } from "@/lib/i18n";
 import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
-import LeadCapture, { shouldOfferLead } from "./LeadCapture";
-import { NOT_PAID_COPY } from "@/lib/lead-copy";
+import { LEAD_CONSENT_TEXT, NOT_PAID_COPY } from "@/lib/lead-copy";
+import { BUY_FORM_COPY } from "@/lib/buy-copy";
+import { cleanBuyerName, cleanIndianMobile, loadSavedBuyer, saveBuyer } from "@/lib/buyer";
 
-type Step = "processing" | "error" | "cancelled" | "failed";
+// details = our name + WhatsApp form (first, 2026-10-18) → processing (Razorpay opening / paying) → …
+type Step = "details" | "processing" | "error" | "cancelled" | "failed";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -30,6 +32,9 @@ interface RazorpayOptions {
   description?: string;
   order_id: string;
   theme?: { color?: string };
+  prefill?: { name?: string; contact?: string };
+  readonly?: { contact?: boolean; email?: boolean; name?: boolean };
+  hidden?: { contact?: boolean; email?: boolean };
   handler: (res: RazorpayResponse) => void;
   modal?: { ondismiss?: () => void };
 }
@@ -44,7 +49,9 @@ interface CheckoutData {
   accessToken: string;
   orderUrl: string;
   productTitle?: string;
+  prefill?: { name: string; contact: string } | null;
   error?: string;
+  field?: "name" | "phone";
 }
 
 type RazorpayCtor = new (options: RazorpayOptions) => {
@@ -151,39 +158,61 @@ function BuyModal({
   onClose: () => void;
   onRetry: () => void;
 }) {
-  const [step, setStep] = useState<Step>("processing");
+  const [step, setStep] = useState<Step>("details");
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
+  // Name + WhatsApp number (remembered on this device, src/lib/buyer.ts).
+  const [buyer, setBuyer] = useState({ name: "", phone: "", offers: false });
+  const [fieldError, setFieldError] = useState<"name" | "phone" | null>(null);
+  const [editing, setEditing] = useState(true);
   // Set when Razorpay reports a failed attempt (bank/UPI declined). Razorpay
   // keeps its window open for a retry; when the buyer then closes it, we know
   // it was a failure (help screen), not a plain cancel (stay-in-touch box).
   const failedRef = useRef<string | null>(null);
-  const [offerLead, setOfferLead] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    // Fetch Razorpay's script while the buyer types.
+    void loadRazorpay();
+    const saved = loadSavedBuyer();
+    // Read after mount (localStorage), so server and first client render match.
+    const id = window.setTimeout(() => {
+      if (saved.name || saved.phone) {
+        setBuyer((current) => ({ ...current, name: saved.name, phone: saved.phone }));
+        // A returning buyer with both details sees a one-tap summary.
+        if (saved.name && saved.phone) setEditing(false);
+      }
+    }, 0);
+    // Same moment as before (Buy tapped), so Meta's funnel stays comparable.
+    trackPixel("InitiateCheckout", pixelProduct({ id: product.id, title: product.title, price: product.price }));
     return () => {
+      window.clearTimeout(id);
       document.body.style.overflow = "";
     };
-  }, []);
+  }, [product.id, product.price, product.title]);
 
   const fail = useCallback((message: string) => {
     setError(message);
     setStep("error");
   }, []);
 
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-
-    const beginCheckout = async () => {
+  const beginCheckout = useCallback(
+    async (details: { name: string; phone: string; offers: boolean }) => {
+      if (started.current) return;
+      started.current = true;
+      setStep("processing");
       const pixelParams = pixelProduct({ id: product.id, title: product.title, price: product.price });
-      trackPixel("InitiateCheckout", pixelParams);
       try {
         const checkoutRequest = fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug: product.slug, locale: editionLocale }),
+          body: JSON.stringify({
+            slug: product.slug,
+            locale: editionLocale,
+            name: details.name,
+            phone: details.phone,
+            offersConsent: details.offers,
+          }),
         });
 
         const [response, scriptReady] = await Promise.all([
@@ -192,6 +221,14 @@ function BuyModal({
         ]);
         const data = (await response.json()) as CheckoutData;
         if (!response.ok) {
+          // The server re-checks the details; send the buyer back to the field.
+          if (data.error === "details") {
+            started.current = false;
+            setEditing(true);
+            setFieldError(data.field ?? "phone");
+            setStep("details");
+            return;
+          }
           return fail(data.error || "Checkout could not be started.");
         }
 
@@ -221,6 +258,11 @@ function BuyModal({
           description: data.productTitle,
           order_id: data.razorpayOrderId ?? "",
           theme: { color: "#0A2342" },
+          // Number from our popup: filled in and locked, so Razorpay doesn't
+          // ask again. No e-mail needed (Razorpay's e-mail field hidden).
+          ...(data.prefill
+            ? { prefill: data.prefill, readonly: { contact: true }, hidden: { email: true } }
+            : {}),
           handler: async (payment: RazorpayResponse) => {
             setStep("processing");
             // Sent from the book page, before redirecting: the order page URL
@@ -257,12 +299,7 @@ function BuyModal({
                 body: JSON.stringify({ orderId: data.orderId, token: data.accessToken }),
                 keepalive: true,
               }).catch(() => undefined);
-              if (failedRef.current) {
-                setStep("failed");
-              } else {
-                setOfferLead(shouldOfferLead());
-                setStep("cancelled");
-              }
+              setStep(failedRef.current ? "failed" : "cancelled");
             },
           },
         });
@@ -273,13 +310,30 @@ function BuyModal({
       } catch {
         fail(UI_COPY[locale].checkoutFailed);
       }
-    };
-
-    void beginCheckout();
-  }, [fail, locale, editionLocale, product.id, product.price, product.slug, product.title]);
+    },
+    [fail, locale, editionLocale, product.id, product.price, product.slug, product.title],
+  );
 
   const copy = UI_COPY[locale];
   const notPaid = NOT_PAID_COPY[locale];
+  const form = BUY_FORM_COPY[locale];
+
+  const submitDetails = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = cleanBuyerName(buyer.name);
+    const phone = cleanIndianMobile(buyer.phone);
+    if (!name) {
+      setEditing(true);
+      return setFieldError("name");
+    }
+    if (!phone) {
+      setEditing(true);
+      return setFieldError("phone");
+    }
+    setFieldError(null);
+    saveBuyer(name, phone);
+    void beginCheckout({ name, phone, offers: buyer.offers });
+  };
 
   return createPortal(
     <div
@@ -287,7 +341,7 @@ function BuyModal({
       onClick={step === "processing" ? undefined : onClose}
     >
       <div
-        className="w-full max-w-md animate-fade-in-up rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-md animate-fade-in-up overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl sm:pb-5"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -317,6 +371,123 @@ function BuyModal({
           )}
         </div>
 
+        {step === "details" && (
+          <form onSubmit={submitDetails} noValidate className="space-y-4">
+            <p className="font-deva -mt-1 text-sm font-semibold text-brand-700">{form.heading}</p>
+
+            {!editing ? (
+              // Returning buyer: details from last time, one tap to pay.
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-deva truncate text-sm font-bold text-brand-900">{buyer.name}</p>
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
+                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> +91 {buyer.phone.replace(/^(\d{5})(\d{5})$/, "$1 $2")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="font-deva inline-flex shrink-0 items-center gap-1 rounded-lg border border-green-300 bg-white px-2.5 py-1.5 text-xs font-bold text-green-800"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> {form.edit}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="buyer-name" className="font-deva mb-1.5 block text-sm font-bold text-brand-900">
+                    {form.name}
+                  </label>
+                  <input
+                    id="buyer-name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    enterKeyHint="next"
+                    maxLength={60}
+                    autoFocus={!buyer.name}
+                    value={buyer.name}
+                    onChange={(e) => {
+                      setBuyer({ ...buyer, name: e.target.value });
+                      if (fieldError === "name") setFieldError(null);
+                    }}
+                    placeholder={form.namePlaceholder}
+                    aria-invalid={fieldError === "name"}
+                    aria-describedby={fieldError === "name" ? "buyer-name-error" : undefined}
+                    className={`font-deva h-12 w-full rounded-xl border bg-white px-4 text-base text-brand-900 outline-none placeholder:text-brand-300 focus:ring-2 ${
+                      fieldError === "name" ? "border-danger-500 focus:ring-danger-500/20" : "border-brand-200 focus:border-brand-teal focus:ring-brand-teal/15"
+                    }`}
+                  />
+                  {fieldError === "name" && (
+                    <p id="buyer-name-error" role="alert" className="font-deva mt-1 text-xs font-semibold text-danger-600">{form.badName}</p>
+                  )}
+                </div>
+
+                {/* WhatsApp number — highlighted: the PDF is sent here */}
+                <div className="rounded-2xl border-2 border-green-500/70 bg-green-50/70 p-3">
+                  <label htmlFor="buyer-phone" className="font-deva mb-1.5 flex items-center gap-1.5 text-sm font-bold text-green-800">
+                    <WhatsAppGlyph className="h-4 w-4" /> {form.whatsapp}
+                  </label>
+                  <div
+                    className={`flex h-12 items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2 ${
+                      fieldError === "phone" ? "border-danger-500 focus-within:ring-danger-500/20" : "border-green-300 focus-within:border-green-600 focus-within:ring-green-600/15"
+                    }`}
+                  >
+                    <span className="flex h-full items-center border-r border-green-200 bg-green-50 px-3 text-base font-bold text-green-800" aria-hidden="true">
+                      +91
+                    </span>
+                    <input
+                      id="buyer-phone"
+                      name="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      enterKeyHint="go"
+                      maxLength={14}
+                      autoFocus={Boolean(buyer.name) && !buyer.phone}
+                      value={buyer.phone}
+                      onChange={(e) => {
+                        setBuyer({ ...buyer, phone: e.target.value.replace(/[^\d\s+-]/g, "") });
+                        if (fieldError === "phone") setFieldError(null);
+                      }}
+                      placeholder={form.phonePlaceholder}
+                      aria-invalid={fieldError === "phone"}
+                      aria-describedby={fieldError === "phone" ? "buyer-phone-error" : "buyer-phone-hint"}
+                      className="h-full min-w-0 flex-1 bg-transparent px-3 text-lg font-semibold tracking-wide text-brand-900 outline-none placeholder:font-normal placeholder:text-brand-300"
+                    />
+                  </div>
+                  {fieldError === "phone" ? (
+                    <p id="buyer-phone-error" role="alert" className="font-deva mt-1.5 text-xs font-semibold text-danger-600">{form.badPhone}</p>
+                  ) : (
+                    <p id="buyer-phone-hint" className="font-deva mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-green-800">
+                      <span aria-hidden="true">📲</span> {form.whatsappHint}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Offers: unticked by default; the exact sentence is stored with the consent */}
+            <label className="font-deva flex cursor-pointer items-start gap-2.5 text-xs leading-snug text-brand-600">
+              <input
+                type="checkbox"
+                checked={buyer.offers}
+                onChange={(e) => setBuyer({ ...buyer, offers: e.target.checked })}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-green-600"
+              />
+              <span>{LEAD_CONSENT_TEXT[locale]}</span>
+            </label>
+
+            <button
+              type="submit"
+              className="font-deva flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 text-base font-extrabold text-brand-teal shadow-[var(--shadow-gold)] transition hover:brightness-95 active:scale-[0.98]"
+            >
+              {form.pay(product.price)}
+            </button>
+            <p className="font-deva -mt-1 text-center text-[11px] text-brand-400">{form.privacy}</p>
+          </form>
+        )}
+
         {step === "processing" && (
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <Loader2
@@ -339,7 +510,6 @@ function BuyModal({
             <button type="button" onClick={onRetry} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
               {copy.retry}
             </button>
-            {offerLead && <LeadCapture locale={locale} productId={product.id} />}
             <button type="button" onClick={onClose} className="w-full rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50">
               {copy.close}
             </button>
@@ -401,5 +571,14 @@ function BuyModal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** WhatsApp mark (lucide has none). */
+function WhatsAppGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35M12.05 21.5h-.01a9.4 9.4 0 0 1-4.79-1.31l-.34-.2-3.56.93.95-3.47-.22-.36a9.39 9.39 0 0 1-1.44-5.01c0-5.19 4.23-9.42 9.43-9.42a9.36 9.36 0 0 1 6.66 2.76 9.36 9.36 0 0 1 2.76 6.67c0 5.19-4.23 9.42-9.43 9.42m8.02-17.44A11.27 11.27 0 0 0 12.05.75C5.8.75.72 5.83.72 12.08c0 2 .52 3.95 1.51 5.66L.62 23.25l5.65-1.48a11.3 11.3 0 0 0 5.78 1.47h.01c6.25 0 11.33-5.08 11.33-11.33 0-3.03-1.18-5.87-3.32-8.01" />
+    </svg>
   );
 }

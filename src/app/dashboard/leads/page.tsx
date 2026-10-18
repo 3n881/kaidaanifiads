@@ -70,8 +70,8 @@ export default async function LeadsPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lead.source === "failed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}>
-                    {lead.source === "failed" ? "Payment failed" : "Cancelled payment"}
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lead.source === "failed" ? "bg-red-100 text-red-700" : lead.source === "checkout" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                    {lead.source === "failed" ? "Payment failed" : lead.source === "checkout" ? "Ticked offers box" : "Cancelled payment"}
                   </span>
                   {lead.boughtLater && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">

@@ -4,34 +4,35 @@ import { BookOpen, CreditCard, FileDown, Headphones, MousePointerClick } from "l
 import { SITE } from "@/data/catalog";
 import { useLanguage } from "./LanguageProvider";
 
-// Our checkout: Buy opens the Razorpay window directly (it asks for the mobile
-// number), the order page starts the download, and the order is saved on the
+// Our checkout (2026-10-18): Buy asks name + WhatsApp number in our popup,
+// then Razorpay opens with that number filled in; the order page starts the
+// download, the PDF also comes on WhatsApp, and the order is saved on the
 // device under "माझी पुस्तके" for later downloads.
 const STEPS = {
   mr: [
     { icon: MousePointerClick, title: "१. पुस्तक निवडा", desc: "हवे असलेले ई-बुक किंवा कॉम्बो पॅक उघडा आणि ‘आत्ताच डाऊनलोड करा’ बटण दाबा." },
-    { icon: CreditCard, title: "२. सुरक्षित पेमेंट", desc: "Razorpay ची सुरक्षित पेमेंट विंडो लगेच उघडते. मोबाईल नंबर टाका आणि UPI, Google Pay, PhonePe, Paytm किंवा कार्डने पेमेंट करा." },
-    { icon: FileDown, title: "३. लगेच डाउनलोड", desc: "पेमेंट यशस्वी होताच PDF डाउनलोड आपोआप सुरू होते आणि स्क्रीनवर Download बटणही मिळते." },
+    { icon: CreditCard, title: "२. सुरक्षित पेमेंट", desc: "तुमचे नाव आणि WhatsApp नंबर टाका — मग Razorpay ची सुरक्षित पेमेंट विंडो उघडते. UPI, Google Pay, PhonePe, Paytm किंवा कार्डने पेमेंट करा." },
+    { icon: FileDown, title: "३. लगेच डाउनलोड", desc: "पेमेंट यशस्वी होताच PDF डाउनलोड आपोआप सुरू होते आणि पुस्तक तुमच्या WhatsApp नंबरवरही येते." },
     { icon: BookOpen, title: "४. माझी पुस्तके", desc: "तुमची खरेदी याच मोबाईलवर ‘माझी पुस्तके’ मध्ये जतन राहते — गरज पडेल तेव्हा पुन्हा डाउनलोड करा." },
   ],
   hi: [
     { icon: MousePointerClick, title: "1. किताब चुनें", desc: "अपनी पसंद की ई-बुक या कॉम्बो पैक खोलें और ‘अभी डाउनलोड करें’ बटन दबाएँ।" },
-    { icon: CreditCard, title: "2. सुरक्षित पेमेंट", desc: "Razorpay की सुरक्षित पेमेंट विंडो तुरंत खुलती है। मोबाइल नंबर डालें और UPI, Google Pay, PhonePe, Paytm या कार्ड से पेमेंट करें।" },
-    { icon: FileDown, title: "3. तुरंत डाउनलोड", desc: "पेमेंट सफल होते ही PDF डाउनलोड अपने आप शुरू होता है और स्क्रीन पर Download बटन भी मिलता है।" },
+    { icon: CreditCard, title: "2. सुरक्षित पेमेंट", desc: "अपना नाम और WhatsApp नंबर डालें — फिर Razorpay की सुरक्षित पेमेंट विंडो खुलती है। UPI, Google Pay, PhonePe, Paytm या कार्ड से पेमेंट करें।" },
+    { icon: FileDown, title: "3. तुरंत डाउनलोड", desc: "पेमेंट सफल होते ही PDF डाउनलोड अपने आप शुरू होता है और किताब आपके WhatsApp नंबर पर भी आती है।" },
     { icon: BookOpen, title: "4. मेरी किताबें", desc: "आपकी खरीद इसी मोबाइल पर ‘मेरी किताबें’ में सेव रहती है — ज़रूरत हो तब फिर से डाउनलोड करें।" },
   ],
   en: [
     { icon: MousePointerClick, title: "1. Choose a book", desc: "Open an ebook or combo pack and press ‘Download now’." },
-    { icon: CreditCard, title: "2. Pay securely", desc: "The secure Razorpay payment window opens right away. Enter your mobile number and pay by UPI, Google Pay, PhonePe, Paytm or card." },
-    { icon: FileDown, title: "3. Download instantly", desc: "As soon as the payment succeeds, the PDF starts downloading and a Download button stays on screen." },
+    { icon: CreditCard, title: "2. Pay securely", desc: "Enter your name and WhatsApp number — then the secure Razorpay payment window opens. Pay by UPI, Google Pay, PhonePe, Paytm or card." },
+    { icon: FileDown, title: "3. Download instantly", desc: "As soon as the payment succeeds, the PDF starts downloading and the book also arrives on your WhatsApp number." },
     { icon: BookOpen, title: "4. My Books", desc: "Your purchase is saved under ‘My Books’ on this phone — download it again whenever you need." },
   ],
 } as const;
 
 const COPY = {
-  mr: { badge: "सोपी प्रक्रिया", title: "ई-बुक कसे खरेदी करावे?", body: "Account, Login किंवा वेगळा फॉर्म नाही — थेट पेमेंट आणि लगेच डाउनलोड.", help: "काही अडचण येत आहे?", support: "पेमेंट केल्यानंतर ई-बुक मिळाले नाही? काळजी करू नका! आमची सपोर्ट टीम तुम्हाला मदत करेल.", action: "व्हॉट्सॲप करा" },
-  hi: { badge: "आसान प्रक्रिया", title: "ई-बुक कैसे खरीदें?", body: "कोई अकाउंट, लॉगिन या अलग फ़ॉर्म नहीं — सीधे पेमेंट और तुरंत डाउनलोड।", help: "कोई परेशानी आ रही है?", support: "पेमेंट के बाद ई-बुक नहीं मिली? चिंता न करें! हमारी सपोर्ट टीम आपकी मदद करेगी।", action: "व्हॉट्सऐप करें" },
-  en: { badge: "Simple process", title: "How to buy an ebook", body: "No account, login or extra form — pay and download straight away.", help: "Having trouble?", support: "Paid but didn't get the ebook? Don't worry — our support team will help.", action: "WhatsApp" },
+  mr: { badge: "सोपी प्रक्रिया", title: "ई-बुक कसे खरेदी करावे?", body: "Account किंवा Login नाही — फक्त नाव आणि WhatsApp नंबर, पेमेंट आणि लगेच डाउनलोड.", help: "काही अडचण येत आहे?", support: "पेमेंट केल्यानंतर ई-बुक मिळाले नाही? काळजी करू नका! आमची सपोर्ट टीम तुम्हाला मदत करेल.", action: "व्हॉट्सॲप करा" },
+  hi: { badge: "आसान प्रक्रिया", title: "ई-बुक कैसे खरीदें?", body: "कोई अकाउंट या लॉगिन नहीं — बस नाम और WhatsApp नंबर, पेमेंट और तुरंत डाउनलोड।", help: "कोई परेशानी आ रही है?", support: "पेमेंट के बाद ई-बुक नहीं मिली? चिंता न करें! हमारी सपोर्ट टीम आपकी मदद करेगी।", action: "व्हॉट्सऐप करें" },
+  en: { badge: "Simple process", title: "How to buy an ebook", body: "No account or login — just your name and WhatsApp number, pay and download straight away.", help: "Having trouble?", support: "Paid but didn't get the ebook? Don't worry — our support team will help.", action: "WhatsApp" },
 } as const;
 
 // Icon box colours per step, as on the original site.

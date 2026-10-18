@@ -7,9 +7,10 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 // ---------------------------------------------------------------------------
 // "Payment not completed" WhatsApp reminder, run by the cron after the
 // reconcile sweep (so an order Razorpay actually captured is already `paid`).
-// Only orders whose payment failed carry a phone (Razorpay's `contact`, saved
-// by the webhook), so a buyer who closed checkout before typing a number is
-// never contacted. Each phone + book gets at most one reminder per day.
+// Since 2026-10-18 every new order carries the WhatsApp number typed in our
+// Buy popup, so a buyer who closed Razorpay without paying also gets ONE
+// reminder (owner decision); older orders only had Razorpay's `contact` on a
+// failed payment. Never after they paid; at most one per phone + book per day.
 // ---------------------------------------------------------------------------
 
 // Wait before reminding: most buyers retry and pay within a few minutes.
