@@ -1,6 +1,6 @@
 # PROJECT STATUS — master doc (read this first)
 
-> **Last updated 2026-10-18 evening** (live commit `c29e379`; 18 Oct: **Buy flow asks Name + WhatsApp number before Razorpay** (prefilled + locked in Razorpay), migration 012, **owner's live ₹99 test passed 2:52 pm**; 17 Oct: **admin Orders + Overview pages redesigned** like the client's
+> **Last updated 2026-10-18 evening** (latest push `937230d` = Buy popup keyboard fix + required agreement box, deploying at the time of writing — check `/api/health`; 18 Oct: **Buy flow asks Name + WhatsApp number before Razorpay** (prefilled + locked in Razorpay), migration 012, **owner's live ₹99 test passed 2:52 pm** (on `c29e379`); 17 Oct: **admin Orders + Overview pages redesigned** like the client's
 > original dashboard, migration 011, CSV export; 16 Oct night: ad-link speed check + 600 px phone cover; 14 Oct: cover fixes, Meta Pixel on, WhatsApp hint;
 > 16 Oct: **Meta Conversions API live + verified**, migration 010, **§7c production settings register** = every
 > setting and where it lives, **§7d brand outro video**). One place for any developer or AI agent to
@@ -695,7 +695,7 @@ alternative tagline.
 ### API / handlers
 | Route | What |
 |---|---|
-| `api/checkout` | Name + WhatsApp from the Buy popup (`src/lib/buyer.ts` rules; 400 `{error:"details",field}` if bad; omitted by pre-release pages → "Guest"), ticked offers box → lead `checkout`; DB price, edition fallback, 409 if nothing deliverable, inserts order (name, `whatsapp_number`, `buyer_contact`), creates Razorpay order (8 s timeout + 1 retry), returns HMAC token + order URL; 503 "busy" on DB/Razorpay errors |
+| `api/checkout` | Name + WhatsApp from the Buy popup (`src/lib/buyer.ts` rules; 400 `{error:"details",field: name/phone/agree}` if bad; omitted by pre-release pages → "Guest"; the required agreement `agreed:true` is enforced when the popup sends `form: 2` — the 18 Oct morning popup without the box sends no `form` and is still accepted), ticked offers box → lead `checkout`; DB price, edition fallback, 409 if nothing deliverable, inserts order (name, `whatsapp_number`, `buyer_contact`), creates Razorpay order (8 s timeout + 1 retry), returns HMAC token + order URL; 503 "busy" on DB/Razorpay errors |
 | `api/checkout/confirm` | Verify signature → `markOrderPaid` (atomic) → order URL; 503 + URL on DB outage |
 | `api/razorpay/webhook` | HMAC on raw body; `payment.failed` → failed + save phone; `payment.captured`/`order.paid` → amount check, save phone/email, mark paid; `onOrderPaid` (auto-WhatsApp) only on `payment.captured`; 503 on DB errors so Razorpay redelivers; unknown orders (original site's) → 200 |
 | `api/cron/reconcile` | POST, Bearer `CRON_SECRET` (timing-safe) → `reconcileRecentOrders` (created/failed, last 48 h) + `sendPaymentReminders` |
@@ -933,7 +933,9 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
      Meta CAPI sent (IP/UA cleared). ✅ closing Razorpay recorded with name + number (#BAE17E). ✅ old open page fell back
      to "Guest" (#82469B). Still open: (a) note what Razorpay's number screen shows with the prefill (skipped or filled
      in); (b) iPhone purchase; (c) reminder test — close Razorpay on a book that phone has NOT bought, wait 10–20 min
-     (a phone that already owns the book is never reminded); (d) refund the test payment in Razorpay.
+     (a phone that already owns the book is never reminded); (d) refund the test payment in Razorpay; (e) after `937230d`
+     is live: on the phone, tap the name field — the pay button + required box must sit just above the keyboard
+     (Claude's test browser can't open a real keyboard; it was checked with a simulated 390 px keyboard).
 
 ### Ideas (not started)
 - ~~Order CSV export~~ ✅ 17 Oct (Orders page download button) · nightly WhatsApp sales summary to the owner · move dashboard totals into
