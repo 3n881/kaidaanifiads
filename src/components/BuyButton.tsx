@@ -544,13 +544,14 @@ function BuyModal({
 
             {/* Pinned to the bottom of the popup: the Terms notice + pay button stay visible while typing */}
             <div className="sticky bottom-0 -mx-5 mt-3 border-t border-brand-100 bg-white px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_16px_-12px_rgba(10,35,66,0.25)] sm:pb-5">
-              <p className="font-deva mb-2.5 text-[11px] leading-snug text-brand-600">
+              {/* One small grey line, nothing highlighted (client): Terms / Privacy links + offers note. */}
+              <p className="font-deva mb-2 text-center text-[10px] leading-snug text-brand-400">
                 {form.agree[0]}
-                <a href="/terms" target="_blank" rel="noopener" className="font-bold underline underline-offset-2">
+                <a href="/terms" target="_blank" rel="noopener" className="underline decoration-brand-200 underline-offset-2">
                   {form.agree[1]}
                 </a>
                 {form.agree[2]}
-                <a href="/privacy-policy" target="_blank" rel="noopener" className="font-bold underline underline-offset-2">
+                <a href="/privacy-policy" target="_blank" rel="noopener" className="underline decoration-brand-200 underline-offset-2">
                   {form.agree[3]}
                 </a>
                 {form.agree[4]}
