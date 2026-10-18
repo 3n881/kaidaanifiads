@@ -6,10 +6,10 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 
 // ---------------------------------------------------------------------------
 // "Payment not completed" WhatsApp reminders (Interakt `pending_followup_v2`).
-// Owner's schedule (2026-10-18, migration 013): up to 4 per unpaid attempt —
+// Owner's schedule (2026-10-18, migration 013): 2 per unpaid attempt —
 //   1st: right away when the buyer closes Razorpay (/api/orders/closed), or
 //        FIRST_DELAY_MINUTES after a failed / abandoned attempt (the cron);
-//   2nd: +10 min, 3rd: +30 min, 4th: +1 h after the previous one.
+//   2nd: 1 h after the 1st. (Same evening it was briefly 4: +10, +30, +60 min.)
 // No daily cap per phone: two pending books get their own reminders. Several
 // Buy taps on the SAME book by one phone → only the newest attempt is reminded.
 // Never to a phone that owns that book (paid before or since). Every new order
@@ -18,8 +18,8 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 // order Razorpay actually captured is already `paid`.
 // ---------------------------------------------------------------------------
 
-/** Minutes between reminders 1→2, 2→3, 3→4. Override: REMINDER_GAPS_MINUTES="10,30,60". */
-const GAPS_MINUTES = (process.env.REMINDER_GAPS_MINUTES || "10,30,60")
+/** Minutes between reminders (1→2, …). Default "60" = 2 reminders; e.g. "10,30,60" = 4. */
+const GAPS_MINUTES = (process.env.REMINDER_GAPS_MINUTES || "60")
   .split(",")
   .map((v) => Number(v.trim()))
   .filter((v) => Number.isFinite(v) && v > 0);
@@ -30,7 +30,7 @@ const FIRST_DELAY_MINUTES = Number(
   process.env.PAYMENT_FAILED_REMINDER_DELAY_MINUTES || process.env.PAYMENT_REMINDER_DELAY_MINUTES || 10,
 );
 // No FIRST reminder for an attempt older than this (no messages hours late, e.g.
-// right after a deploy); a started sequence finishes within ~2 h anyway.
+// right after a deploy); a started sequence finishes within ~1 h anyway.
 const START_WITHIN_HOURS = 3;
 const WINDOW_HOURS = 24;
 

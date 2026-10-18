@@ -1,7 +1,9 @@
 -- 013 — Payment reminders as a short sequence (owner, 2026-10-18).
--- An unpaid attempt with a WhatsApp number now gets up to 4 reminders:
+-- An unpaid attempt with a WhatsApp number gets a short reminder sequence:
 -- right away when the buyer closes Razorpay (or ~10 min after a failed /
--- abandoned attempt), then +10 min, +30 min and +1 h after the previous one.
+-- abandoned attempt), then more after gaps (src/lib/reminders.ts; default
+-- since 18 Oct evening: 2 reminders, the 2nd 1 h after the 1st). The back-fill
+-- uses 4 = "finished" for any schedule up to 4.
 -- reminder_count = reminders sent so far (claimed atomically before sending),
 -- reminder_last_at = when the last one went. reminder_sent_at keeps meaning
 -- "first reminder handled". Safe to re-run.
