@@ -1,6 +1,7 @@
 // Texts of the Buy popup's details step (name + WhatsApp number before
-// Razorpay, 2026-10-18). Client-safe. ONE required box (owner, 18 Oct): Terms +
-// Privacy + book/order messages + offers/new books on WhatsApp. Its sentence
+// Razorpay, 2026-10-18). Client-safe. No tick box (client, 18 Oct night): the
+// `agree` notice above the pay button says continuing accepts Terms + Privacy +
+// WhatsApp book/order messages and offers (STOP any time). Its sentence
 // (agreeText) is stored word for word with the lead (/api/checkout).
 import type { Locale } from "./i18n";
 
@@ -14,7 +15,7 @@ export const BUY_FORM_COPY: Record<Locale, {
   pay: (price: number) => string;
   badName: string;
   badPhone: string;
-  /** Required box: [before, "Terms", middle, "Privacy Policy", after]. */
+  /** Notice above the pay button: [before, "Terms", middle, "Privacy Policy", after]. */
   agree: [string, string, string, string, string];
   needAgree: string;
   privacy: string;
@@ -30,7 +31,7 @@ export const BUY_FORM_COPY: Record<Locale, {
     pay: (price) => `पुढे जा — ₹${price} पेमेंट करा`,
     badName: "कृपया तुमचे योग्य नाव लिहा — फक्त अक्षरे, किमान २ (अंक किंवा चिन्हे नको).",
     badPhone: "कृपया तुमचा योग्य १० अंकी WhatsApp नंबर लिहा (6, 7, 8 किंवा 9 ने सुरू होणारा).",
-    agree: ["मला ", "अटी", " व ", "गोपनीयता धोरण", " मान्य आहे. पुस्तक, ऑर्डरचे संदेश आणि नवीन पुस्तके / ऑफर्स WhatsApp वर मिळावेत (STOP पाठवून कधीही थांबवता येईल)."],
+    agree: ["पुढे गेल्यास तुम्ही आमच्या ", "अटी", " व ", "गोपनीयता धोरण", " मान्य करता. पुस्तक, ऑर्डरचे संदेश आणि नवीन पुस्तके / ऑफर्स WhatsApp वर मिळतील (STOP पाठवून कधीही थांबवता येईल)."],
     needAgree: "पुढे जाण्यासाठी ही चौकट निवडा.",
     privacy: "तुमचा नंबर फक्त पुस्तक पाठवण्यासाठी आणि ऑर्डरच्या मदतीसाठी वापरला जातो.",
     edit: "नाव / नंबर बदला",
@@ -45,7 +46,7 @@ export const BUY_FORM_COPY: Record<Locale, {
     pay: (price) => `आगे बढ़ें — ₹${price} भुगतान करें`,
     badName: "कृपया अपना सही नाम लिखें — केवल अक्षर, कम से कम 2 (अंक या चिह्न नहीं)।",
     badPhone: "कृपया अपना सही 10 अंकों का WhatsApp नंबर लिखें (6, 7, 8 या 9 से शुरू)।",
-    agree: ["मुझे ", "शर्तें", " और ", "गोपनीयता नीति", " मंज़ूर हैं। किताब, ऑर्डर के संदेश और नई किताबें / ऑफ़र WhatsApp पर मिलें (STOP भेजकर कभी भी बंद कर सकते हैं)।"],
+    agree: ["आगे बढ़ने पर आप हमारी ", "शर्तें", " और ", "गोपनीयता नीति", " स्वीकार करते हैं। किताब, ऑर्डर के संदेश और नई किताबें / ऑफ़र WhatsApp पर मिलेंगे (STOP भेजकर कभी भी बंद कर सकते हैं)।"],
     needAgree: "आगे बढ़ने के लिए यह बॉक्स चुनें।",
     privacy: "आपका नंबर केवल किताब भेजने और ऑर्डर में मदद के लिए इस्तेमाल होता है।",
     edit: "नाम / नंबर बदलें",
@@ -60,7 +61,7 @@ export const BUY_FORM_COPY: Record<Locale, {
     pay: (price) => `Continue — pay ₹${price}`,
     badName: "Please enter your real name — letters only, at least 2 (no digits or symbols).",
     badPhone: "Please enter your real 10-digit WhatsApp number (starting with 6, 7, 8 or 9).",
-    agree: ["I accept the ", "Terms", " and ", "Privacy Policy", ", and agree to get the book, order messages and new books / offers on WhatsApp (send STOP to stop any time)."],
+    agree: ["By continuing you accept our ", "Terms", " and ", "Privacy Policy", ". You get the book, order messages and new books / offers on WhatsApp (send STOP to stop any time)."],
     needAgree: "Please tick this box to continue.",
     privacy: "Your number is used only to send the book and to help with your order.",
     edit: "Change name / number",

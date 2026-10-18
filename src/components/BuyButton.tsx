@@ -135,7 +135,9 @@ export default function BuyButton({
         <BuyModal
           key={attempt}
           product={product}
-          locale={locale}
+          // The popup speaks the book's language, like the rest of the book page
+          // (a Marathi book shows Marathi even when the site is set to Hindi).
+          locale={editionLocale}
           editionLocale={editionLocale}
           onClose={() => setOpen(false)}
           onRetry={() => setAttempt((n) => n + 1)}
@@ -162,8 +164,8 @@ function BuyModal({
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
   // Name + WhatsApp number (remembered on this device, src/lib/buyer.ts).
-  // One required box (Terms, Privacy, WhatsApp book/order messages and offers), never pre-ticked.
-  const [buyer, setBuyer] = useState({ name: "", phone: "", agreed: false });
+  // No tick box (client, 18 Oct): the notice above the pay button says continuing accepts it.
+  const [buyer, setBuyer] = useState({ name: "", phone: "" });
   const [errors, setErrors] = useState<{ name?: boolean; phone?: boolean; agree?: boolean }>({});
   const [touched, setTouched] = useState({ name: false, phone: false });
   const [editing, setEditing] = useState(true);
@@ -238,7 +240,8 @@ function BuyModal({
             locale: editionLocale,
             name: details.name,
             phone: details.phone,
-            // The one required box also covers offers / new books on WhatsApp.
+            // Continuing = accepting the notice above the button (Terms, Privacy,
+            // WhatsApp book/order messages and offers, STOP any time) — client's choice.
             offersConsent: true,
             agreed: true,
             consentLocale: locale,
@@ -354,7 +357,6 @@ function BuyModal({
   // Errors show once a field was left (or on Continue), never while typing the first time.
   const showName = errors.name || (touched.name && !nameOk);
   const showPhone = errors.phone || (touched.phone && !phoneOk);
-  const showAgree = errors.agree && !buyer.agreed;
   // Keyboard open: shorter header, no extra lines, so fields + pay button fit above it.
   const compact = step === "details" && Boolean(view?.keyboard);
 
@@ -368,17 +370,13 @@ function BuyModal({
     event.preventDefault();
     const name = cleanBuyerName(buyer.name);
     const phone = cleanIndianMobile(buyer.phone);
-    const next = { name: !name, phone: !phone, agree: !buyer.agreed };
+    const next = { name: !name, phone: !phone };
     setErrors(next);
     setTouched({ name: true, phone: true });
     if (next.name || next.phone) {
       setEditing(true);
       // Move to the first wrong field (the buyer pressed Continue, so the keyboard may open).
       window.setTimeout(() => document.getElementById(next.name ? "buyer-name" : "buyer-phone")?.focus(), 0);
-      return;
-    }
-    if (next.agree) {
-      document.getElementById("buyer-agree")?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
     saveBuyer(name, phone);
@@ -544,39 +542,19 @@ function BuyModal({
 
             </div>
 
-            {/* Pinned to the bottom of the popup: the required agreement + pay button stay visible while typing */}
+            {/* Pinned to the bottom of the popup: the Terms notice + pay button stay visible while typing */}
             <div className="sticky bottom-0 -mx-5 mt-3 border-t border-brand-100 bg-white px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_16px_-12px_rgba(10,35,66,0.25)] sm:pb-5">
-              <label
-                id="buyer-agree"
-                className={`font-deva mb-2.5 flex cursor-pointer items-start gap-2.5 rounded-lg text-xs leading-snug ${showAgree ? "bg-danger-500/5 p-2 text-danger-600 ring-1 ring-danger-500/40" : "text-brand-700"}`}
-              >
-                <input
-                  type="checkbox"
-                  required
-                  checked={buyer.agreed}
-                  onChange={(e) => {
-                    setBuyer({ ...buyer, agreed: e.target.checked });
-                    if (e.target.checked) setErrors((er) => ({ ...er, agree: false }));
-                  }}
-                  aria-invalid={showAgree}
-                  aria-describedby={showAgree ? "buyer-agree-error" : undefined}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-brand-teal"
-                />
-                <span>
-                  {form.agree[0]}
-                  <a href="/terms" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-bold underline underline-offset-2">
-                    {form.agree[1]}
-                  </a>
-                  {form.agree[2]}
-                  <a href="/privacy-policy" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-bold underline underline-offset-2">
-                    {form.agree[3]}
-                  </a>
-                  {form.agree[4]} <span className="text-danger-600" aria-hidden="true">*</span>
-                </span>
-              </label>
-              {showAgree && (
-                <p id="buyer-agree-error" role="alert" className="font-deva -mt-1 mb-2 text-xs font-semibold text-danger-600">{form.needAgree}</p>
-              )}
+              <p className="font-deva mb-2.5 text-[11px] leading-snug text-brand-600">
+                {form.agree[0]}
+                <a href="/terms" target="_blank" rel="noopener" className="font-bold underline underline-offset-2">
+                  {form.agree[1]}
+                </a>
+                {form.agree[2]}
+                <a href="/privacy-policy" target="_blank" rel="noopener" className="font-bold underline underline-offset-2">
+                  {form.agree[3]}
+                </a>
+                {form.agree[4]}
+              </p>
               <button
                 type="submit"
                 className="font-deva flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 text-base font-extrabold text-brand-teal shadow-[var(--shadow-gold)] transition hover:brightness-95 active:scale-[0.98]"
