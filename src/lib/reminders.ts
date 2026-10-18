@@ -3,6 +3,7 @@ import { DatabaseUnavailableError, getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
 import { isReminderConfigured, REMINDER_TEMPLATE_NAME, sendPaymentReminder } from "./interakt";
 import { logWhatsApp } from "./whatsapp-log";
+import { checkOrderWithRazorpay } from "./reconcile";
 import { localizedTitle, normalizeLocale } from "./i18n";
 
 // ---------------------------------------------------------------------------
@@ -193,26 +194,57 @@ function sendReminderMessage(order: ReminderOrder): Promise<boolean> {
   });
 }
 
-export type AdminReminderResult = "sent" | "failed" | "owns_book" | "not_pending" | "no_number" | "too_soon" | "off";
+export type AdminReminderResult =
+  | "sent"
+  | "failed"
+  | "owns_book"
+  | "not_pending"
+  | "newer_attempt"
+  | "paid_now"
+  | "paying"
+  | "razorpay_unreachable"
+  | "no_number"
+  | "too_soon"
+  | "off";
 
 // A second tap / a double selection can't send the same message twice.
 const ADMIN_MIN_GAP_MINUTES = 10;
 
 /**
  * Dashboard: an admin sends the "payment not completed" reminder to a pending,
- * cancelled or failed attempt now (one order, or several selected). Same rules
- * as the automatic ones: still unpaid, has a number, the number doesn't own the
- * book. Doesn't change the automatic sequence. Recorded with the admin's e-mail.
+ * cancelled or failed attempt now (one order, or several selected — each one
+ * checked on its own, right before its message). Same checks as the automatic
+ * ones: still unpaid, newest attempt on that book, the number doesn't own the
+ * book, Razorpay says not paid (and no payment in progress), status re-read
+ * just before sending. Doesn't change the automatic sequence. Recorded with the
+ * admin's e-mail.
  */
 export async function sendAdminReminder(orderId: string, by: string): Promise<AdminReminderResult> {
   if (!isReminderConfigured) return "off";
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("orders").select(COLUMNS).eq("id", orderId).maybeSingle();
+  const { data, error } = await admin
+    .from("orders")
+    .select(`${COLUMNS}, razorpay_order_id, amount`)
+    .eq("id", orderId)
+    .maybeSingle();
   if (error) throw new DatabaseUnavailableError("admin reminder order", error);
-  const order = data as unknown as ReminderOrder | null;
+  const order = data as unknown as (ReminderOrder & { razorpay_order_id: string | null; amount: number }) | null;
+
+  // 1. Still unpaid, with a number.
   if (!order || (order.status !== "created" && order.status !== "failed")) return "not_pending";
   if (!order.buyer_contact || !order.products) return "no_number";
 
+  // 2. Only the newest attempt on this book by this number (no duplicates for repeat taps).
+  const { count: newer, error: newerError } = await admin
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("buyer_contact", order.buyer_contact)
+    .eq("product_id", order.product_id)
+    .gt("created_at", order.created_at);
+  if (newerError) throw new DatabaseUnavailableError("admin reminder newer check", newerError);
+  if ((newer ?? 0) > 0) return "newer_attempt";
+
+  // 3. The number doesn't own the book (bought before or since).
   const { count: owned, error: ownedError } = await admin
     .from("orders")
     .select("id", { count: "exact", head: true })
@@ -222,6 +254,7 @@ export async function sendAdminReminder(orderId: string, by: string): Promise<Ad
   if (ownedError) throw new DatabaseUnavailableError("admin reminder owned check", ownedError);
   if ((owned ?? 0) > 0) return "owns_book";
 
+  // Not the same number + book twice within a few minutes (double tap / bulk overlap).
   const since = new Date(Date.now() - ADMIN_MIN_GAP_MINUTES * 60_000).toISOString();
   const { count: recent } = await admin
     .from("whatsapp_log")
@@ -232,6 +265,16 @@ export async function sendAdminReminder(orderId: string, by: string): Promise<Ad
     .eq("ok", true)
     .gte("created_at", since);
   if ((recent ?? 0) > 0) return "too_soon";
+
+  // 4. Ask Razorpay now: paid (→ marked paid + PDF sent), still paying, or unreachable → no reminder.
+  const razorpay = await checkOrderWithRazorpay({ id: order.id, razorpay_order_id: order.razorpay_order_id, amount: order.amount });
+  if (razorpay === "paid") return "paid_now";
+  if (razorpay === "in_progress") return "paying";
+  if (razorpay === "unreachable") return "razorpay_unreachable";
+
+  // 5. Re-read the status a moment before sending (paid in the meantime → nothing).
+  const { data: fresh } = await admin.from("orders").select("status").eq("id", order.id).maybeSingle();
+  if (!fresh || (fresh.status !== "created" && fresh.status !== "failed")) return "not_pending";
 
   const ok = await sendReminderMessage(order);
   await logWhatsApp({

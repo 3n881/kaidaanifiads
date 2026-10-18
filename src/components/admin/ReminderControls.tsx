@@ -13,6 +13,10 @@ import { isStaleAction, reloadForNewVersion } from "@/lib/stale-action";
 const SKIP_LABELS: Record<string, string> = {
   owns_book: "already own the book",
   not_pending: "already paid",
+  paid_now: "Razorpay shows paid — PDF sent",
+  paying: "payment still in progress",
+  newer_attempt: "a newer attempt on the same book",
+  razorpay_unreachable: "Razorpay not reachable, try again",
   no_number: "no number",
   too_soon: "reminded in the last 10 min",
   failed: "WhatsApp refused",

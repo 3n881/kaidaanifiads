@@ -73,6 +73,40 @@ export async function reconcileOrder(order: PendingOrder): Promise<boolean> {
 }
 
 /**
+ * Before an admin sends a payment reminder: what does Razorpay say about this
+ * order right now? "paid" (marked paid here + PDF sent, so no reminder),
+ * "in_progress" (a payment attempt is still open / authorized — the buyer may
+ * be paying), "unpaid", or "unreachable" (don't send while we can't check).
+ */
+export async function checkOrderWithRazorpay(
+  order: PendingOrder,
+): Promise<"paid" | "in_progress" | "unpaid" | "unreachable"> {
+  if (!isRazorpayConfigured || !order.razorpay_order_id) return "unpaid";
+  let payments: RazorpayPayment[];
+  try {
+    payments = await fetchOrderPayments(order.razorpay_order_id);
+  } catch (error) {
+    console.error("[reconcile] Razorpay lookup failed", String(error));
+    return "unreachable";
+  }
+  const payment = capturedFor(order, payments);
+  if (payment) {
+    await applyPayment(order, payment);
+    return "paid";
+  }
+  // "created" / "authorized" = a payment attempt that hasn't finished yet —
+  // counted only if it started in the last 15 min (abandoned ones stay "created").
+  const recent = Date.now() / 1000 - 15 * 60;
+  const open = payments.some(
+    (p) =>
+      p.order_id === order.razorpay_order_id &&
+      (p.status === "created" || p.status === "authorized") &&
+      (p.created_at ?? 0) >= recent,
+  );
+  return open ? "in_progress" : "unpaid";
+}
+
+/**
  * Sweeps every unpaid order from the last `hours` hours (cron). `failed`
  * orders are included: a buyer can retry inside the same Razorpay order and
  * succeed. One Razorpay list call per 100 payments, not one per order.
