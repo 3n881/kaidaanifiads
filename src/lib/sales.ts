@@ -405,6 +405,9 @@ export interface OrderDetail extends OrderRow {
   razorpay_order_id: string | null;
   last_downloaded_at: string | null;
   reminder_sent_at: string | null;
+  /** Reminders sent in the sequence (migration 013, up to 4). */
+  reminder_count?: number | null;
+  reminder_last_at?: string | null;
   refunded_at: string | null;
   razorpay_refund_id: string | null;
   delivered: boolean | null;

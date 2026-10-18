@@ -41,7 +41,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
   if (paid) timeline.push({ at: order.paid_at, text: `Paid ₹${order.amount}`, tone: "success" });
   else if (order.status === "failed") timeline.push({ at: null, text: "Payment failed (declined or cancelled at Razorpay)", tone: "danger" });
   else timeline.push({ at: null, text: "Not paid — Razorpay was closed or the payment is still pending", tone: "warning" });
-  if (order.reminder_sent_at) timeline.push({ at: order.reminder_sent_at, text: "Payment reminder sent on WhatsApp", tone: "warning", label: "Reminder" });
+  if (order.reminder_sent_at) timeline.push({ at: order.reminder_sent_at, text: (order.reminder_count ?? 0) > 1 && (order.reminder_count ?? 0) <= 4 && order.reminder_last_at ? `Payment reminders sent on WhatsApp: ${order.reminder_count}× (last one ${new Date(order.reminder_last_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" })})` : "Payment reminder sent on WhatsApp", tone: "warning", label: "Reminder" });
   if (paid) {
     timeline.push(order.whatsapp_sends
       ? { at: null, text: `PDF sent on WhatsApp (${order.whatsapp_sends}×)`, tone: "success" }
