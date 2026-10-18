@@ -11,7 +11,7 @@ import { UI_COPY, type Locale } from "@/lib/i18n";
 import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
-import { LEAD_CONSENT_TEXT, NOT_PAID_COPY } from "@/lib/lead-copy";
+import { NOT_PAID_COPY } from "@/lib/lead-copy";
 import { BUY_FORM_COPY } from "@/lib/buy-copy";
 import { cleanBuyerName, cleanIndianMobile, loadSavedBuyer, saveBuyer } from "@/lib/buyer";
 
@@ -162,7 +162,8 @@ function BuyModal({
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
   // Name + WhatsApp number (remembered on this device, src/lib/buyer.ts).
-  const [buyer, setBuyer] = useState({ name: "", phone: "", offers: false, agreed: false });
+  // One required box (Terms, Privacy, WhatsApp book/order messages and offers), never pre-ticked.
+  const [buyer, setBuyer] = useState({ name: "", phone: "", agreed: false });
   const [errors, setErrors] = useState<{ name?: boolean; phone?: boolean; agree?: boolean }>({});
   const [touched, setTouched] = useState({ name: false, phone: false });
   const [editing, setEditing] = useState(true);
@@ -181,8 +182,8 @@ function BuyModal({
     // Read after mount (localStorage), so server and first client render match.
     const id = window.setTimeout(() => {
       if (saved.name || saved.phone) {
-        // Name + number are only saved after the agreement box was ticked.
-        setBuyer((current) => ({ ...current, name: saved.name, phone: saved.phone, agreed: Boolean(saved.name && saved.phone) }));
+        // The agreement box is ticked by the buyer every time (owner, 18 Oct).
+        setBuyer((current) => ({ ...current, name: saved.name, phone: saved.phone }));
         // A returning buyer with both details sees a one-tap summary.
         if (saved.name && saved.phone) setEditing(false);
       }
@@ -223,7 +224,7 @@ function BuyModal({
   }, []);
 
   const beginCheckout = useCallback(
-    async (details: { name: string; phone: string; offers: boolean }) => {
+    async (details: { name: string; phone: string }) => {
       if (started.current) return;
       started.current = true;
       setStep("processing");
@@ -237,8 +238,10 @@ function BuyModal({
             locale: editionLocale,
             name: details.name,
             phone: details.phone,
-            offersConsent: details.offers,
+            // The one required box also covers offers / new books on WhatsApp.
+            offersConsent: true,
             agreed: true,
+            consentLocale: locale,
             form: 2, // popup with the required agreement box (server checks it)
           }),
         });
@@ -379,7 +382,7 @@ function BuyModal({
       return;
     }
     saveBuyer(name, phone);
-    void beginCheckout({ name, phone, offers: buyer.offers });
+    void beginCheckout({ name, phone });
   };
 
   return createPortal(
@@ -539,16 +542,6 @@ function BuyModal({
                 </>
               )}
 
-              {/* Offers: optional, unticked by default; the exact sentence is stored with the consent */}
-              <label className="font-deva flex cursor-pointer items-start gap-2.5 text-xs leading-snug text-brand-600">
-                <input
-                  type="checkbox"
-                  checked={buyer.offers}
-                  onChange={(e) => setBuyer({ ...buyer, offers: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-green-600"
-                />
-                <span>{LEAD_CONSENT_TEXT[locale]}</span>
-              </label>
             </div>
 
             {/* Pinned to the bottom of the popup: the required agreement + pay button stay visible while typing */}

@@ -19,7 +19,7 @@ export default function Page() {
           heading: "2. How We Use Your Information",
           body: [
             "Your name and WhatsApp number are used solely to deliver the purchased ebook on WhatsApp, to send one reminder if you start a payment and it does not complete (for example, if you close the payment window), to provide purchase recovery through My Books, and to offer order support. We send only order-related messages unless you separately consent to marketing.",
-            "Offers and new books on WhatsApp: the Buy form has a separate box, unticked by default, to receive offers and news about new books on WhatsApp. We send these only if you tick that box. We store your number, the book you were viewing, your language and the time and wording of your consent. We send at most a few messages a month. Reply STOP on WhatsApp, or contact us, to stop them at any time; we then stop messaging you and keep only a record that you opted out.",
+            "Offers and new books on WhatsApp: the Buy form has one box, unticked by default, that you tick to accept our Terms and this Privacy Policy and to receive the ebook, order messages and news about offers and new books on WhatsApp. We store your number, the book you were viewing, your language and the time and wording of your consent. We send at most a few messages a month. Reply STOP on WhatsApp, or contact us, to stop them at any time; we then stop messaging you and keep only a record that you opted out.",
           ],
         },
         {

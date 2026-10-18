@@ -22,6 +22,8 @@ export async function saveLead(input: {
   locale: Locale;
   source: "cancelled" | "failed" | "checkout";
   ipHash: string | null;
+  /** Exact sentence agreed to (defaults to the after-cancel box text). */
+  consentText?: string;
 }): Promise<"saved" | "rate_limited"> {
   const admin = getSupabaseAdmin();
   if (input.ipHash) {
@@ -41,7 +43,7 @@ export async function saveLead(input: {
       locale: input.locale,
       source: input.source,
       consent_at: now,
-      consent_text: LEAD_CONSENT_TEXT[input.locale],
+      consent_text: input.consentText ?? LEAD_CONSENT_TEXT[input.locale],
       ip_hash: input.ipHash,
       updated_at: now,
       opted_out_at: null, // signing up again = consent given again

@@ -9,11 +9,12 @@ import {
   createRazorpayOrder,
 } from "@/lib/razorpay";
 import { getDeliverableItems, orderPagePath } from "@/lib/orders";
-import { localizedTitle, normalizeLocale } from "@/lib/i18n";
+import { isLocale, localizedTitle, normalizeLocale } from "@/lib/i18n";
 import { editionLocaleFor } from "@/lib/catalog";
 import { collectMetaSignals } from "@/lib/meta-capi";
 import { cleanBuyerName, cleanIndianMobile } from "@/lib/buyer";
 import { saveLead } from "@/lib/leads";
+import { agreeText } from "@/lib/buy-copy";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown; agreed?: unknown; form?: unknown };
+  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown; agreed?: unknown; form?: unknown; consentLocale?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -186,7 +187,16 @@ async function handle(req: NextRequest) {
     const ipHash = ip ? crypto.createHash("sha256").update(ip).digest("hex") : null;
     after(async () => {
       try {
-        await saveLead({ phone: buyerPhone, productId: product.id, locale: orderLocale, source: "checkout", ipHash });
+        // form 2: the one required box (its exact sentence, in the language shown) covers offers too.
+        const consentLocale = isLocale(body.consentLocale) ? body.consentLocale : orderLocale;
+        await saveLead({
+          phone: buyerPhone,
+          productId: product.id,
+          locale: orderLocale,
+          source: "checkout",
+          ipHash,
+          consentText: needsAgreement ? agreeText(consentLocale) : undefined,
+        });
       } catch (leadError) {
         console.error("[checkout] offers consent not saved", orderId, leadError instanceof Error ? leadError.message : leadError);
       }
