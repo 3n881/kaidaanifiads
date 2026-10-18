@@ -22,6 +22,7 @@ import {
 import AdminShell from "@/components/admin/AdminShell";
 import ResendButton from "@/components/admin/ResendButton";
 import { CopyButton, CustomRange, FreshnessBadge, PendingHint, RefreshButton } from "@/components/admin/OrdersClientBits";
+import { ReminderBar, ReminderCheckbox, ReminderProvider, ReminderToolbar, SendReminderButton } from "@/components/admin/ReminderControls";
 import type { AdminProduct } from "@/lib/admin";
 import { coverThumbSrc } from "@/lib/covers";
 import {
@@ -101,6 +102,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
 
   return (
     <AdminShell active="orders" title="Orders" action={<RefreshButton />}>
+      <ReminderProvider eligible={view.rows.filter(isRemindable).map((o) => o.id)}>
       <p className="-mt-4 mb-4 text-xs text-brand-500">
         Numbers for <b className="text-brand-700">{view.period === "custom" && (view.from || view.to) ? customLabel(view) : periodName}</b>
         {COMPARED[view.period] && <> · % {COMPARED[view.period]}</>}
@@ -270,6 +272,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
           </p>
         )}
 
+        <ReminderToolbar />
         {view.rows.length === 0 ? (
           <div className="mt-4 rounded-2xl border border-dashed border-brand-200 p-10 text-center">
             <ShoppingBag className="mx-auto h-10 w-10 text-brand-300" aria-hidden="true" />
@@ -278,7 +281,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
         ) : (
           <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {view.rows.map((o) => (
-              <OrderCard key={o.id} o={o} product={o.product_id === null ? undefined : byId.get(o.product_id)} />
+              <OrderCard key={o.id} o={o} product={o.product_id === null ? undefined : byId.get(o.product_id)} reminders />
             ))}
           </ul>
         )}
@@ -290,6 +293,8 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
           </Link>
         </div>
       </section>
+      <ReminderBar />
+      </ReminderProvider>
     </AdminShell>
   );
 }
@@ -378,8 +383,10 @@ const BADGES = {
   partial: ["PART REFUND", "bg-purple-100 text-purple-700"],
 } as const;
 
-export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct }) {
+/** `reminders`: show the tick + "Remind" on pending / cancelled / failed orders (Orders page only). */
+export function OrderCard({ o, product, reminders = false }: { o: OrderRow; product?: AdminProduct; reminders?: boolean }) {
   const phone = o.buyer_contact || o.whatsapp_number;
+  const remindable = reminders && isRemindable(o);
   // Name from the Buy popup (2026-10-18); older orders were "Guest".
   const buyerName = o.name && o.name !== "Guest" && o.name !== "Customer" ? o.name : null;
   const kind = o.refund_status === "full" ? "refunded" : o.refund_status === "partial" ? "partial" : (dropOffKind(o) ?? "paid");
@@ -392,6 +399,11 @@ export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct 
   return (
     <li className="flex min-w-0 flex-col rounded-2xl border border-brand-100 bg-white p-3.5 shadow-[var(--shadow-card)] sm:p-4">
       <div className="flex items-start gap-3">
+        {remindable && (
+          <div className="flex h-16 items-center">
+            <ReminderCheckbox id={o.id} />
+          </div>
+        )}
         <Link href={detail} className="h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-brand-50 ring-1 ring-brand-100">
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP thumbnail
@@ -404,7 +416,7 @@ export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct 
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <Link href={detail} className="font-deva min-w-0 truncate text-base font-extrabold text-brand-900 hover:underline">
+            <Link href={detail} className="font-deva line-clamp-2 min-w-0 break-words text-base font-extrabold leading-snug text-brand-900 hover:underline">
               {buyerName ?? phone ?? <span className="font-semibold text-brand-400">No number</span>}
             </Link>
             <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-extrabold tracking-wide ${badgeClass}`}>{badge}</span>
@@ -422,6 +434,11 @@ export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct 
               </>
             )}
           </p>
+          {o.status !== "paid" && o.reminder_last_at && (
+            <p className="mt-0.5 text-[11px] font-semibold text-amber-700">
+              Auto reminder{(o.reminder_count ?? 0) > 1 && (o.reminder_count ?? 0) < 4 ? `s: ${o.reminder_count}×` : ""} · last {istTime(o.reminder_last_at)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -440,10 +457,16 @@ export function OrderCard({ o, product }: { o: OrderRow; product?: AdminProduct 
           </a>
         )}
         {o.status === "paid" && <ResendButton orderId={o.id} compact />}
+        {remindable && <SendReminderButton id={o.id} />}
         <Link href={detail} aria-label="Order details" className="flex h-10 w-8 shrink-0 items-center justify-center text-brand-400 hover:text-brand-700">
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </Link>
       </div>
     </li>
   );
+}
+
+/** Pending / cancelled / failed with a number, not refunded → can get the payment reminder. */
+function isRemindable(o: OrderRow): boolean {
+  return (o.status === "created" || o.status === "failed") && Boolean(o.buyer_contact || o.whatsapp_number) && !o.refund_status;
 }

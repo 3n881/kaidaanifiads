@@ -1,7 +1,8 @@
 import "server-only";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
-import { isLeadFollowupConfigured, sendLeadFollowup } from "./interakt";
+import { isLeadFollowupConfigured, LEAD_TEMPLATE_NAME, sendLeadFollowup } from "./interakt";
+import { logWhatsApp } from "./whatsapp-log";
 import { localizedTitle, normalizeLocale, type Locale } from "./i18n";
 import { LEAD_CONSENT_TEXT } from "./lead-copy";
 
@@ -117,6 +118,7 @@ export async function sendLeadFollowups(): Promise<{ due: number; sent: number }
       productLink: product ? `${base}/${product.is_combo ? "combos" : "ebooks"}/${product.slug}` : `${base}/ebooks`,
       locale,
     });
+    await logWhatsApp({ leadId: lead.id, phone: lead.phone, productId: lead.product_id, kind: "offer", template: LEAD_TEMPLATE_NAME, ok });
     if (ok) sent++;
   }
   return { due: due.length, sent };

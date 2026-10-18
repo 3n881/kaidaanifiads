@@ -473,10 +473,33 @@ export async function saveStoreSettings(formData: FormData) {
 
 /** Re-sends the order link on WhatsApp. Admin only; bypasses the per-order cap. */
 export async function resendDelivery(orderId: string) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const { sendOrderOnWhatsApp } = await import("@/lib/delivery");
-  await sendOrderOnWhatsApp(orderId, { force: true });
+  await sendOrderOnWhatsApp(orderId, { force: true, by: admin.email ?? "admin" });
   revalidatePath("/dashboard/orders");
+}
+
+/**
+ * Dashboard: send the "payment not completed" WhatsApp reminder now to one or
+ * several pending / cancelled / failed orders (src/lib/reminders.ts rules).
+ * Returns how each order went, for the result line on the Orders page.
+ */
+export async function sendRemindersAction(orderIds: string[]): Promise<{ sent: number; skipped: Record<string, number> }> {
+  const admin = await requireAdmin();
+  const { sendAdminReminder } = await import("@/lib/reminders");
+  const ids = [...new Set((Array.isArray(orderIds) ? orderIds : []).map(String))]
+    .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+    .slice(0, 50);
+  let sent = 0;
+  const skipped: Record<string, number> = {};
+  for (const id of ids) {
+    const result = await sendAdminReminder(id, admin.email ?? "admin");
+    if (result === "sent") sent++;
+    else skipped[result] = (skipped[result] ?? 0) + 1;
+  }
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/whatsapp");
+  return { sent, skipped };
 }
 
 /** Admin "Check with Razorpay" on an order: payment + refund state. */

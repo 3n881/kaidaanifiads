@@ -56,6 +56,11 @@ const TEMPLATES: Record<Locale, Template> = {
   },
 };
 
+/** Name of the delivery template for a book language (for the message record). */
+export function deliveryTemplateName(locale: Locale): string {
+  return TEMPLATES[normalizeLocale(locale)].name;
+}
+
 /** True when the buyer's language template attaches the PDF itself. */
 export function templateAttachesPdf(locale: Locale): boolean {
   return TEMPLATES[normalizeLocale(locale)].header === "document";
@@ -110,6 +115,7 @@ export async function sendWhatsAppDelivery(opts: {
 // name; each book language picks which approved language version to send
 // (falls back to the Marathi version until a Hindi/English one is approved).
 const REMINDER_NAME = process.env.INTERAKT_REMINDER_TEMPLATE_NAME ?? "";
+export const REMINDER_TEMPLATE_NAME = REMINDER_NAME;
 const REMINDER_DEFAULT_LANGUAGE = process.env.INTERAKT_REMINDER_TEMPLATE_LANGUAGE ?? "mr";
 const REMINDER_LANGUAGES: Record<Locale, string> = {
   mr: REMINDER_DEFAULT_LANGUAGE,
@@ -138,6 +144,7 @@ export async function sendPaymentReminder(opts: {
 // MARKETING template, approved separately in Interakt. Body blanks:
 // {{1}} = book title, {{2}} = link to the book page. Empty name = off.
 const LEAD_NAME = process.env.INTERAKT_LEAD_TEMPLATE_NAME ?? "";
+export const LEAD_TEMPLATE_NAME = LEAD_NAME;
 const LEAD_DEFAULT_LANGUAGE = process.env.INTERAKT_LEAD_TEMPLATE_LANGUAGE ?? "mr";
 const LEAD_LANGUAGES: Record<Locale, string> = {
   mr: LEAD_DEFAULT_LANGUAGE,

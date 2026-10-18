@@ -7,6 +7,7 @@ import OrderActions from "@/components/admin/OrderActions";
 import { getAdminProducts } from "@/lib/admin";
 import { orderPageUrl } from "@/lib/orders";
 import { getOrderDetail, SALES_START } from "@/lib/sales";
+import { getOrderWhatsAppLog } from "@/lib/whatsapp-log";
 
 export const metadata: Metadata = { title: "Admin — Order", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ const waLink = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "").repl
 
 export default async function OrderDetailPage({ params }: PageProps<"/dashboard/orders/[orderId]">) {
   const { orderId } = await params;
-  const [order, products] = await Promise.all([getOrderDetail(orderId), getAdminProducts()]);
+  const [order, products, messages] = await Promise.all([getOrderDetail(orderId), getAdminProducts(), getOrderWhatsAppLog(orderId)]);
   if (!order) notFound();
 
   const product = products.find((p) => p.id === order.product_id);
@@ -41,7 +42,14 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
   if (paid) timeline.push({ at: order.paid_at, text: `Paid ₹${order.amount}`, tone: "success" });
   else if (order.status === "failed") timeline.push({ at: null, text: "Payment failed (declined or cancelled at Razorpay)", tone: "danger" });
   else timeline.push({ at: null, text: "Not paid — Razorpay was closed or the payment is still pending", tone: "warning" });
-  if (order.reminder_sent_at) timeline.push({ at: order.reminder_sent_at, text: (order.reminder_count ?? 0) > 1 && (order.reminder_count ?? 0) <= 4 && order.reminder_last_at ? `Payment reminders sent on WhatsApp: ${order.reminder_count}× (last one ${new Date(order.reminder_last_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" })})` : "Payment reminder sent on WhatsApp", tone: "warning", label: "Reminder" });
+  // WhatsApp messages from the record (since 18 Oct); older orders show the summary line instead.
+  const KIND_TEXT = { pdf: "Book PDF sent on WhatsApp", reminder: "Payment reminder sent on WhatsApp", reminder_admin: "Payment reminder sent on WhatsApp", offer: "Offer sent on WhatsApp" } as const;
+  for (const m of messages) {
+    const who = m.sent_by === "auto" ? (m.kind === "reminder" && m.step ? ` (automatic #${m.step})` : " (automatic)") : ` (by ${m.sent_by})`;
+    timeline.push({ at: m.created_at, text: m.ok ? `${KIND_TEXT[m.kind]}${who}` : `WhatsApp refused: ${KIND_TEXT[m.kind].toLowerCase()}${who}`, tone: m.ok ? (m.kind === "pdf" ? "success" : "warning") : "danger", label: m.kind === "pdf" ? "WhatsApp" : "Reminder" });
+  }
+  const loggedReminders = messages.some((m) => m.kind === "reminder");
+  if (order.reminder_sent_at && !loggedReminders) timeline.push({ at: order.reminder_sent_at, text: (order.reminder_count ?? 0) > 1 && (order.reminder_count ?? 0) <= 4 && order.reminder_last_at ? `Payment reminders sent on WhatsApp: ${order.reminder_count}× (last one ${new Date(order.reminder_last_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" })})` : "Payment reminder sent on WhatsApp", tone: "warning", label: "Reminder" });
   if (paid) {
     timeline.push(order.whatsapp_sends
       ? { at: null, text: `PDF sent on WhatsApp (${order.whatsapp_sends}×)`, tone: "success" }

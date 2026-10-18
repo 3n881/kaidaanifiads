@@ -1,7 +1,8 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
-import { isInteraktConfigured, sendWhatsAppDelivery, templateAttachesPdf } from "./interakt";
+import { deliveryTemplateName, isInteraktConfigured, sendWhatsAppDelivery, templateAttachesPdf } from "./interakt";
+import { logWhatsApp } from "./whatsapp-log";
 import { getDeliverableItems, normalizePhone, orderPageUrl } from "./orders";
 import { localizedTitle, normalizeLocale } from "./i18n";
 import { after } from "next/server";
@@ -52,7 +53,8 @@ export async function createSignedPdfUrl(
  */
 export async function sendOrderOnWhatsApp(
   orderId: string,
-  opts: { force?: boolean; phone?: string; skipIfDelivered?: boolean } = {},
+  /** by = admin e-mail when sent from the dashboard (message record). */
+  opts: { force?: boolean; phone?: string; skipIfDelivered?: boolean; by?: string } = {},
 ): Promise<boolean> {
   const admin = getSupabaseAdmin();
   const { data: order } = await admin
@@ -106,6 +108,16 @@ export async function sendOrderOnWhatsApp(
     booksLink: `${SITE_URL.replace(/\/$/, "")}/ebooks`,
     document,
     locale,
+  });
+  await logWhatsApp({
+    orderId,
+    phone,
+    name: order.name,
+    productId: order.product_id,
+    kind: "pdf",
+    template: deliveryTemplateName(locale),
+    ok: sent,
+    by: opts.by,
   });
   if (sent) {
     await admin.from("orders").update({ delivered: true }).eq("id", orderId);

@@ -1,7 +1,8 @@
 import "server-only";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "./supabase/server";
 import { SITE_URL } from "./supabase/config";
-import { isReminderConfigured, sendPaymentReminder } from "./interakt";
+import { isReminderConfigured, REMINDER_TEMPLATE_NAME, sendPaymentReminder } from "./interakt";
+import { logWhatsApp } from "./whatsapp-log";
 import { localizedTitle, normalizeLocale } from "./i18n";
 
 // ---------------------------------------------------------------------------
@@ -164,15 +165,84 @@ async function remind(order: ReminderOrder): Promise<boolean> {
   if (claimError) throw new DatabaseUnavailableError("claim reminder", claimError);
   if (!claimed) return false;
 
-  const locale = normalizeLocale(order.locale);
-  const section = order.products.is_combo ? "combos" : "ebooks";
-  const ok = await sendPaymentReminder({
+  const ok = await sendReminderMessage(order);
+  await logWhatsApp({
+    orderId: order.id,
     phone: order.buyer_contact,
-    name: order.name && order.name !== "Guest" ? order.name : "ग्राहक",
-    productTitle: localizedTitle(order.products, locale),
-    productLink: `${SITE_URL.replace(/\/$/, "")}/${section}/${order.products.slug}`,
-    locale,
+    name: order.name,
+    productId: order.product_id,
+    kind: "reminder",
+    template: REMINDER_TEMPLATE_NAME,
+    step: count + 1,
+    ok,
   });
   if (!ok) console.error("[reminders] Interakt refused", order.id, `#${count + 1}`);
   return ok;
+}
+
+function sendReminderMessage(order: ReminderOrder): Promise<boolean> {
+  const products = order.products!;
+  const locale = normalizeLocale(order.locale);
+  const section = products.is_combo ? "combos" : "ebooks";
+  return sendPaymentReminder({
+    phone: order.buyer_contact,
+    name: order.name && order.name !== "Guest" ? order.name : "ग्राहक",
+    productTitle: localizedTitle(products, locale),
+    productLink: `${SITE_URL.replace(/\/$/, "")}/${section}/${products.slug}`,
+    locale,
+  });
+}
+
+export type AdminReminderResult = "sent" | "failed" | "owns_book" | "not_pending" | "no_number" | "too_soon" | "off";
+
+// A second tap / a double selection can't send the same message twice.
+const ADMIN_MIN_GAP_MINUTES = 10;
+
+/**
+ * Dashboard: an admin sends the "payment not completed" reminder to a pending,
+ * cancelled or failed attempt now (one order, or several selected). Same rules
+ * as the automatic ones: still unpaid, has a number, the number doesn't own the
+ * book. Doesn't change the automatic sequence. Recorded with the admin's e-mail.
+ */
+export async function sendAdminReminder(orderId: string, by: string): Promise<AdminReminderResult> {
+  if (!isReminderConfigured) return "off";
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("orders").select(COLUMNS).eq("id", orderId).maybeSingle();
+  if (error) throw new DatabaseUnavailableError("admin reminder order", error);
+  const order = data as unknown as ReminderOrder | null;
+  if (!order || (order.status !== "created" && order.status !== "failed")) return "not_pending";
+  if (!order.buyer_contact || !order.products) return "no_number";
+
+  const { count: owned, error: ownedError } = await admin
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("buyer_contact", order.buyer_contact)
+    .eq("product_id", order.product_id)
+    .eq("status", "paid");
+  if (ownedError) throw new DatabaseUnavailableError("admin reminder owned check", ownedError);
+  if ((owned ?? 0) > 0) return "owns_book";
+
+  const since = new Date(Date.now() - ADMIN_MIN_GAP_MINUTES * 60_000).toISOString();
+  const { count: recent } = await admin
+    .from("whatsapp_log")
+    .select("id", { count: "exact", head: true })
+    .eq("phone", order.buyer_contact)
+    .eq("product_id", order.product_id)
+    .in("kind", ["reminder", "reminder_admin"])
+    .eq("ok", true)
+    .gte("created_at", since);
+  if ((recent ?? 0) > 0) return "too_soon";
+
+  const ok = await sendReminderMessage(order);
+  await logWhatsApp({
+    orderId: order.id,
+    phone: order.buyer_contact,
+    name: order.name,
+    productId: order.product_id,
+    kind: "reminder_admin",
+    template: REMINDER_TEMPLATE_NAME,
+    ok,
+    by,
+  });
+  return ok ? "sent" : "failed";
 }

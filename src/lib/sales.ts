@@ -190,6 +190,9 @@ export interface OrderRow extends SalesOrder {
   checkout_closed_at: string | null;
   /** From the Buy popup since 2026-10-18; "Guest" before. */
   name: string | null;
+  /** Automatic payment reminders (migration 013; 4 = finished under an older rule). */
+  reminder_count?: number | null;
+  reminder_last_at?: string | null;
 }
 
 /** Short order number shown on cards and searchable: first 6 characters of the id, e.g. #3F9A2C. */
@@ -300,7 +303,7 @@ export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters
   const end = range.end !== null ? iso(range.end) : null;
 
   const COLUMNS =
-    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name";
+    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name, reminder_count, reminder_last_at";
   const SUMMARY = "status, amount, download_count, refunded_amount, checkout_closed_at";
 
   let summary = admin.from("orders").select(SUMMARY).limit(50000);
@@ -405,9 +408,6 @@ export interface OrderDetail extends OrderRow {
   razorpay_order_id: string | null;
   last_downloaded_at: string | null;
   reminder_sent_at: string | null;
-  /** Reminders sent in the sequence (migration 013, up to 4). */
-  reminder_count?: number | null;
-  reminder_last_at?: string | null;
   refunded_at: string | null;
   razorpay_refund_id: string | null;
   delivered: boolean | null;
