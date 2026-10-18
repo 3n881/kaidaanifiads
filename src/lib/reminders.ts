@@ -91,7 +91,8 @@ export async function sendPaymentReminders(): Promise<{ due: number; sent: numbe
   if (error) throw new DatabaseUnavailableError("reminder candidates", error);
   const candidates = (data ?? []) as unknown as ReminderOrder[];
 
-  // Newest attempt per phone + book only (list is newest first).
+  // Newest attempt per phone + book within this list (list is newest first);
+  // remind() also checks the database for newer attempts outside this list.
   const newest = new Set<string>();
   const due: ReminderOrder[] = [];
   for (const order of candidates) {
@@ -133,6 +134,23 @@ export async function sendReminderNowIfDue(orderId: string): Promise<boolean> {
 async function remind(order: ReminderOrder): Promise<boolean> {
   const admin = getSupabaseAdmin();
   if (!order.products) return false;
+
+  // A NEWER attempt on this book by this number exists (pending, finished or
+  // paid) → this older one is finished. Checked against the database, not just
+  // the cron's candidate list: on 18 Oct an older attempt started its own
+  // reminders once the newer one had finished its 2 (the candidate list only
+  // held attempts with reminders left) — 4 messages for one book.
+  const { count: newer, error: newerError } = await admin
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("buyer_contact", order.buyer_contact)
+    .eq("product_id", order.product_id)
+    .gt("created_at", order.created_at);
+  if (newerError) throw new DatabaseUnavailableError("reminder newer check", newerError);
+  if ((newer ?? 0) > 0) {
+    await admin.from("orders").update({ reminder_count: MAX_REMINDERS }).eq("id", order.id).lt("reminder_count", MAX_REMINDERS);
+    return false;
+  }
 
   // Owns the book (paid for it before or since) → this attempt is finished.
   const { count: owned, error: ownedError } = await admin

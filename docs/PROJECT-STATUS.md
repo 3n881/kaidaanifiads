@@ -199,7 +199,7 @@ Full detail: `docs/HANDOFF.md` §3.
    (cron); the **2nd 1 hour after the 1st** (`REMINDER_GAPS_MINUTES`, default `60`; `10,30,60` would give 4 — that was
    live briefly as `ba12cc8`, then the owner chose 2). No daily
    cap per phone (two pending books → each gets its own); several taps on the SAME book → only the newest attempt;
-   never to a phone that owns the book; no 1st reminder for an attempt older than 3 h. Before that: a failed or
+   never to a phone that owns the book; no 1st reminder for an attempt older than 3 h. Newer-attempt check runs against the database right before every reminder (fix 18 Oct night). Before that: a failed or
    abandoned payment with a phone number got **one** `pending_followup_v2` reminder after
    **10 min** (both delays set to 10 on the server 2026-10-11; the cron runs every 10 min, so it arrives
    10–20 min after the buyer leaves), at most one per phone + book per day, none if they paid since.
@@ -1113,6 +1113,7 @@ Trust this file over these where they disagree:
 | 10-18 | select by group | Orders page "select all" follows the tab (failed / pending / cancelled) or offers one button per group on All; bar shows the mix; paid skipped. Previewed with made-up orders on All / Failed / Cancelled / Pending / Paid |
 | 10-18 | popup language + no tick | Buy popup follows the book's language; tick box removed (client) — the agreement sentence (incl. offers, STOP) is a note above the pay button, Continue = agreement, lead still saved |
 | 10-18 | consent line | Popup consent note shortened to one small grey line (client chose it over removing it; removing would mean no valid offers consent) |
+| 10-18 | reminder bug fixed | **Owner got 4 reminders for one book (#19):** 2 for the newer attempt #D4C44B (3:33 + 4:40 pm, correct) and 2 for the older #67636C (4:50 + 5:50 pm, wrong). Cause: "newest attempt per number + book" only compared attempts that still had reminders left, so once the newer one finished, the older one took over. Fix: before every reminder the server checks the database for ANY newer attempt (pending, finished or paid) and closes the older one for good. At fix time no other attempt was at risk (0 rows) |
 
 Problems we hit while going live and how we fixed them: `go-live-plan.md` → "Problems we hit"
 (19 entries: domain spelling, Tokyo latency, IPv6-only DB host, Lightsail plan block, health check, build
