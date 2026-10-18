@@ -469,7 +469,12 @@ export function OrderCard({ o, product, reminders = false }: { o: OrderRow; prod
   );
 }
 
-/** Pending / cancelled / failed with a number, not refunded → can get the payment reminder. */
+/**
+ * Pending / cancelled / failed, not refunded, WITH a valid 10-digit number in
+ * buyer_contact (the number reminders are sent to) → can get the payment
+ * reminder. Older orders (before the 18 Oct Buy popup) mostly have no number:
+ * no tick, no "Remind", never in "select all".
+ */
 function isRemindable(o: OrderRow): boolean {
-  return (o.status === "created" || o.status === "failed") && Boolean(o.buyer_contact || o.whatsapp_number) && !o.refund_status;
+  return (o.status === "created" || o.status === "failed") && /^[6-9]\d{9}$/.test(o.buyer_contact ?? "") && !o.refund_status;
 }
