@@ -102,7 +102,10 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
 
   return (
     <AdminShell active="orders" title="Orders" action={<RefreshButton />}>
-      <ReminderProvider eligible={view.rows.filter(isRemindable).map((o) => o.id)}>
+      <ReminderProvider
+        tab={view.status}
+        eligible={view.rows.filter(isRemindable).map((o) => ({ id: o.id, kind: dropOffKind(o) ?? "pending" }))}
+      >
       <p className="-mt-4 mb-4 text-xs text-brand-500">
         Numbers for <b className="text-brand-700">{view.period === "custom" && (view.from || view.to) ? customLabel(view) : periodName}</b>
         {COMPARED[view.period] && <> · % {COMPARED[view.period]}</>}

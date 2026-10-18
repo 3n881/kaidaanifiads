@@ -23,11 +23,18 @@ const SKIP_LABELS: Record<string, string> = {
   off: "reminders are switched off",
 };
 
+/** Unpaid group of an order (pending = Razorpay left open, cancelled = closed with X, failed = payment declined). */
+export type UnpaidKind = "pending" | "cancelled" | "failed";
+const KIND_WORD: Record<UnpaidKind, string> = { pending: "pending", cancelled: "cancelled", failed: "failed" };
+
 type Ctx = {
-  eligible: string[];
+  eligible: Array<{ id: string; kind: UnpaidKind }>;
+  /** The status tab on show (all, pending, cancelled, failed, …). */
+  tab: string;
   selected: Set<string>;
   toggle: (id: string) => void;
-  setAll: (on: boolean) => void;
+  select: (ids: string[]) => void;
+  clear: () => void;
   send: (ids: string[]) => void;
   sending: boolean;
   result: string | null;
@@ -42,7 +49,7 @@ function useReminders(): Ctx {
   return ctx;
 }
 
-export function ReminderProvider({ eligible, children }: { eligible: string[]; children: React.ReactNode }) {
+export function ReminderProvider({ eligible, tab, children }: { eligible: Array<{ id: string; kind: UnpaidKind }>; tab: string; children: React.ReactNode }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<string | null>(null);
@@ -51,6 +58,7 @@ export function ReminderProvider({ eligible, children }: { eligible: string[]; c
   const value = useMemo<Ctx>(
     () => ({
       eligible,
+      tab,
       selected,
       sending,
       result,
@@ -62,7 +70,8 @@ export function ReminderProvider({ eligible, children }: { eligible: string[]; c
           else next.add(id);
           return next;
         }),
-      setAll: (on) => setSelected(on ? new Set(eligible) : new Set()),
+      select: (ids) => setSelected(new Set(ids)),
+      clear: () => setSelected(new Set()),
       send: (ids) =>
         startTransition(async () => {
           try {
@@ -77,7 +86,7 @@ export function ReminderProvider({ eligible, children }: { eligible: string[]; c
           }
         }),
     }),
-    [eligible, selected, sending, result, router],
+    [eligible, tab, selected, sending, result, router],
   );
 
   return <ReminderContext.Provider value={value}>{children}</ReminderContext.Provider>;
@@ -120,24 +129,49 @@ export function SendReminderButton({ id }: { id: string }) {
   );
 }
 
-/** Above the list: select all + result line. */
+/** Above the list: "select all" for the tab on show (or one button per group on other tabs) + result line. */
 export function ReminderToolbar() {
-  const { eligible, selected, setAll, result, clearResult } = useReminders();
+  const { eligible, tab, selected, select, clear, result, clearResult } = useReminders();
   if (eligible.length === 0 && !result) return null;
-  const allOn = eligible.length > 0 && selected.size === eligible.length;
+  const idsOf = (kind?: UnpaidKind) => eligible.filter((e) => !kind || e.kind === kind).map((e) => e.id);
+  const sameSet = (ids: string[]) => ids.length > 0 && ids.length === selected.size && ids.every((id) => selected.has(id));
+  const groups = (["pending", "cancelled", "failed"] as const).filter((k) => idsOf(k).length > 0);
+  // Pending / Cancelled / Failed tab → one button for that group; any other tab → one per group + all unpaid.
+  const buttons: Array<{ label: string; ids: string[] }> =
+    tab === "pending" || tab === "cancelled" || tab === "failed"
+      ? [{ label: `Select all ${idsOf(tab).length} ${KIND_WORD[tab]} here`, ids: idsOf(tab) }]
+      : [
+          ...groups.map((k) => ({ label: `${KIND_WORD[k][0].toUpperCase()}${KIND_WORD[k].slice(1)} (${idsOf(k).length})`, ids: idsOf(k) })),
+          ...(groups.length > 1 ? [{ label: `All unpaid (${eligible.length})`, ids: idsOf() }] : []),
+        ];
   return (
     <div className="mt-3 space-y-2">
       {eligible.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setAll(!allOn)}
-          className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-bold text-brand-700 hover:bg-brand-50"
-        >
-          <span className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${allOn ? "border-brand-teal bg-brand-teal text-white" : "border-brand-300"}`}>
-            {allOn && <Check className="h-3 w-3" aria-hidden="true" />}
-          </span>
-          {allOn ? "Clear selection" : `Select all ${eligible.length} pending here`}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {tab !== "pending" && tab !== "cancelled" && tab !== "failed" && (
+            <span className="text-xs font-semibold text-brand-500">Select for reminder:</span>
+          )}
+          {buttons.map((b) => {
+            const on = sameSet(b.ids);
+            return (
+              <button
+                key={b.label}
+                type="button"
+                aria-pressed={on}
+                onClick={() => (on ? clear() : select(b.ids))}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                  on ? "border-brand-teal bg-brand-teal text-white" : "border-brand-200 bg-white text-brand-700 hover:bg-brand-50"
+                }`}
+              >
+                <span className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${on ? "border-white bg-white text-brand-teal" : "border-brand-300"}`}>
+                  {on && <Check className="h-3 w-3" aria-hidden="true" />}
+                </span>
+                {b.label}
+              </button>
+            );
+          })}
+          <span className="text-[11px] text-brand-400">paid orders are skipped</span>
+        </div>
       )}
       {result && (
         <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
@@ -153,16 +187,22 @@ export function ReminderToolbar() {
 
 /** Sticky bar at the bottom while orders are selected. */
 export function ReminderBar() {
-  const { selected, send, sending, setAll } = useReminders();
+  const { eligible, selected, send, sending, clear } = useReminders();
   if (selected.size === 0) return null;
+  const mix = (["pending", "cancelled", "failed"] as const)
+    .map((k) => [k, eligible.filter((e) => e.kind === k && selected.has(e.id)).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${n} ${KIND_WORD[k]}`)
+    .join(" · ");
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_-12px_rgba(10,35,66,0.3)] backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-3">
         <p className="min-w-0 flex-1 text-sm font-bold text-brand-900">
           {selected.size} selected
-          <button type="button" onClick={() => setAll(false)} className="ml-2 text-xs font-semibold text-brand-500 underline underline-offset-2">
+          <button type="button" onClick={clear} className="ml-2 text-xs font-semibold text-brand-500 underline underline-offset-2">
             clear
           </button>
+          {mix && <span className="block text-[11px] font-semibold text-brand-500">{mix}</span>}
         </p>
         <button
           type="button"
