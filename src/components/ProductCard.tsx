@@ -115,15 +115,15 @@ export default function ProductCard({
         )}
 
         {/* Price (struck MRP above the price) + compact buy button, as on the original */}
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-brand-50 pt-3">
+        <div className="mt-auto flex items-center max-[359px]:flex-wrap justify-between gap-2 max-[374px]:gap-1 border-t border-brand-50 pt-3">
           <div className="flex flex-col">
             {product.mrp > product.price && (
-              <span className="mb-1 text-xs font-bold leading-none text-brand-500 line-through decoration-red-400/60">
+              <span className="mb-1 text-sm font-bold leading-none text-gray-500 line-through decoration-red-500 decoration-2">
                 ₹{product.mrp}
               </span>
             )}
-            <span className="flex items-center gap-0.5 text-xl font-extrabold leading-none text-red-600">
-              <span className="text-sm">₹</span>
+            <span className="flex items-center gap-0.5 text-2xl font-extrabold leading-none text-red-600 sm:text-[26px]">
+              <span className="text-base">₹</span>
               {product.price}
             </span>
           </div>
