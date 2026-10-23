@@ -6,6 +6,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import OrderActions from "@/components/admin/OrderActions";
 import { getAdminProducts } from "@/lib/admin";
 import { orderPageUrl } from "@/lib/orders";
+import { failureLabel } from "@/lib/payment-failure";
 import { getOrderDetail, SALES_START } from "@/lib/sales";
 import { getOrderWhatsAppLog } from "@/lib/whatsapp-log";
 
@@ -40,7 +41,10 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
   const timeline: Array<{ at: string | null; text: string; tone: Tone; label?: string }> = [];
   timeline.push({ at: order.created_at, text: "Buy tapped — Razorpay opened", tone: "neutral" });
   if (paid) timeline.push({ at: order.paid_at, text: `Paid ₹${order.amount}`, tone: "success" });
-  else if (order.status === "failed") timeline.push({ at: null, text: "Payment failed (declined or cancelled at Razorpay)", tone: "danger" });
+  else if (order.status === "failed") {
+    const reason = failureLabel(order);
+    timeline.push({ at: null, text: reason ? `Payment failed: ${reason}${order.failure_method ? ` (${order.failure_method})` : ""}` : "Payment failed (declined or cancelled at Razorpay)", tone: "danger" });
+  }
   else timeline.push({ at: null, text: "Not paid — Razorpay was closed or the payment is still pending", tone: "warning" });
   // WhatsApp messages from the record (since 18 Oct); older orders show the summary line instead.
   const KIND_TEXT = { pdf: "Book PDF sent on WhatsApp", reminder: "Payment reminder sent on WhatsApp", reminder_admin: "Payment reminder sent on WhatsApp", offer: "Offer sent on WhatsApp" } as const;
@@ -137,6 +141,17 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
                   </a>
                 ) : "—"}
               </Fact>
+              {order.status === "failed" && (
+                <>
+                  <Fact label="Why it failed">
+                    <span className="break-words font-semibold text-danger-600">{failureLabel(order) ?? "Not fetched from Razorpay yet"}</span>
+                    {order.failure_description && order.failure_description !== failureLabel(order) && (
+                      <span className="mt-0.5 block break-words text-xs text-brand-500">Razorpay: {order.failure_description}</span>
+                    )}
+                  </Fact>
+                  {order.failure_method && <Fact label="Tried to pay with">{order.failure_method}</Fact>}
+                </>
+              )}
               <Fact label="Razorpay order id"><span className="font-mono text-xs">{order.razorpay_order_id || "—"}</span></Fact>
               <Fact label="Our order id"><span className="font-mono text-xs">{order.id}</span></Fact>
             </dl>

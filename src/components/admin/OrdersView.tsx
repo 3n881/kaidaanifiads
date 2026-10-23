@@ -18,6 +18,7 @@ import {
   TrendingDown,
   TrendingUp,
   UserX,
+  XCircle,
 } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import ResendButton from "@/components/admin/ResendButton";
@@ -25,6 +26,7 @@ import { CopyButton, CustomRange, FreshnessBadge, PendingHint, RefreshButton } f
 import { ReminderBar, ReminderCheckbox, ReminderProvider, ReminderToolbar, SendReminderButton } from "@/components/admin/ReminderControls";
 import type { AdminProduct } from "@/lib/admin";
 import { coverThumbSrc } from "@/lib/covers";
+import { failureLabel } from "@/lib/payment-failure";
 import {
   dropOffKind,
   shortOrderId,
@@ -276,6 +278,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
         )}
 
         <ReminderToolbar />
+        {view.status === "failed" && <FailureSummary rows={view.rows} />}
         {view.rows.length === 0 ? (
           <div className="mt-4 rounded-2xl border border-dashed border-brand-200 p-10 text-center">
             <ShoppingBag className="mx-auto h-10 w-10 text-brand-300" aria-hidden="true" />
@@ -386,6 +389,44 @@ const BADGES = {
   partial: ["PART REFUND", "bg-purple-100 text-purple-700"],
 } as const;
 
+function CountChips({ items, tone }: { items: Array<[string, number]>; tone: string }) {
+  return (
+    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+      {items.map(([label, n]) => (
+        <li key={label} className={`inline-flex max-w-full items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${tone}`}>
+          <span className="min-w-0 break-words">{label}</span>
+          <span className="shrink-0 font-extrabold tabular-nums">{n}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Failed tab: why the listed payments failed, most common first (migration 015). */
+function FailureSummary({ rows }: { rows: OrderRow[] }) {
+  const failed = rows.filter((o) => o.status === "failed");
+  if (failed.length === 0) return null;
+  const count = (key: (o: OrderRow) => string) => {
+    const map = new Map<string, number>();
+    for (const o of failed) map.set(key(o), (map.get(key(o)) ?? 0) + 1);
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  const reasons = count((o) => failureLabel(o) ?? "Not fetched yet");
+  const methods = count((o) => o.failure_method ?? "Not known").filter(([m]) => m !== "Not known");
+  return (
+    <div className="mt-3 rounded-2xl border border-red-100 bg-red-50/60 p-3 sm:p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-danger-600">Why these {failed.length} payments failed</p>
+      <CountChips items={reasons} tone="bg-white text-brand-800 ring-1 ring-red-100" />
+      {methods.length > 0 && (
+        <>
+          <p className="mt-3 text-xs font-bold uppercase tracking-wide text-brand-500">Tried to pay with</p>
+          <CountChips items={methods} tone="bg-white text-brand-700 ring-1 ring-brand-100" />
+        </>
+      )}
+    </div>
+  );
+}
+
 /** `reminders`: show the tick + "Remind" on pending / cancelled / failed orders (Orders page only). */
 export function OrderCard({ o, product, reminders = false }: { o: OrderRow; product?: AdminProduct; reminders?: boolean }) {
   const phone = o.buyer_contact || o.whatsapp_number;
@@ -437,6 +478,15 @@ export function OrderCard({ o, product, reminders = false }: { o: OrderRow; prod
               </>
             )}
           </p>
+          {o.status === "failed" && (failureLabel(o) || o.failure_method) && (
+            <p className="mt-1 flex items-start gap-1 text-[11px] font-semibold leading-snug text-danger-600">
+              <XCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 break-words">
+                {failureLabel(o) ?? "Reason not known"}
+                {o.failure_method && <span className="font-normal text-brand-500"> · {o.failure_method}</span>}
+              </span>
+            </p>
+          )}
           {o.status !== "paid" && o.reminder_last_at && (
             <p className="mt-0.5 text-[11px] font-semibold text-amber-700">
               Auto reminder{(o.reminder_count ?? 0) > 1 && (o.reminder_count ?? 0) < 4 ? `s: ${o.reminder_count}×` : ""} · last {istTime(o.reminder_last_at)}

@@ -209,6 +209,10 @@ export interface OrderRow extends SalesOrder {
   /** Automatic payment reminders (migration 013; 4 = finished under an older rule). */
   reminder_count?: number | null;
   reminder_last_at?: string | null;
+  /** Why the payment failed (migration 015, src/lib/payment-failure.ts). */
+  failure_reason?: string | null;
+  failure_description?: string | null;
+  failure_method?: string | null;
 }
 
 /** Short order number shown on cards and searchable: first 6 characters of the id, e.g. #3F9A2C. */
@@ -331,7 +335,7 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
   const end = range.end !== null ? iso(range.end) : null;
 
   const COLUMNS =
-    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name, reminder_count, reminder_last_at";
+    "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name, reminder_count, reminder_last_at, failure_reason, failure_description, failure_method";
   const SUMMARY = "status, amount, download_count, refunded_amount, checkout_closed_at";
 
   let summary = admin.from("orders").select(SUMMARY).limit(50000);

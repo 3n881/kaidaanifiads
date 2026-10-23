@@ -135,6 +135,14 @@ export interface RazorpayPayment {
   amount_refunded?: number;
   refund_status?: "partial" | "full" | null;
   created_at?: number;
+  /** Failed payments: why (error_reason code, e.g. payment_timeout) and the customer-facing text. */
+  error_reason?: string | null;
+  error_description?: string | null;
+  method?: string; // upi | card | netbanking | wallet | …
+  vpa?: string | null;
+  upi?: { vpa?: string | null } | null;
+  wallet?: string | null;
+  bank?: string | null;
 }
 
 export interface RazorpayRefund {

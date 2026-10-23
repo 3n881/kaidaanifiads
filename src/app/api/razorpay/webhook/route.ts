@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { markOrderPaid, normalizePhone } from "@/lib/orders";
+import { saveFailure } from "@/lib/payment-failure";
 import { onOrderPaid } from "@/lib/delivery";
 import { applyRefundState } from "@/lib/refunds";
 
@@ -14,6 +15,14 @@ interface PaymentEntity {
   status?: string;
   contact?: string;
   email?: string;
+  // payment.failed: why + how (src/lib/payment-failure.ts)
+  error_reason?: string | null;
+  error_description?: string | null;
+  method?: string;
+  vpa?: string | null;
+  upi?: { vpa?: string | null } | null;
+  wallet?: string | null;
+  bank?: string | null;
 }
 
 /**
@@ -100,6 +109,8 @@ async function handle(req: NextRequest) {
       .eq("id", order.id)
       .eq("status", "created");
     if (error) throw new DatabaseUnavailableError("mark failed", error);
+    // Why it failed (migration 015) — the latest failed attempt wins.
+    await saveFailure(order.id, payment);
     // The phone typed into Razorpay is the only way to send the "payment not
     // completed" reminder (src/lib/reminders.ts). Never overwrite.
     const contact = normalizePhone(payment.contact);

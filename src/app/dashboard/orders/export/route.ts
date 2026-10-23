@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getAdminProducts } from "@/lib/admin";
+import { failureLabel } from "@/lib/payment-failure";
 import { dropOffKind, EXPORT_LIMIT, getOrdersView, parseOrderFilters, shortOrderId } from "@/lib/sales";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   const [view, products] = await Promise.all([getOrdersView(filters, EXPORT_LIMIT), getAdminProducts()]);
   const titles = new Map(products.map((p) => [p.id, p.title_mr || p.title || p.title_hi || p.title_en || ""]));
 
-  const header = ["Order no", "Name", "Created (IST)", "Paid (IST)", "Status", "Book ID", "Book", "Language", "Amount ₹", "Refunded ₹", "Phone", "Razorpay payment", "Downloads", "WhatsApp sends", "Order ID"];
+  const header = ["Order no", "Name", "Created (IST)", "Paid (IST)", "Status", "Book ID", "Book", "Language", "Amount ₹", "Refunded ₹", "Phone", "Razorpay payment", "Failure reason", "Payment method", "Downloads", "WhatsApp sends", "Order ID"];
   const lines = view.rows.map((o) =>
     [
       `#${shortOrderId(o.id)}`,
@@ -34,6 +35,8 @@ export async function GET(req: NextRequest) {
       o.refunded_amount ?? 0,
       o.buyer_contact || o.whatsapp_number || "",
       o.razorpay_payment_id ?? "",
+      o.status === "failed" ? failureLabel(o) ?? "" : "",
+      o.status === "failed" ? o.failure_method ?? "" : "",
       o.download_count ?? 0,
       o.whatsapp_sends ?? 0,
       o.id,

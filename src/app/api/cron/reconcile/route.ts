@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { reconcileRecentOrders } from "@/lib/reconcile";
 import { sendPaymentReminders } from "@/lib/reminders";
 import { sendLeadFollowups } from "@/lib/leads";
+import { backfillFailureReasons } from "@/lib/payment-failure";
 import { DatabaseUnavailableError } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -58,5 +59,13 @@ export async function POST(req: NextRequest) {
     console.error("[leads] follow-ups failed", message);
     leads = { error: "lead follow-ups failed" };
   }
-  return NextResponse.json({ ok: true, ...result, reminders, leads });
+  // Why older failed payments failed (migration 015): a few per run, once each.
+  let failures: { checked: number; found: number } | { error: string };
+  try {
+    failures = await backfillFailureReasons();
+  } catch (error) {
+    console.error("[payment-failure] backfill failed", String(error));
+    failures = { error: "failure reasons failed" };
+  }
+  return NextResponse.json({ ok: true, ...result, reminders, leads, failures });
 }
