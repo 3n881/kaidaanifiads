@@ -10,7 +10,7 @@ import { isStaleAction, reloadForNewVersion } from "@/lib/stale-action";
 // pending / cancelled / failed buyers — one card, or several selected (bulk).
 // The server applies the same rules as the automatic reminders.
 
-const SKIP_LABELS: Record<string, string> = {
+export const SKIP_LABELS: Record<string, string> = {
   owns_book: "already own the book",
   not_pending: "already paid",
   paid_now: "Razorpay shows paid — PDF sent",

@@ -86,6 +86,45 @@ export async function getWhatsAppLog(filters: { kind: LogKindFilter; period: "to
   return (data ?? []) as WhatsAppLogRow[];
 }
 
+/**
+ * What became of each refused book PDF / payment reminder in `rows`:
+ * "open" = still worth sending again; "sent_later" = the same message for that
+ * order went through afterwards; "settled" = no longer applies (a reminder
+ * whose order is paid or closed, a PDF whose order isn't paid). Offers and
+ * rows without an order get no state.
+ */
+export type RefusedState = "open" | "sent_later" | "settled";
+const messageGroup = (kind: WhatsAppKind) => (kind === "pdf" ? "pdf" : "reminder");
+
+export async function getRefusedStates(rows: WhatsAppLogRow[]): Promise<Map<string, RefusedState>> {
+  await requireAdmin();
+  const refused = rows.filter((r) => !r.ok && r.order_id && r.kind !== "offer");
+  const states = new Map<string, RefusedState>();
+  if (refused.length === 0) return states;
+  const orderIds = [...new Set(refused.map((r) => r.order_id!))];
+  const okRows: Array<{ order_id: string; kind: WhatsAppKind; created_at: string }> = [];
+  const status = new Map<string, string>();
+  for (let i = 0; i < orderIds.length; i += 100) {
+    const chunk = orderIds.slice(i, i + 100);
+    const [sent, orders] = await Promise.all([
+      getSupabaseAdmin().from("whatsapp_log").select("order_id, kind, created_at").in("order_id", chunk).eq("ok", true),
+      getSupabaseAdmin().from("orders").select("id, status").in("id", chunk),
+    ]);
+    if (sent.error) throw new Error(sent.error.message);
+    if (orders.error) throw new Error(orders.error.message);
+    okRows.push(...(sent.data ?? []));
+    for (const o of orders.data ?? []) status.set(o.id, o.status);
+  }
+  for (const r of refused) {
+    const group = messageGroup(r.kind);
+    const later = okRows.some((o) => o.order_id === r.order_id && messageGroup(o.kind) === group && o.created_at > r.created_at);
+    const orderStatus = status.get(r.order_id!);
+    const applies = group === "pdf" ? orderStatus === "paid" : orderStatus === "created" || orderStatus === "failed";
+    states.set(r.id, later ? "sent_later" : applies ? "open" : "settled");
+  }
+  return states;
+}
+
 /** Admin-only: messages for one order (order page timeline). */
 export async function getOrderWhatsAppLog(orderId: string): Promise<WhatsAppLogRow[]> {
   await requireAdmin();

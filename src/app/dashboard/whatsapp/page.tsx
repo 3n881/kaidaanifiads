@@ -4,7 +4,8 @@ import Link from "@/components/admin/AdminLink";
 import { BellRing, CheckCircle2, FileDown, Megaphone, MessageCircle, Search, UserRound, XCircle } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import { getAdminProducts } from "@/lib/admin";
-import { getWhatsAppLog, LOG_KINDS, type LogKindFilter, type WhatsAppKind } from "@/lib/whatsapp-log";
+import { ResendAllRefused, ResendRefusedButton } from "@/components/admin/RefusedResend";
+import { getRefusedStates, getWhatsAppLog, LOG_KINDS, type LogKindFilter, type WhatsAppKind } from "@/lib/whatsapp-log";
 
 export const metadata: Metadata = {
   title: "Admin — WhatsApp",
@@ -44,6 +45,17 @@ export default async function WhatsAppLogPage({ searchParams }: PageProps<"/dash
   const failed = one("failed") === "1";
   const q = one("q").trim().slice(0, 60);
   const [rows, products] = await Promise.all([getWhatsAppLog({ kind, period, failed, q }), getAdminProducts()]);
+  const states = await getRefusedStates(rows);
+  // One "send again" per order and message type (newest refused row; rows are newest first).
+  const openKeys = new Set<string>();
+  const openIds = rows.filter((r) => {
+    if (states.get(r.id) !== "open") return false;
+    const key = `${r.kind === "pdf" ? "pdf" : "reminder"}:${r.order_id}`;
+    if (openKeys.has(key)) return false;
+    openKeys.add(key);
+    return true;
+  }).map((r) => r.id);
+  const openSet = new Set(openIds);
   const titles = new Map(products.map((p) => [p.id, p.title_mr || p.title || p.title_hi || p.title_en || `#${p.id}`]));
 
   const href = (change: Partial<{ kind: string; period: string; failed: string; q: string }>) => {
@@ -86,6 +98,7 @@ export default async function WhatsAppLogPage({ searchParams }: PageProps<"/dash
           Refused only
         </Link>
       </nav>
+      <ResendAllRefused ids={openIds} />
       <Form action="/dashboard/whatsapp" scroll={false} className="relative mt-3">
         {kind !== "all" && <input type="hidden" name="kind" value={kind} />}
         {period !== "today" && <input type="hidden" name="period" value={period} />}
@@ -123,6 +136,16 @@ export default async function WhatsAppLogPage({ searchParams }: PageProps<"/dash
                   {r.name && <p className="text-sm font-semibold text-green-700">{r.phone}</p>}
                   <p className="font-deva mt-1 line-clamp-2 text-sm text-brand-700">{r.product_id === null ? "—" : titles.get(r.product_id) ?? `#${r.product_id}`}</p>
                 </div>
+                {!r.ok && openSet.has(r.id) && <ResendRefusedButton id={r.id} />}
+                {!r.ok && states.get(r.id) === "open" && !openSet.has(r.id) && (
+                  <p className="text-xs font-semibold text-brand-400">Newer refused message above — send that one</p>
+                )}
+                {!r.ok && states.get(r.id) === "sent_later" && (
+                  <p className="text-xs font-semibold text-green-700">Sent successfully later</p>
+                )}
+                {!r.ok && states.get(r.id) === "settled" && (
+                  <p className="text-xs font-semibold text-brand-400">{r.kind === "pdf" ? "Order not paid — nothing to send" : "No longer needed — order paid or closed"}</p>
+                )}
                 <p className="mt-auto flex flex-wrap items-center gap-x-2 border-t border-brand-50 pt-2 text-[11px] text-brand-500">
                   <span>{istTime(r.created_at)}</span>
                   <span>· {r.sent_by === "auto" ? "automatic" : `by ${r.sent_by}`}</span>

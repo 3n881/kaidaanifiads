@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Send, Loader2, Check } from "lucide-react";
+import { Send, Loader2, Check, XCircle } from "lucide-react";
 import { resendDelivery } from "@/app/dashboard/actions";
 import { isStaleAction, reloadForNewVersion } from "@/lib/stale-action";
 
 /** `compact`: icon only on phones (label from sm up). */
 export default function ResendButton({ orderId, compact = false }: { orderId: string; compact?: boolean }) {
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<"sent" | "refused" | null>(null);
 
   return (
     <button
@@ -16,15 +16,16 @@ export default function ResendButton({ orderId, compact = false }: { orderId: st
       title="Resend PDF on WhatsApp"
       onClick={() =>
         startTransition(async () => {
+          let sent: boolean;
           try {
-            await resendDelivery(orderId);
+            sent = await resendDelivery(orderId);
           } catch (error) {
             // Page loaded before a deploy → reload to get the new version.
             if (isStaleAction(error) && reloadForNewVersion()) return;
             throw error;
           }
-          setDone(true);
-          setTimeout(() => setDone(false), 2500);
+          setDone(sent ? "sent" : "refused");
+          setTimeout(() => setDone(null), sent ? 2500 : 6000);
         })
       }
       disabled={pending}
@@ -34,12 +35,14 @@ export default function ResendButton({ orderId, compact = false }: { orderId: st
     >
       {pending ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : done ? (
+      ) : done === "sent" ? (
         <Check className="h-3.5 w-3.5 text-green-600" />
+      ) : done === "refused" ? (
+        <XCircle className="h-3.5 w-3.5 text-danger-600" />
       ) : (
         <Send className="h-3.5 w-3.5" />
       )}
-      <span className={compact ? "hidden sm:inline" : undefined}>{done ? "पाठवले" : "Resend"}</span>
+      <span className={compact ? "hidden sm:inline" : undefined}>{done === "sent" ? "पाठवले" : done === "refused" ? "Refused" : "Resend"}</span>
     </button>
   );
 }

@@ -473,13 +473,86 @@ export async function saveStoreSettings(formData: FormData) {
   redirect(returnTo);
 }
 
-/** Re-sends the order link on WhatsApp. Admin only; bypasses the per-order cap. */
-export async function resendDelivery(orderId: string) {
+/** Re-sends the order link on WhatsApp. Admin only; bypasses the per-order cap. false = not sent (refused). */
+export async function resendDelivery(orderId: string): Promise<boolean> {
   const admin = await requireAdmin();
   const { sendOrderOnWhatsApp } = await import("@/lib/delivery");
-  await sendOrderOnWhatsApp(orderId, { force: true, by: admin.email ?? "admin" });
+  const sent = await sendOrderOnWhatsApp(orderId, { force: true, by: admin.email ?? "admin" });
   updateTag(ADMIN_DATA_TAG);
   revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/whatsapp");
+  return sent;
+}
+
+/**
+ * WhatsApp page: send refused messages again (one, or "all refused"). A book
+ * PDF goes again only if the order is paid and no PDF reached that order since;
+ * a payment reminder goes through sendAdminReminder (all its checks: still
+ * unpaid, newest attempt, doesn't own the book, Razorpay not paid). Each order
+ * gets at most one PDF and one reminder per call. Offers aren't resent.
+ */
+export async function resendRefusedAction(logIds: string[]): Promise<{ sent: number; refused: number; skipped: Record<string, number> }> {
+  const admin = await requireAdmin();
+  const by = admin.email ?? "admin";
+  const ids = [...new Set((Array.isArray(logIds) ? logIds : []).map(String))]
+    .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+    .slice(0, 50);
+  const { sendOrderOnWhatsApp } = await import("@/lib/delivery");
+  const { sendAdminReminder } = await import("@/lib/reminders");
+  const db = getSupabaseAdmin();
+  const { data: rows, error } = ids.length
+    ? await db.from("whatsapp_log").select("id, created_at, order_id, kind").in("id", ids).eq("ok", false)
+    : { data: [], error: null };
+  if (error) throw new Error(error.message);
+
+  let sent = 0;
+  let refused = 0;
+  const skipped: Record<string, number> = {};
+  const skip = (reason: string) => (skipped[reason] = (skipped[reason] ?? 0) + 1);
+  const done = new Set<string>();
+  for (const row of rows ?? []) {
+    if (!row.order_id || row.kind === "offer") {
+      skip("no_order");
+      continue;
+    }
+    const pdf = row.kind === "pdf";
+    const key = `${pdf ? "pdf" : "reminder"}:${row.order_id}`;
+    if (done.has(key)) continue;
+    done.add(key);
+
+    // Re-checked here (not only on the page): a second tap can't send twice.
+    const { count, error: laterError } = await db
+      .from("whatsapp_log")
+      .select("id", { count: "exact", head: true })
+      .eq("order_id", row.order_id)
+      .in("kind", pdf ? ["pdf"] : ["reminder", "reminder_admin"])
+      .eq("ok", true)
+      .gt("created_at", row.created_at);
+    if (laterError) throw new Error(laterError.message);
+    if ((count ?? 0) > 0) {
+      skip("already_sent");
+      continue;
+    }
+
+    if (pdf) {
+      const { data: order } = await db.from("orders").select("status").eq("id", row.order_id).maybeSingle();
+      if (order?.status !== "paid") {
+        skip("not_paid");
+        continue;
+      }
+      if (await sendOrderOnWhatsApp(row.order_id, { force: true, by })) sent++;
+      else refused++;
+    } else {
+      const result = await sendAdminReminder(row.order_id, by);
+      if (result === "sent") sent++;
+      else if (result === "failed") refused++;
+      else skip(result);
+    }
+  }
+  updateTag(ADMIN_DATA_TAG);
+  revalidatePath("/dashboard/whatsapp");
+  revalidatePath("/dashboard/orders");
+  return { sent, refused, skipped };
 }
 
 /**
