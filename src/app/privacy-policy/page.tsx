@@ -35,13 +35,19 @@ export default function Page() {
           ],
         },
         {
-          heading: "5. Data Security",
+          heading: "5. Our Own Visit Statistics",
+          body: [
+            "To see which of our posts and ads bring visitors and where people stop before paying, our own website keeps simple visit statistics, stored only with us (not shared with anyone). Your browser keeps a random ID in its local storage, and we record the steps of a visit: the page you landed on, the books you view, when you tap Buy, fill in the form and open the payment window, together with how you arrived — the campaign tags in the link (utm), whether you came from a Facebook/Instagram ad, and the website that linked to us. When you buy, the same random visit ID and campaign tags are saved with your order so we can tell which post or ad led to the sale. These statistics contain no name, phone number, IP address or anything you type, and they are not recorded on the order page, My Books or our admin pages. You can clear them at any time by clearing your browser's site data.",
+          ],
+        },
+        {
+          heading: "6. Data Security",
           body: [
             "We take reasonable technical and organisational measures to protect your information. No method of transmission over the Internet is 100% secure.",
           ],
         },
         {
-          heading: "6. Your Rights",
+          heading: "7. Your Rights",
           body: [
             "You may request access to, correction of, or deletion of your personal data at any time by contacting us (see our Data Deletion policy).",
           ],

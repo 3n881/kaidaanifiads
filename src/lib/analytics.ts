@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabase/server";
 import { requireAdmin } from "./auth";
 import { failureLabel } from "./payment-failure";
+import { isMissingSchema } from "./visit-events";
 import { ADMIN_DATA_TAG, SALES_START, parseOrderFilters, periodRange } from "./sales";
 
 // ---------------------------------------------------------------------------
@@ -115,8 +116,55 @@ export interface Analytics {
     refusingNow: boolean;
   };
   ads: { since: string; fromAds: { tries: number; paid: number; revenue: number }; other: { tries: number; paid: number; revenue: number } };
+  traffic: Traffic;
   insights: Array<{ tone: "good" | "bad" | "info"; text: string }>;
 }
+
+/** Funnel steps, in order (migration 016). "paid" comes from orders linked by visit id. */
+export const FUNNEL_STEPS = ["Visit", "Book page", "Buy tapped", "Details filled", "Razorpay opened", "Paid"] as const;
+
+export interface CampaignRow {
+  key: string;
+  /** utm_campaign, or how the visit arrived when it carried no campaign tag. */
+  label: string;
+  /** The ad (utm_content) — only in the per-ad list. */
+  ad: string | null;
+  tagged: boolean;
+  source: string;
+  visits: number;
+  buyTaps: number;
+  sales: number;
+  revenue: number;
+  /** Paid visits ÷ visits. */
+  conversion: number | null;
+  /** Typed in by an admin (campaign_spend), for the whole campaign. */
+  spend: number | null;
+  allTimeRevenue: number;
+  roas: number | null;
+}
+
+export interface Traffic {
+  /** Migration 016 applied (events table readable). */
+  ready: boolean;
+  /** First recorded event (any period). */
+  since: string | null;
+  /** Visits that reached at least each of FUNNEL_STEPS. */
+  funnel: number[];
+  /** Per book: visits that reached at least Book page … Paid for that book. */
+  books: Array<{ productId: number; steps: number[] }>;
+  campaigns: CampaignRow[];
+  ads: CampaignRow[];
+  /** Paid orders in the period with no visit record (older pages, blocked storage, bought from a private tab). */
+  untrackedSales: number;
+}
+
+type FunnelRow = { kind: "visit" | "book"; product_id: number | null; source: string | null; utm_campaign: string | null; utm_content: string | null; from_ad: boolean | null; step: number; visits: number };
+type AttributionRow = { id: string; visit_id: string | null; utm_source: string | null; utm_campaign: string | null; utm_content: string | null; from_ad: boolean | null; referrer_host: string | null };
+
+/** Same rule as analytics_funnel() in the database: where a visit came from. */
+const sourceOf = (a: Pick<AttributionRow, "utm_source" | "from_ad" | "referrer_host">) => a.utm_source || (a.from_ad ? "facebook" : null) || a.referrer_host || "direct";
+const untaggedLabel = (source: string, fromAd: boolean) =>
+  fromAd ? "Meta ad (no campaign tag)" : source === "direct" ? "Direct / typed / app" : `From ${source}`;
 
 const buyerOf = (o: OrderRow) => (o.buyer_contact || o.whatsapp_number || "").replace(/\D/g, "").slice(-10) || null;
 const net = (o: OrderRow) => Number(o.amount || 0) - Number(o.refunded_amount || 0);
@@ -143,7 +191,7 @@ export async function getAnalytics(filters: ReturnType<typeof parseOrderFilters>
 const cachedAnalytics = unstable_cache(
   (period: string, from: string, to: string) =>
     computeAnalytics(parseOrderFilters({ period, from, to })),
-  ["admin-analytics-v1"],
+  ["admin-analytics-v2"],
   { revalidate: 30, tags: [ADMIN_DATA_TAG] },
 );
 
@@ -175,6 +223,7 @@ async function computeAnalytics(filters: ReturnType<typeof parseOrderFilters>): 
   const floor = ms(SALES_START);
   const start = Math.max(range.start ?? floor, floor);
   const end = range.end ?? now;
+  const traffic = await readTraffic(admin, all, start, end);
   const inRange = (iso: string, a: number, b: number) => ms(iso) >= a && ms(iso) < b;
   const rows = all.filter((o) => inRange(o.created_at, start, end));
   const prevStart = range.prevStart !== null ? Math.max(range.prevStart, floor) : null;
@@ -395,11 +444,103 @@ async function computeAnalytics(filters: ReturnType<typeof parseOrderFilters>): 
     weekdays,
     whatsapp,
     ads,
-    insights: buildInsights({ money, lost, failures, books, hours, whatsapp, ads }, (id) => {
+    traffic,
+    insights: buildInsights({ money, lost, failures, books, hours, whatsapp, ads, traffic }, (id) => {
       const p = products.find((x) => x.id === id);
       return p?.title_mr || p?.title || `#${id}`;
     }),
   };
+}
+
+/**
+ * First-party funnel + campaigns (migration 016). Counts come grouped from
+ * analytics_funnel() in the database; sales and revenue per campaign from the
+ * tags saved on each order. Before the migration everything is empty (ready: false).
+ */
+async function readTraffic(admin: ReturnType<typeof getSupabaseAdmin>, all: OrderRow[], start: number, end: number): Promise<Traffic> {
+  const empty: Traffic = { ready: false, since: null, funnel: FUNNEL_STEPS.map(() => 0), books: [], campaigns: [], ads: [], untrackedSales: 0 };
+  const [funnelRes, firstRes, attrRes, spendRes] = await Promise.all([
+    admin.rpc("analytics_funnel", { p_start: new Date(start).toISOString(), p_end: new Date(end).toISOString() }),
+    admin.from("events").select("created_at").order("created_at", { ascending: true }).limit(1),
+    admin
+      .from("orders")
+      .select("id, visit_id, utm_source, utm_campaign, utm_content, from_ad, referrer_host")
+      .not("visit_id", "is", null)
+      .limit(50000),
+    admin.from("campaign_spend").select("campaign, spend"),
+  ]);
+  for (const res of [funnelRes, firstRes, attrRes, spendRes]) {
+    if (res.error && isMissingSchema(res.error.code)) return empty;
+    if (res.error) throw new Error(res.error.message);
+  }
+  const rows = (funnelRes.data ?? []) as FunnelRow[];
+  const attribution = (attrRes.data ?? []) as AttributionRow[];
+  const spendOf = new Map(((spendRes.data ?? []) as Array<{ campaign: string; spend: number }>).map((r) => [r.campaign, Number(r.spend)]));
+  const since = (firstRes.data?.[0] as { created_at: string } | undefined)?.created_at ?? null;
+  const reached = (list: FunnelRow[], step: number) => list.filter((r) => r.step >= step).reduce((s, r) => s + Number(r.visits), 0);
+
+  const visitRows = rows.filter((r) => r.kind === "visit");
+  const funnel = FUNNEL_STEPS.map((_, i) => reached(visitRows, i + 1));
+
+  const bookIds = [...new Set(rows.filter((r) => r.kind === "book" && r.product_id !== null).map((r) => r.product_id!))];
+  const books = bookIds
+    .map((productId) => {
+      const of = rows.filter((r) => r.kind === "book" && r.product_id === productId);
+      return { productId, steps: [2, 3, 4, 5, 6].map((step) => reached(of, step)) };
+    })
+    .sort((a, b) => b.steps[0] - a.steps[0]);
+
+  // Orders: paid ones, keyed by id, to credit sales to campaigns.
+  const orderById = new Map(all.map((o) => [o.id, o]));
+  const inPeriod = (o: OrderRow) => ms(o.created_at) >= start && ms(o.created_at) < end;
+  const paidTracked = attribution
+    .map((a) => ({ a, o: orderById.get(a.id) }))
+    .filter((x): x is { a: AttributionRow; o: OrderRow } => x.o?.status === "paid");
+
+  const build = (byAd: boolean): CampaignRow[] => {
+    const groups = new Map<string, CampaignRow>();
+    const group = (campaign: string | null, content: string | null, source: string, fromAd: boolean) => {
+      const label = campaign || untaggedLabel(source, fromAd);
+      const ad = byAd ? content || "(no ad tag)" : null;
+      const key = `${label}|${ad ?? ""}`;
+      let row = groups.get(key);
+      if (!row) {
+        const spend = !byAd && campaign ? spendOf.get(campaign) ?? null : null;
+        row = { key, label, ad, tagged: Boolean(campaign), source, visits: 0, buyTaps: 0, sales: 0, revenue: 0, conversion: null, spend, allTimeRevenue: 0, roas: null };
+        groups.set(key, row);
+      }
+      return row;
+    };
+    const paidVisits = new Map<string, number>();
+    for (const r of visitRows) {
+      const row = group(r.utm_campaign, r.utm_content, r.source ?? "direct", Boolean(r.from_ad));
+      row.visits += Number(r.visits);
+      if (r.step >= 3) row.buyTaps += Number(r.visits);
+      if (r.step >= 6) paidVisits.set(row.key, (paidVisits.get(row.key) ?? 0) + Number(r.visits));
+    }
+    for (const { a, o } of paidTracked) {
+      const row = group(a.utm_campaign, a.utm_content, sourceOf(a), Boolean(a.from_ad));
+      row.allTimeRevenue += net(o);
+      if (inPeriod(o)) {
+        row.sales++;
+        row.revenue += net(o);
+      }
+    }
+    const list = [...groups.values()];
+    for (const row of list) {
+      row.conversion = row.visits ? (paidVisits.get(row.key) ?? 0) / row.visits : null;
+      row.roas = row.spend ? row.allTimeRevenue / row.spend : null;
+    }
+    return list
+      .filter((r) => r.visits > 0 || r.sales > 0 || r.spend !== null)
+      .sort((x, y) => y.revenue - x.revenue || y.visits - x.visits);
+  };
+
+  const trackedIds = new Set(attribution.map((a) => a.id));
+  const trackingFrom = since ? ms(since) : Infinity;
+  const untrackedSales = all.filter((o) => o.status === "paid" && inPeriod(o) && ms(o.created_at) >= trackingFrom && !trackedIds.has(o.id)).length;
+
+  return { ready: true, since, funnel, books, campaigns: build(false), ads: build(true).filter((r) => r.tagged).slice(0, 15), untrackedSales };
 }
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -408,7 +549,7 @@ const hourLabel = (h: number) => `${((h + 11) % 12) + 1} ${h < 12 ? "am" : "pm"}
 
 /** Plain-language findings for the top of the page, most urgent first. */
 function buildInsights(
-  a: Pick<Analytics, "money" | "lost" | "failures" | "books" | "hours" | "whatsapp" | "ads">,
+  a: Pick<Analytics, "money" | "lost" | "failures" | "books" | "hours" | "whatsapp" | "ads" | "traffic">,
   title: (productId: number) => string,
 ): Analytics["insights"] {
   const out: Analytics["insights"] = [];
@@ -455,6 +596,24 @@ function buildInsights(
   const low = a.books.find((b) => b.lowConversion);
   if (low) {
     out.push({ tone: "bad", text: `“${title(low.productId)}”: ${low.tries} people tried, only ${low.paid} paid — check its price, cover and description.` });
+  }
+  const f = a.traffic.funnel;
+  if (a.traffic.ready && f[0] >= 30) {
+    // The step that loses the most people (of those who reached the step before).
+    let worst = -1;
+    for (let i = 1; i < f.length; i++) {
+      if (f[i - 1] >= 10 && (worst < 0 || f[i] / f[i - 1] < f[worst] / f[worst - 1])) worst = i;
+    }
+    if (worst > 0) {
+      out.push({
+        tone: "info",
+        text: `Biggest drop-off: ${FUNNEL_STEPS[worst - 1]} → ${FUNNEL_STEPS[worst]} — only ${pct(f[worst] / f[worst - 1])} go on (${f[worst]} of ${f[worst - 1]} visits).`,
+      });
+    }
+  }
+  const best = a.traffic.campaigns.filter((c) => c.tagged && c.sales > 0).sort((x, y) => y.revenue - x.revenue)[0];
+  if (best) {
+    out.push({ tone: "good", text: `Best campaign: “${best.label}” — ${best.sales} sales, ${inr(best.revenue)}${best.roas !== null ? `, ${best.roas.toFixed(1)}× its ad spend` : ""}.` });
   }
   const ad = a.ads.fromAds;
   const totalPaid = ad.paid + a.ads.other.paid;

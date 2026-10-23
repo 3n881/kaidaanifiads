@@ -15,6 +15,7 @@ import { collectMetaSignals } from "@/lib/meta-capi";
 import { cleanBuyerName, cleanIndianMobile } from "@/lib/buyer";
 import { saveLead } from "@/lib/leads";
 import { agreeText } from "@/lib/buy-copy";
+import { cleanId, cleanVisitSource, isMissingSchema } from "@/lib/visit-events";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown; agreed?: unknown; form?: unknown; consentLocale?: unknown };
+  let body: { slug?: string; locale?: string; name?: unknown; phone?: unknown; offersConsent?: unknown; agreed?: unknown; form?: unknown; consentLocale?: unknown; visit?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -221,6 +222,21 @@ async function handle(req: NextRequest) {
       // 42703 = migration 010 not applied yet: the Purchase is still sent, with the phone only.
       if (signalError && signalError.code !== "42703") {
         console.error("[checkout] meta signals not saved", orderId, signalError.message);
+      }
+    });
+  }
+
+  // Visit + campaign tags from our own tracking (migration 016, src/lib/visit-tracking.ts),
+  // so the admin can see which campaign / ad brought each sale. After the response, best effort.
+  const visit = body.visit && typeof body.visit === "object" ? (body.visit as Record<string, unknown>) : null;
+  const visitId = visit ? cleanId(visit.visitId) : null;
+  if (visit && visitId) {
+    const attribution = { visit_id: visitId, ...cleanVisitSource(visit) };
+    after(async () => {
+      const { error: visitError } = await admin.from("orders").update(attribution).eq("id", orderId);
+      // Missing columns = migration 016 not applied yet: the sale just isn't credited to a campaign.
+      if (visitError && !isMissingSchema(visitError.code)) {
+        console.error("[checkout] visit not saved", orderId, visitError.message);
       }
     });
   }

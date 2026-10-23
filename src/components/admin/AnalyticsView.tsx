@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Filter,
   IndianRupee,
   Info,
   Megaphone,
@@ -20,7 +21,8 @@ import AdminShell from "@/components/admin/AdminShell";
 import { CustomRange, FreshnessBadge, PendingHint, RefreshButton } from "@/components/admin/OrdersClientBits";
 import { KpiCard, Trend } from "@/components/admin/OrdersView";
 import type { AdminProduct } from "@/lib/admin";
-import type { Analytics, Counted } from "@/lib/analytics";
+import CampaignSpendInput from "@/components/admin/CampaignSpendInput";
+import { FUNNEL_STEPS, type Analytics, type CampaignRow, type Counted } from "@/lib/analytics";
 import { coverThumbSrc } from "@/lib/covers";
 import type { OrderPeriod } from "@/lib/sales";
 
@@ -141,6 +143,96 @@ export default function AnalyticsView({ data, products, period, from, to }: { da
           headers={["Day", "Tried", "Paid", "₹"]}
           newestFirst
         />
+      </Card>
+
+      {/* Visit funnel (our own tracking, migration 016) */}
+      <Card title="From visit to payment" icon={Filter} note={data.traffic.since ? `our own visit count from ${dayLabel(istDay(data.traffic.since), { day: "numeric", month: "short" })}` : undefined}>
+        {!data.traffic.ready ? (
+          <TrackingNotReady />
+        ) : data.traffic.funnel[0] === 0 ? (
+          <p className="text-sm text-brand-500">No visits recorded in this period yet.</p>
+        ) : (
+          <>
+            <Funnel steps={data.traffic.funnel} />
+            {data.traffic.books.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-bold text-brand-800">Per book</h3>
+                <ol className="mt-2 divide-y divide-brand-50">
+                  {data.traffic.books.slice(0, 12).map((b) => (
+                    <li key={b.productId} className="py-2.5">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="font-deva line-clamp-2 min-w-0 text-sm font-bold leading-snug text-brand-900">{title(b.productId)}</p>
+                        <span className="shrink-0 text-xs font-bold tabular-nums text-brand-700">{pct(b.steps[0] ? b.steps[4] / b.steps[0] : null)} paid</span>
+                      </div>
+                      <div className="mt-1.5 grid grid-cols-5 gap-1 text-center">
+                        {b.steps.map((n, i) => {
+                          const prev = i ? b.steps[i - 1] : null;
+                          const low = prev !== null && prev >= 5 && n / prev < 0.3;
+                          return (
+                            <div key={BOOK_STEPS[i]} className={`min-w-0 rounded-lg px-0.5 py-1 ${low ? "bg-red-50 text-red-800" : "bg-brand-50/60 text-brand-900"}`}>
+                              <p className="text-sm font-extrabold tabular-nums">{n}</p>
+                              <p className="truncate text-[10px] leading-tight opacity-75">{BOOK_STEPS[i]}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                {data.traffic.books.length > 12 && <p className="mt-1 text-xs text-brand-500">Top 12 of {data.traffic.books.length} books shown (most viewed first).</p>}
+                <p className="mt-1 text-[11px] leading-snug text-brand-400">Red = fewer than 3 in 10 went on from the step before. Tapping Buy on a book list also counts as a book view.</p>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Campaigns & ads */}
+      <Card title="Campaigns & ads" icon={Megaphone} note="which link brought each visit and sale">
+        {!data.traffic.ready ? (
+          <TrackingNotReady />
+        ) : data.traffic.campaigns.length === 0 ? (
+          <p className="text-sm text-brand-500">No visits recorded in this period yet.</p>
+        ) : (
+          <>
+            <ul className="divide-y divide-brand-50">
+              {data.traffic.campaigns.slice(0, 20).map((c) => (
+                <CampaignItem key={c.key} c={c} />
+              ))}
+            </ul>
+            {data.traffic.ads.length > 0 && (
+              <div className="mt-5">
+                <h3 className="text-sm font-bold text-brand-800">By ad</h3>
+                <BarList
+                  items={data.traffic.ads.map((a) => ({
+                    label: `${a.ad} · ${a.label}`,
+                    value: a.visits,
+                    fill: a.sales,
+                    right: `${inr(a.revenue)} · ${a.sales}/${a.visits}`,
+                  }))}
+                  fillLegend="₹ revenue · sales/visits · bar = visits, dark part = sales"
+                />
+              </div>
+            )}
+            {data.traffic.untrackedSales > 0 && (
+              <p className="mt-3 text-[11px] leading-snug text-brand-400">
+                {data.traffic.untrackedSales} paid order{data.traffic.untrackedSales === 1 ? "" : "s"} in this period had no visit record (page opened before tracking started, or the browser blocks storage) and {data.traffic.untrackedSales === 1 ? "is" : "are"} not in this list.
+              </p>
+            )}
+          </>
+        )}
+        <details className="mt-3 text-xs text-brand-500">
+          <summary className="cursor-pointer font-semibold text-brand-600">How to tag Meta ads</summary>
+          <p className="mt-2 leading-snug">
+            In Ads Manager open each ad → <b>Tracking</b> → <b>URL parameters</b> and paste:
+          </p>
+          <code className="mt-1 block break-all rounded-lg bg-brand-50 px-2 py-1.5 text-[11px] text-brand-800">
+            {"utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}"}
+          </code>
+          <p className="mt-2 leading-snug">
+            Each campaign then shows here by name and each ad under “By ad”. Type the total spend from Ads Manager next to a campaign to see the rupees it earns per rupee spent (all-time sales ÷ spend). Untagged ad clicks show as “Meta ad (no campaign tag)”.
+          </p>
+        </details>
       </Card>
 
       {/* Lost sales & recovery */}
@@ -371,7 +463,7 @@ export default function AnalyticsView({ data, products, period, from, to }: { da
             <Stat label="Other visitors" value={inr(data.ads.other.revenue)} sub={`${data.ads.other.paid} paid of ${data.ads.other.tries} · ${pct(rate({ sales: data.ads.other.tries, recovered: data.ads.other.paid }))}`} />
           </div>
           <p className="mt-3 text-[11px] leading-snug text-brand-400">
-            “From an ad click” = Meta&apos;s ad-click marker was on the buyer&apos;s browser at checkout. Which ad or campaign brought each sale needs campaign tracking (next step).
+            “From an ad click” = Meta&apos;s ad-click marker was on the buyer&apos;s browser at checkout. Which campaign and ad brought each sale: see “Campaigns &amp; ads” above.
           </p>
         </Card>
       </div>
@@ -380,6 +472,76 @@ export default function AnalyticsView({ data, products, period, from, to }: { da
         <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Live payments from 11 Oct 2026. “Tried” counts each buyer once per book. Numbers refresh every 30 s (or press Refresh).
       </p>
     </AdminShell>
+  );
+}
+
+const BOOK_STEPS = ["Viewed", "Buy", "Details", "Razorpay", "Paid"];
+const istDay = (iso: string) => new Date(Date.parse(iso) + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+function TrackingNotReady() {
+  return (
+    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      Visit tracking is waiting for its database table: run <b className="break-all">supabase/migrations/016_visit_events.sql</b> in the Supabase SQL editor. Numbers start from the first visit after that.
+    </p>
+  );
+}
+
+/** Funnel steps as bars (width = share of all visits) with the drop-off between steps. */
+function Funnel({ steps }: { steps: number[] }) {
+  const top = Math.max(1, steps[0]);
+  return (
+    <ol className="space-y-1">
+      {steps.map((n, i) => {
+        const prev = i ? steps[i - 1] : null;
+        const goOn = prev ? n / prev : null;
+        return (
+          <li key={FUNNEL_STEPS[i]}>
+            {prev !== null && (
+              <p className={`py-0.5 pl-3 text-[11px] font-semibold ${goOn !== null && goOn <= 0.3 ? "text-danger-600" : "text-brand-400"}`}>
+                ↓ {pct(goOn)} go on · {(prev - n).toLocaleString("en-IN")} left here
+              </p>
+            )}
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 font-semibold text-brand-800">{FUNNEL_STEPS[i]}</span>
+              <span className="shrink-0 text-xs font-bold tabular-nums text-brand-700">
+                {n.toLocaleString("en-IN")}
+                {i > 0 && <span className="font-normal text-brand-400"> · {pct(n / top)} of visits</span>}
+              </span>
+            </div>
+            <div className="mt-1 h-3 overflow-hidden rounded-full bg-brand-50">
+              <div className="h-full rounded-full bg-brand-teal/80" style={{ width: `${Math.max((n / top) * 100, n ? 1.5 : 0)}%` }} />
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function CampaignItem({ c }: { c: CampaignRow }) {
+  return (
+    <li className="py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-bold leading-snug text-brand-900">{c.label}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-brand-500">
+            {c.tagged && <span className="mr-1 rounded bg-brand-50 px-1.5 py-0.5 font-semibold text-brand-600">{c.source}</span>}
+            {c.visits} visits · {c.buyTaps} tapped Buy · {c.sales} sale{c.sales === 1 ? "" : "s"} · <b className="text-brand-700">{pct(c.conversion)}</b> of visits paid
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-extrabold tabular-nums text-brand-900">{inr(c.revenue)}</span>
+      </div>
+      {c.tagged && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <CampaignSpendInput campaign={c.label} spend={c.spend} />
+          {c.roas !== null && (
+            <span className={`text-xs font-bold ${c.roas >= 1 ? "text-green-700" : "text-danger-600"}`}>
+              {c.roas.toFixed(2)}× return · {inr(Math.round(c.allTimeRevenue))} all-time sales
+            </span>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 

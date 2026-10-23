@@ -579,6 +579,25 @@ export async function sendRemindersAction(orderIds: string[]): Promise<{ sent: n
   return { sent, skipped };
 }
 
+/** Analytics → Campaigns: total ad spend for one campaign (₹, empty = clear) → return on ad spend. */
+export async function saveCampaignSpend(campaign: string, spend: string): Promise<{ ok: boolean; message?: string }> {
+  await requireAdmin();
+  const name = campaign.trim().slice(0, 100);
+  if (!name) return { ok: false, message: "No campaign" };
+  const admin = getSupabaseAdmin();
+  const value = spend.replace(/[₹,\s]/g, "");
+  const { error } =
+    value === ""
+      ? await admin.from("campaign_spend").delete().eq("campaign", name)
+      : Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) < 1e9
+        ? await admin.from("campaign_spend").upsert({ campaign: name, spend: Math.round(Number(value) * 100) / 100, updated_at: new Date().toISOString() })
+        : { error: { message: "Enter an amount in ₹" } };
+  if (error) return { ok: false, message: error.message };
+  updateTag(ADMIN_DATA_TAG);
+  revalidatePath("/dashboard/analytics");
+  return { ok: true };
+}
+
 /** Refresh button on Overview / Orders: drop the 30-second dashboard cache, then the page re-reads. */
 export async function refreshAdminData() {
   await requireAdmin();

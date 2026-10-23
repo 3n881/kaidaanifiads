@@ -11,6 +11,7 @@ import { UI_COPY, type Locale } from "@/lib/i18n";
 import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
+import { trackVisit, visitForCheckout } from "@/lib/visit-tracking";
 import { NOT_PAID_COPY } from "@/lib/lead-copy";
 import { BUY_FORM_COPY } from "@/lib/buy-copy";
 import { cleanBuyerName, cleanIndianMobile, loadSavedBuyer, saveBuyer } from "@/lib/buyer";
@@ -192,6 +193,7 @@ function BuyModal({
     }, 0);
     // Same moment as before (Buy tapped), so Meta's funnel stays comparable.
     trackPixel("InitiateCheckout", pixelProduct({ id: product.id, title: product.title, price: product.price }));
+    trackVisit("buy_tap", product.id);
     return () => {
       window.clearTimeout(id);
       document.body.style.overflow = "";
@@ -231,6 +233,8 @@ function BuyModal({
       started.current = true;
       setStep("processing");
       const pixelParams = pixelProduct({ id: product.id, title: product.title, price: product.price });
+      // Admin funnel: details accepted (sent now — Razorpay may cover the page next).
+      trackVisit("details", product.id, true);
       try {
         const checkoutRequest = fetch("/api/checkout", {
           method: "POST",
@@ -246,6 +250,8 @@ function BuyModal({
             agreed: true,
             consentLocale: locale,
             form: 2, // popup with the required agreement box (server checks it)
+            // Which visit / campaign this sale belongs to (admin analytics; no personal data).
+            visit: visitForCheckout(),
           }),
         });
 
@@ -341,6 +347,7 @@ function BuyModal({
           failedRef.current = response?.error?.description || "failed";
         });
         razorpay.open();
+        trackVisit("razorpay_open", product.id, true);
       } catch {
         fail(UI_COPY[locale].checkoutFailed);
       }
