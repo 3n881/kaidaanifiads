@@ -68,7 +68,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | Interakt (WhatsApp API) | Client's account. Sender name "AS Consultancy Services". Templates `payment_sucess_pdf_v2` (sic) and `pending_followup_v2` |
 | cron-job.org | `POST https://kaydyachaanifayddyacha.com/api/cron/reconcile` every 10 min, `Authorization: Bearer <CRON_SECRET>` |
 | UptimeRobot | HTTPS monitor on `/api/health` every 5 min |
-| Meta Pixel | **On since 2026-10-14**: ID `1323976956324834` (GitHub variable `NEXT_PUBLIC_META_PIXEL_IDS`). Domain verification + Conversions API token still to come from the client (§11 item 8) |
+| Meta Pixel | **Two pixels since 2026-10-23**: `NEXT_PUBLIC_META_PIXEL_IDS=1323976956324834,938102005677893`. `1323976956324834` (first) = browser + Conversions API (server copy of each sale, token for this pixel only). `938102005677893` = **the pixel the Meta ads track** ("Kaydyach aani Faydyach Ebook"), browser events only — client can't give a CAPI token for it. ⚠️ Keep `1323976956324834` FIRST (server `META_PIXEL_ID` is empty → CAPI goes to the first ID; the token would be refused by the other pixel). Checked live 23 Oct 7:55 pm: both pixels load and send PageView + ViewContent |
 
 ### Where secrets live (never commit, never paste in chat)
 
@@ -78,7 +78,7 @@ The owner wants our UI to **look like the original**, but with our safer and sim
 | SSH key `kaf-key.pem`, Origin cert `origin.pem`/`origin.key`, GHCR token | `C:\Users\shivr\kaf-keys\` on the admin laptop |
 | Mumbai Supabase keys + DB URL, Cloudflare Zone ID, purge token, `CLOUDFLARE_RULES_TOKEN` | `.env.mumbai` in the project folder (git-ignored) |
 | Local dev settings | `.env.local` (git-ignored). **Points at the PRODUCTION Mumbai database**: any local write or script run is live immediately. Old Tokyo values are in `.env.local.tokyo-backup` |
-| Build-time public values | GitHub → Settings → Secrets and variables → Actions → **Variables**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_MEDIA_PROXY=true`, `NEXT_PUBLIC_META_PIXEL_IDS` (`1323976956324834`), `DEPLOY_ENABLED=true`, `DEPLOY_HOSTS`, `DEPLOY_LIGHTSAIL_INSTANCE=kaf-a` |
+| Build-time public values | GitHub → Settings → Secrets and variables → Actions → **Variables**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_MEDIA_PROXY=true`, `NEXT_PUBLIC_META_PIXEL_IDS` (`1323976956324834,938102005677893` — order matters, see Meta Pixel row), `DEPLOY_ENABLED=true`, `DEPLOY_HOSTS`, `DEPLOY_LIGHTSAIL_INSTANCE=kaf-a` |
 | Deploy secrets | GitHub Secrets: `DEPLOY_SSH_KEY`, `AWS_DEPLOY_ACCESS_KEY_ID`, `AWS_DEPLOY_SECRET_ACCESS_KEY` (IAM user `github-deploy`, may only edit Lightsail port rules) |
 
 ---
@@ -592,7 +592,7 @@ production, add or update its row here in the same session.** ✅ = set and conf
 | `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | ✅ (purge on admin save + after deploys) |
 | `META_CAPI_ACCESS_TOKEN` | ✅ added by the owner **10-16 ~11:48** (copy in `C:\Users\shivr\kaf-keys\meta-capi-token.txt`); verified with a real sale 3:37 pm. Empty = CAPI off |
 | `META_CAPI_TEST_EVENT_CODE` | Only while testing (events go to Test events only, real sales not counted) — **must be removed** after the test |
-| `META_PIXEL_ID` | optional; empty = first of `NEXT_PUBLIC_META_PIXEL_IDS` (`1323976956324834`) |
+| `META_PIXEL_ID` | optional; empty (current) = first of `NEXT_PUBLIC_META_PIXEL_IDS` = `1323976956324834`, the pixel the CAPI token belongs to |
 After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy.sh` (zero downtime, §7b).
 
 ### GitHub (`3n881/kaidaanifiads` → Settings → Secrets and variables → Actions)
