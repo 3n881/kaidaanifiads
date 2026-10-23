@@ -645,7 +645,7 @@ After editing `app.env`: `cd /opt/kaf && IMAGE=$(cat .current-image) bash deploy
 | **Conversions API token** | Events Manager → pixel → Settings → Conversions API → *Generate access token* (client) → save to `C:\Users\shivr\kaf-keys\meta-capi-token.txt` (**never in chat**) → server `app.env` | ✅ received + saved 10-16; on the server (`app.env`). **No domain verification needed** | 10-16 |
 | Domain verification | Business Settings → Brand safety and suitability → Domains → Add → "Update DNS TXT record" → client sends the line → we add TXT in Cloudflare → client clicks Verify | ⏳ asked 10-15; optional, not blocking ads | — |
 | Server-side Purchase (CAPI) code | `src/lib/meta-capi.ts` + checkout signals + migration 010 (§11 item 8) | ✅ live `ebc643f`; first real send order #8, 3:37 pm | 10-16 |
-| **Campaign tags on every ad** (for Dashboard → Analytics → Campaigns & ads) | Ads Manager → each ad → Tracking → URL parameters: `utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}` | ⏳ owner/client (untagged ad clicks still show as "Meta ad (no campaign tag)") | — |
+| **Campaign tags on every ad** (for Dashboard → Analytics → Campaigns & ads) | Ads Manager → each ad → Tracking → URL parameters: `utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}` | ⏳ owner/client (untagged ad clicks still show as "Meta ad (no campaign tag)"); steps: `docs/meta-ads-campaign-tags.md`, §11 item 12 | — |
 
 ### Monitoring, cron and other services
 | Setting | Where | State | When |
@@ -1014,6 +1014,10 @@ Full list with meanings: `.env.local.example` (local) and `deploy/app.env.exampl
 10. Hindi versions of both Interakt templates (optional) → `INTERAKT_TEMPLATE_LANGUAGE_HI=hi` etc.
 11. Past buyers of the original site: their old download links stay on the old domain (it isn't moving).
     Later the client may forward the old domain to ours.
+12. ⏳ **Campaign tags on every Meta ad** (asked 2026-10-23; owner will tell the client): Ads Manager → each ad →
+    Tracking → URL parameters → `utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}`.
+    Step-by-step for the client: `docs/meta-ads-campaign-tags.md`. Until done, ad visits show as "Meta ad (no campaign tag)"
+    in Analytics. Daily reminder to the owner runs (scheduled task `remind-meta-ad-tags`) until the owner says it's done.
 
 ### After launch
 12. About a week without problems → pause, then delete the Tokyo Supabase project and the Replov
