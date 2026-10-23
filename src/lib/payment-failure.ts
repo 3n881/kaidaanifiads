@@ -56,6 +56,7 @@ export function failureFromPayment(p: FailedPaymentFields): PaymentFailure {
 // Razorpay's error_reason codes → short English for the dashboard.
 const LABELS: Record<string, string> = {
   payment_timeout: "Payment timed out",
+  payment_timed_out: "Payment timed out",
   payment_cancelled: "Cancelled by the customer",
   payment_failed: "Payment failed",
   incorrect_pin: "Wrong UPI PIN",

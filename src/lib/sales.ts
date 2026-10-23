@@ -289,7 +289,7 @@ export function parseOrderFilters(params: Record<string, string | string[] | und
 const istMidnight = (date: string) => Date.parse(`${date}T00:00:00+05:30`);
 
 /** [start, end) of the chosen period and of the one before it (same length), epoch ms. */
-function periodRange(f: ReturnType<typeof parseOrderFilters>, now: number) {
+export function periodRange(f: ReturnType<typeof parseOrderFilters>, now: number) {
   const today = startOfTodayIst(now);
   if (f.period === "today") return { start: today, end: now, prevStart: today - DAY_MS, prevEnd: now - DAY_MS };
   const days = PERIOD_DAYS[f.period];
