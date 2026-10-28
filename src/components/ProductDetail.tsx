@@ -282,6 +282,9 @@ export default function ProductDetail({
             <WhatsAppHint text={t.whatsappHint} />
           </div>
 
+          {/* Everything below Buy is under the first screen on phones: .cv-auto lets
+              the browser skip laying it out until it is scrolled to (page speed). */}
+          <div className="cv-auto">
           {/* what's inside a set */}
           {product.isCombo && comboBooks.length > 0 && <BookChecklist books={comboBooks} price={product.price} t={t} />}
 
@@ -360,6 +363,8 @@ export default function ProductDetail({
                 <ShareButton title={product.title} label={t.share} copied={t.copied} />
               </div>
             </div>
+          </div>
+
           </div>
 
           {/* FAQ */}
