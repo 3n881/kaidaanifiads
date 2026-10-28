@@ -24,7 +24,7 @@ import {
   localizeProduct,
 } from "@/lib/catalog";
 import { SITE } from "@/data/catalog";
-import { coverSrc, coverSrcSet, coverThumbSrc, PHONE_COVER_MAX, PHONE_COVER_SIZES, PHONE_MEDIA, WIDE_COVER_SIZES, WIDE_MEDIA } from "@/lib/covers";
+import { coverSrc, coverSrcSet, PHONE_COVER_MAX, PHONE_COVER_SIZES, PHONE_MEDIA, WIDE_COVER_SIZES, WIDE_MEDIA } from "@/lib/covers";
 import { previewPdfUrl } from "@/lib/previews";
 import { SITE_URL } from "@/lib/supabase/config";
 import BuyButton from "./BuyButton";
@@ -36,7 +36,7 @@ import Carousel from "./Carousel";
 import ProductGallery from "./ProductGallery";
 import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
-import { PRODUCT_COPY } from "@/lib/product-copy";
+import { GALLERY_COPY, PRODUCT_COPY } from "@/lib/product-copy";
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
 
@@ -65,6 +65,17 @@ export default function ProductDetail({
   const t = PRODUCT_COPY[editionLocale];
   const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
   const offers = comboOffers.map((item) => localizeProduct(item, locale));
+  const g = GALLERY_COPY[editionLocale];
+  // Cover slider after this book's cover (client, 28 Oct): a combo's books, else
+  // the combos with this book, else other titles.
+  const slides = comboBooks.length
+    ? comboBooks.map((item, i) => ({ product: item, label: g.bookOf(i + 1, comboBooks.length) }))
+    : offers.length
+      ? offers.map((item) => ({ product: item, label: t.comboBooks(item.setSize ?? 2) }))
+      : related.slice(0, 4).map((item) => ({ product: item, label: g.more }));
+  // Swipe row under Buy: the combos with this book, else other titles (then
+  // the "you may also like" row at the bottom would repeat it, so it is left out).
+  const alsoBuy = offers.length ? offers : related.slice(0, 6);
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
@@ -140,7 +151,7 @@ export default function ProductDetail({
         {/* Preview viewer — full width on phones; the sticky bar keeps price
             and Buy on screen (as on the previous site). */}
         <div className="mx-auto w-full max-w-md lg:sticky lg:top-24 lg:max-w-none lg:self-start">
-          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} />
+          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} others={slides} />
         </div>
 
         {/* Info — styling follows the original site's book page */}
@@ -224,8 +235,8 @@ export default function ProductDetail({
             <BuyButton
               product={product}
               offers={comboOffers}
-              label={copy.downloadNow}
-              className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
+              label={`${copy.downloadNow} · ₹${product.price}`}
+              className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
             />
             <p className="font-deva flex items-center justify-center gap-1 text-center text-[10px] text-brand-500">
               <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
@@ -234,7 +245,9 @@ export default function ProductDetail({
             <WhatsAppHint text={t.whatsappHint} />
           </div>
 
-          {offers.length > 0 && <ComboOffers book={product} offers={offers} t={t} />}
+          {alsoBuy.length > 0 && (
+            <AlsoBuyRow book={product} items={alsoBuy} title={offers.length ? t.comboOffer : g.alsoBuy} t={t} g={g} />
+          )}
 
           {/* chips */}
           <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
@@ -364,7 +377,7 @@ export default function ProductDetail({
       </div>
 
       {/* Related products */}
-      {related.length > 0 && (
+      {offers.length > 0 && related.length > 0 && (
         <section className="cv-auto mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
@@ -400,58 +413,59 @@ function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string })
   );
 }
 
-/** Under Buy on a single book: the combos that include it, each with its
- *  saving against buying the books one by one at this book's price. */
-function ComboOffers({
+/** Under Buy: a swipe row of books / combos, each with its own big Buy
+ *  (client, 28 Oct). For a combo with this book, the saving against buying
+ *  the books one by one at this book's price. */
+function AlsoBuyRow({
   book,
-  offers,
+  items,
+  title,
   t,
+  g,
 }: {
   book: Product;
-  offers: Product[];
+  items: Product[];
+  title: string;
   t: (typeof PRODUCT_COPY)[keyof typeof PRODUCT_COPY];
+  g: (typeof GALLERY_COPY)[keyof typeof GALLERY_COPY];
 }) {
   return (
-    <section className="mb-4 rounded-2xl border-2 border-brand-gold/60 bg-amber-50/60 p-3 sm:p-4">
-      <h3 className="font-deva flex items-center gap-1.5 text-sm font-extrabold text-brand-teal sm:text-base">
-        <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {t.comboOffer}
+    <section className="mb-4 rounded-2xl border-2 border-brand-gold/60 bg-amber-50/60 py-3">
+      <h3 className="font-deva flex items-center gap-1.5 px-3 text-sm font-extrabold text-brand-teal sm:text-base">
+        <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {title}
       </h3>
-      <p className="font-deva mt-0.5 text-[11px] text-brand-500">{t.comboOfferBody}</p>
-      <ul className="mt-3 space-y-2">
-        {offers.map((offer) => {
-          const size = offer.setSize ?? 0;
-          const saving = size > 1 ? size * book.price - offer.price : 0;
+      <ul className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-3 px-3 pb-1">
+        {items.map((item) => {
+          const size = item.isCombo ? item.setSize ?? 0 : 1;
+          const saving = item.isCombo && !book.isCombo && size > 1 ? size * book.price - item.price : 0;
+          const href = `/${item.isCombo ? "combos" : "ebooks"}/${item.slug}`;
           return (
-            <li key={offer.id}>
-              <Link
-                href={`/combos/${offer.slug}`}
-                className="flex items-center gap-3 rounded-xl border border-amber-200 bg-white p-2 transition hover:border-brand-gold"
-              >
-                <span className="h-14 w-[42px] shrink-0 overflow-hidden rounded-md bg-brand-50 ring-1 ring-brand-100">
-                  {offer.coverImage && (
-                    // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP thumbnail
-                    <img src={coverThumbSrc(offer.coverImage)} alt="" width={42} height={56} loading="lazy" className="h-full w-full object-cover" />
+            <li key={item.id} className="flex w-[62%] max-w-[230px] shrink-0 snap-start flex-col rounded-xl border border-amber-200 bg-white p-2">
+              <Link href={href} className="block">
+                <span className="relative block aspect-[3/4] overflow-hidden rounded-lg bg-brand-50">
+                  {item.coverImage && (
+                    // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
+                    <img src={coverSrc(item.coverImage)} alt={item.title} width={400} height={533} loading="lazy" className="h-full w-full object-cover" />
                   )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  {size > 1 && (
-                    <span className="font-deva block text-[11px] font-bold text-brand-teal">{t.comboBooks(size)}</span>
-                  )}
-                  <span className="font-deva line-clamp-2 text-xs font-semibold leading-snug text-brand-900">{offer.title}</span>
                   {saving > 0 && (
-                    <span className="font-deva mt-0.5 inline-block rounded bg-green-100 px-1.5 text-[10px] font-bold text-green-800">
+                    <span className="font-deva absolute left-1.5 top-1.5 rounded-md bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                       {t.comboSave(saving)}
                     </span>
                   )}
                 </span>
-                <span className="flex shrink-0 flex-col items-end leading-tight">
-                  {offer.mrp > offer.price && (
-                    <span className="text-[11px] font-semibold text-gray-400 line-through">₹{offer.mrp}</span>
-                  )}
-                  <span className="text-lg font-black text-green-700">₹{offer.price}</span>
-                  <span className="font-deva text-[10px] font-bold text-brand-teal">{t.comboView} ›</span>
-                </span>
+                {size > 1 && <span className="font-deva mt-1.5 block text-[11px] font-bold text-brand-teal">{t.comboBooks(size)}</span>}
+                <span className="font-deva mt-0.5 line-clamp-2 text-xs font-semibold leading-snug text-brand-900">{item.title}</span>
               </Link>
+              <span className="mt-auto flex items-baseline gap-1.5 pt-1.5">
+                {item.mrp > item.price && <span className="text-[11px] font-semibold text-gray-400 line-through">₹{item.mrp}</span>}
+                <span className="text-xl font-black text-green-600">₹{item.price}</span>
+              </span>
+              <BuyButton
+                product={item}
+                showIcon={false}
+                label={g.buyNow}
+                className="font-deva mt-1.5 flex min-h-11 w-full items-center justify-center rounded-lg bg-brand-gold px-3 py-2 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
+              />
             </li>
           );
         })}
