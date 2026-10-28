@@ -226,45 +226,30 @@ export async function getComboBySlug(
   return (await getCombos()).find((p) => p.slug === slug);
 }
 
-/** The books included in a combo (via combo_items). Empty if none assigned. */
-export async function getComboBooks(comboId: number): Promise<Product[]> {
-  if (!isSupabaseConfigured) return [];
-  const supabase = getSupabase();
-  const current = await supabase
-    .from("combo_items")
-    .select(`product_id, products:product_id(${PUBLIC_COLUMNS})`)
-    .eq("combo_id", comboId);
-  let data: unknown = current.data;
-  let error = current.error;
-  if (current.error?.code === "42703") {
-    const v3 = await supabase
-      .from("combo_items")
-      .select(`product_id, products:product_id(${V3_PUBLIC_COLUMNS})`)
-      .eq("combo_id", comboId);
-    data = v3.data;
-    error = v3.error;
-  }
-  if (error || !data) return [];
-  return (data as unknown as { products: ProductRow | null }[])
-    .map((r) => r.products)
-    .filter((p): p is ProductRow => Boolean(p))
-    .sort((a, b) => a.id - b.id)
-    .map(rowToProduct);
-}
-
-/** Visible combos that include this book (via combo_items), smallest set
- *  first — the "save with a combo" offer on a single book's page. */
-export async function getCombosContaining(bookId: number): Promise<Product[]> {
-  if (!isSupabaseConfigured) return [];
-  const { data, error } = await getSupabase()
-    .from("combo_items")
-    .select("combo_id")
-    .eq("product_id", bookId);
-  if (error || !data?.length) return [];
-  const ids = new Set(data.map((r) => Number(r.combo_id)));
-  return (await getCombos())
-    .filter((p) => ids.has(p.id))
-    .sort((a, b) => (a.setSize ?? 0) - (b.setSize ?? 0) || a.price - b.price || a.id - b.id);
+/** A book or set and everything linked to it through combo_items — the sets
+ *  holding its books and those sets' books: the choices of the offer picker on
+ *  its page (client, 28 Oct). Visible products only. `members` = the book ids
+ *  of each set. Empty when the product is not linked to anything. */
+export async function getProductFamily(
+  product: Product,
+): Promise<{ items: Product[]; members: Record<number, number[]> }> {
+  const none = { items: [], members: {} };
+  if (!isSupabaseConfigured) return none;
+  const { data, error } = await getSupabase().from("combo_items").select("combo_id, product_id");
+  if (error || !data?.length) return none;
+  const catalog = new Map((await loadCatalog()).map((p) => [p.id, p]));
+  const links = data
+    .map((l) => ({ combo: Number(l.combo_id), book: Number(l.product_id) }))
+    .filter((l) => catalog.has(l.combo) && catalog.has(l.book));
+  const books = product.isCombo ? links.filter((l) => l.combo === product.id).map((l) => l.book) : [product.id];
+  const comboIds = new Set(links.filter((l) => books.includes(l.book)).map((l) => l.combo));
+  if (!comboIds.size) return none;
+  const members: Record<number, number[]> = {};
+  for (const l of links) if (comboIds.has(l.combo)) (members[l.combo] ??= []).push(l.book);
+  for (const list of Object.values(members)) list.sort((a, b) => a - b);
+  const ids = [...new Set(Object.values(members).flat())].sort((a, b) => a - b);
+  const items = [...ids, ...[...comboIds].sort((a, b) => a - b)].map((id) => catalog.get(id)!);
+  return { items, members };
 }
 
 /** Related products for a detail page: every other title (ebooks and

@@ -40,26 +40,30 @@ import Carousel from "./Carousel";
 import ProductGallery from "./ProductGallery";
 import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
+import { replaceProductAddress } from "@/lib/meta-pixel";
 import { GALLERY_COPY, PRODUCT_COPY } from "@/lib/product-copy";
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
 
 export default function ProductDetail({
-  product: sourceProduct,
+  product: openedProduct,
   relatedProducts = [],
-  comboBooks: sourceComboBooks = [],
-  comboOffers = [],
-  offerBooks = {},
+  family = [],
+  members = {},
 }: {
   product: Product;
   relatedProducts?: Product[];
-  comboBooks?: Product[];
-  /** Combos that include this (single) book — the offer cards. */
-  comboOffers?: Product[];
-  /** The books inside each offer, by combo id. */
-  offerBooks?: Record<number, Product[]>;
+  /** The books and sets linked to this product (the offer picker); empty when none. */
+  family?: Product[];
+  /** Book ids of each set in `family`. */
+  members?: Record<number, number[]>;
 }) {
   const { locale } = useLanguage();
+  // Offer picker (client, 28 Oct): the page opens on the product of its address
+  // and switches in place to any book or set of its group — title, price,
+  // preview, description, Buy and the address all follow the selection.
+  const [selectedId, setSelectedId] = useState(openedProduct.id);
+  const sourceProduct = family.find((item) => item.id === selectedId) ?? openedProduct;
   const product = localizeProduct(sourceProduct, locale);
   // Every other title, each shown in its own edition (as on the previous site).
   const related = relatedProducts.map((item) => localizeProduct(item, locale));
@@ -70,54 +74,42 @@ export default function ProductDetail({
   // Labels follow the edition on show (a Hindi-only book reads in Hindi).
   const copy = UI_COPY[editionLocale];
   const t = PRODUCT_COPY[editionLocale];
-  const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
-  const offers = comboOffers.map((item) => localizeProduct(item, locale));
   const g = GALLERY_COPY[editionLocale];
-  // Offer cards (client, 28 Oct): the biggest set is ticked first; the Buy
-  // buttons and the phone's bottom bar always sell what is ticked.
-  const biggest = offers.reduce<Product | null>((best, o) => (!best || (o.setSize ?? 0) > (best.setSize ?? 0) ? o : best), null);
-  const [choiceId, setChoiceId] = useState<number | null>(biggest?.id ?? null);
-  const chosen = offers.find((o) => o.id === choiceId) ?? product;
-  // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
-  const chosenSize = chosen.isCombo ? chosen.setSize ?? 0 : 1;
-  // The big picture shows what is ticked: this book's cover, or the 2-book /
-  // 3-book set's cover (client, 28 Oct).
-  const heroImage = chosen.coverImage ?? product.coverImage;
-  const heroCover =
-    chosen.isCombo && chosen.coverImage
-      ? { image: chosen.coverImage, alt: chosen.title, label: `${t.setOf(chosenSize || 2)} · ₹${chosen.price}` }
-      : undefined;
-  // Cover slider after the big picture: a combo's books, else the other combos
-  // with this book, else other titles.
+  const group = family.map((item) => localizeProduct(item, locale));
+  const byId = new Map(group.map((item) => [item.id, item]));
+  const sizeOf = (item: Product) => (item.isCombo ? item.setSize ?? members[item.id]?.length ?? 0 : 1);
+  const productSize = sizeOf(product);
+  const comboBooks = (members[product.id] ?? []).flatMap((id) => byId.get(id) ?? []);
+  // The single book the buyer is "on": the shown one, or the opened one while a set is shown.
+  const anchorId = !product.isCombo ? product.id : !openedProduct.isCombo ? openedProduct.id : null;
+  const tiers = buildTiers(group, members, product, openedProduct.id, sizeOf);
+  const select = (item: Product) => {
+    setSelectedId(item.id);
+    replaceProductAddress(`/${item.isCombo ? "combos" : "ebooks"}/${item.slug}`);
+  };
+  // Cover slider after the big picture: a set's books, else the sets with this
+  // book, else other titles.
   const slides = comboBooks.length
     ? comboBooks.map((item, i) => ({ product: item, label: g.bookOf(i + 1, comboBooks.length) }))
-    : offers.length
-      ? offers.filter((item) => item.id !== chosen.id).map((item) => ({ product: item, label: t.comboBooks(item.setSize ?? 2) }))
+    : group.length
+      ? group.filter((item) => item.isCombo && item.id !== product.id).map((item) => ({ product: item, label: t.comboBooks(sizeOf(item)) }))
       : related.slice(0, 4).map((item) => ({ product: item, label: g.more }));
-  // The same choice as buttons in the phone's bottom bar: this book, then one per set size.
-  const barOptions = offers.length
-    ? [
-        { key: "1", label: t.pill(1), price: product.price, selected: !chosen.isCombo, onSelect: () => setChoiceId(null) },
-        ...[...new Set(offers.map((o) => o.setSize ?? 2))]
-          .sort((a, b) => a - b)
-          .map((size, index, sizes) => {
-            const group = offers.filter((o) => (o.setSize ?? 2) === size);
-            const current = group.find((o) => o.id === chosen.id) ?? group[0];
-            return {
-              key: String(size),
-              label: t.pill(size),
-              price: current.price,
-              best: index === sizes.length - 1,
-              selected: Boolean(group.find((o) => o.id === chosen.id)),
-              onSelect: () => setChoiceId(current.id),
-            };
-          }),
-      ]
-    : [];
-  const buyLabel = chosenSize > 1 ? t.buySet(chosenSize, chosen.price) : `${copy.downloadNow} · ₹${chosen.price}`;
-  // Swipe row under Buy (books without combos): other titles; the "you may
+  // The same choice as buttons in the phone's bottom bar (seen without scrolling).
+  const barOptions = tiers.map((tier) => ({
+    key: String(tier.size),
+    label: t.pill(tier.size),
+    price: tier.shown.price,
+    best: tier.best,
+    selected: tier.selected,
+    onSelect: () => select(tier.shown),
+  }));
+  // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
+  const buyLabel = productSize > 1 ? t.buySet(productSize, product.price) : `${copy.downloadNow} · ₹${product.price}`;
+  // Swipe row under Buy (books without a group): other titles; the "you may
   // also like" row at the bottom would repeat it, so that one is left out.
-  const alsoBuy = offers.length ? [] : related.slice(0, 6);
+  const alsoBuy = group.length ? [] : related.slice(0, 6);
+  // The first screen is the opened product's cover (server-rendered, preloaded).
+  const heroImage = openedProduct.coverImage;
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
@@ -171,7 +163,7 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={chosen} label={chosenSize > 1 ? t.buySetShort(chosenSize) : undefined} options={barOptions} pageBookId={product.id} />
+      <StickyBuyBar product={product} label={productSize > 1 ? t.buySetShort(productSize) : undefined} options={barOptions} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -193,7 +185,7 @@ export default function ProductDetail({
         {/* Preview viewer — full width on phones; the sticky bar keeps price
             and Buy on screen (as on the previous site). */}
         <div className="mx-auto w-full max-w-md lg:sticky lg:top-24 lg:max-w-none lg:self-start">
-          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} others={slides} cover={heroCover} />
+          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} others={slides} />
         </div>
 
         {/* Info — styling follows the original site's book page */}
@@ -232,8 +224,8 @@ export default function ProductDetail({
           </div>
 
           {/* price — or the offer cards on a book that is also sold in combos */}
-          {offers.length > 0 ? (
-            <OfferCards book={product} offers={offers} offerBooks={offerBooks} chosenId={chosen.id} onChoose={setChoiceId} t={t} />
+          {tiers.length > 0 ? (
+            <OfferCards tiers={tiers} current={product} anchorId={anchorId} members={members} byId={byId} onSelect={select} t={t} />
           ) : (
           <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-green-100 bg-green-50/60 p-3 md:p-4">
             <div className="flex flex-col">
@@ -279,8 +271,7 @@ export default function ProductDetail({
           {/* buy */}
           <div id="buy-now" className="mb-4 flex flex-col gap-2">
             <BuyButton
-              product={chosen}
-              pageBookId={product.id}
+              product={product}
               label={buyLabel}
               className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
             />
@@ -291,10 +282,7 @@ export default function ProductDetail({
             <WhatsAppHint text={t.whatsappHint} />
           </div>
 
-          {/* what's inside: the ticked combo (book page) or this combo (combo page) */}
-          {chosen.isCombo && (offerBooks[chosen.id]?.length ?? 0) > 0 && (
-            <BookChecklist books={offerBooks[chosen.id].map((b) => localizeProduct(b, locale))} price={chosen.price} t={t} />
-          )}
+          {/* what's inside a set */}
           {product.isCombo && comboBooks.length > 0 && <BookChecklist books={comboBooks} price={product.price} t={t} />}
 
           {alsoBuy.length > 0 && <AlsoBuyRow book={product} items={alsoBuy} title={g.alsoBuy} t={t} g={g} />}
@@ -353,9 +341,8 @@ export default function ProductDetail({
             <div className="pointer-events-none absolute right-0 top-0 -mr-10 -mt-10 h-28 w-28 rounded-full bg-brand-gold/10 blur-2xl" />
             <div className="relative z-10 flex flex-col gap-3">
               <BuyButton
-                product={chosen}
-                pageBookId={product.id}
-                label={chosenSize > 1 ? buyLabel : `${copy.downloadNow} (Download Now)`}
+                product={product}
+                label={productSize > 1 ? buyLabel : `${copy.downloadNow} (Download Now)`}
                 className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
               />
               <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">
@@ -398,7 +385,7 @@ export default function ProductDetail({
       </div>
 
       {/* Related products */}
-      {offers.length > 0 && related.length > 0 && (
+      {group.length > 0 && related.length > 0 && (
         <section className="cv-auto mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
@@ -434,99 +421,145 @@ function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string })
   );
 }
 
-/** Text-only offer cards: this book, then each combo size (2 books, all 3),
- *  with the price per book and the saving; a size with several combos asks
- *  for the second book. One tap ticks it — the Buy buttons follow. */
+type Tier = {
+  size: number;
+  items: Product[];
+  /** The item this tier sells right now (the shown one, or the best match). */
+  shown: Product;
+  selected: boolean;
+  best: boolean;
+  /** Against buying the books one by one at the single-book price. */
+  saving: number;
+  extra: number;
+};
+
+/** One tier per set size of the group (1 book, 2 books, 3 books …). A tier
+ *  offers the shown product if it is in it, else the one holding the opened
+ *  book, else one holding the shown set's books, else its first item. */
+function buildTiers(
+  group: Product[],
+  members: Record<number, number[]>,
+  current: Product,
+  openedId: number,
+  sizeOf: (item: Product) => number,
+): Tier[] {
+  if (!group.length) return [];
+  const sizes = [...new Set(group.map(sizeOf))].sort((a, b) => a - b);
+  const top = sizes[sizes.length - 1];
+  const singles = group.filter((item) => !item.isCombo);
+  const base = singles.length ? Math.min(...singles.map((item) => item.price)) : 0;
+  const holds = (item: Product, id: number) => item.id === id || (members[item.id] ?? []).includes(id);
+  const focus = current.isCombo ? members[current.id] ?? [] : [current.id];
+  return sizes.map((size) => {
+    const items = group.filter((item) => sizeOf(item) === size);
+    const shown =
+      items.find((item) => item.id === current.id) ??
+      items.find((item) => holds(item, openedId)) ??
+      items.find((item) => focus.some((id) => holds(item, id))) ??
+      items[0];
+    return {
+      size,
+      items,
+      shown,
+      selected: shown.id === current.id,
+      best: size === top && size > 1,
+      saving: size > 1 && base ? size * base - shown.price : 0,
+      extra: size > 1 && base ? shown.price - base : 0,
+    };
+  });
+}
+
+/** Text-only offer cards, one per tier, with the price per book and the
+ *  saving; a tier with several products asks which (book / other book). One
+ *  tap switches the whole page to it. */
 function OfferCards({
-  book,
-  offers,
-  offerBooks,
-  chosenId,
-  onChoose,
+  tiers,
+  current,
+  anchorId,
+  members,
+  byId,
+  onSelect,
   t,
 }: {
-  book: Product;
-  offers: Product[];
-  offerBooks: Record<number, Product[]>;
-  chosenId: number;
-  onChoose: (id: number | null) => void;
+  tiers: Tier[];
+  current: Product;
+  anchorId: number | null;
+  members: Record<number, number[]>;
+  byId: Map<number, Product>;
+  onSelect: (item: Product) => void;
   t: (typeof PRODUCT_COPY)[keyof typeof PRODUCT_COPY];
 }) {
-  const sizes = [...new Set(offers.map((o) => o.setSize ?? 2))].sort((a, b) => a - b);
-  const top = sizes[sizes.length - 1];
-  const tiers = [
-    { size: 1, items: [book] },
-    ...sizes.map((size) => ({ size, items: offers.filter((o) => (o.setSize ?? 2) === size) })),
-  ];
+  const top = tiers[tiers.length - 1]?.size ?? 1;
+  // A set seen from the anchor book: "+ the other book(s)"; otherwise all its books.
+  const chipLabel = (item: Product) => {
+    if (!item.isCombo) return item.title;
+    const books = (members[item.id] ?? []).flatMap((id) => byId.get(id) ?? []);
+    const others = anchorId && books.some((b) => b.id === anchorId) ? books.filter((b) => b.id !== anchorId) : books;
+    const names = others.map((b) => b.title).join(" + ") || item.title;
+    return others.length < books.length ? `+ ${names}` : names;
+  };
   return (
     <section className="mb-3" aria-label={t.offerPick}>
       <h3 className="font-deva mb-2 text-sm font-extrabold text-brand-teal">{t.offerPick}</h3>
       <div className="space-y-2" role="radiogroup">
-        {tiers.map(({ size, items }) => {
-          const picked = items.find((i) => i.id === chosenId);
-          const shown = picked ?? items[0];
-          const on = Boolean(picked);
-          const saving = size > 1 ? size * book.price - shown.price : 0;
-          const extra = size > 1 ? shown.price - book.price : 0;
-          return (
-            <div
-              key={size}
-              className={`rounded-2xl border-2 transition ${on ? "border-green-500 bg-green-50" : "border-brand-100 bg-white"}`}
+        {tiers.map((tier) => (
+          <div
+            key={tier.size}
+            className={`rounded-2xl border-2 transition ${tier.selected ? "border-green-500 bg-green-50" : "border-brand-100 bg-white"}`}
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={tier.selected}
+              onClick={() => onSelect(tier.shown)}
+              className="flex w-full items-center gap-3 p-3 text-left"
             >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => onChoose(size === 1 ? null : shown.id)}
-                className="flex w-full items-center gap-3 p-3 text-left"
-              >
-                {on ? (
-                  <CheckCircle2 className="h-6 w-6 shrink-0 text-green-600" aria-hidden="true" />
-                ) : (
-                  <Circle className="h-6 w-6 shrink-0 text-brand-200" aria-hidden="true" />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="font-deva flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] font-extrabold leading-tight text-brand-900">
-                    {size === 1 ? t.thisBookOnly : t.setOf(size)}
-                    {size === top && size > 1 && (
-                      <span className="rounded-md bg-brand-gold px-1.5 py-0.5 text-[10px] font-extrabold text-brand-teal">⭐ {t.bestValue}</span>
-                    )}
-                  </span>
-                  {size > 1 && (
-                    <span className="font-deva mt-0.5 block text-xs font-bold text-green-700">
-                      {t.perBook(Math.round(shown.price / size))} · {size === top ? t.save(saving) : t.justMore(extra)}
-                    </span>
+              {tier.selected ? (
+                <CheckCircle2 className="h-6 w-6 shrink-0 text-green-600" aria-hidden="true" />
+              ) : (
+                <Circle className="h-6 w-6 shrink-0 text-brand-200" aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="font-deva flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] font-extrabold leading-tight text-brand-900">
+                  {tier.size === 1 ? (anchorId ? t.thisBookOnly : t.pill(1)) : t.setOf(tier.size)}
+                  {tier.best && (
+                    <span className="rounded-md bg-brand-gold px-1.5 py-0.5 text-[10px] font-extrabold text-brand-teal">⭐ {t.bestValue}</span>
                   )}
                 </span>
-                <span className="flex shrink-0 flex-col items-end leading-tight">
-                  {shown.mrp > shown.price && <span className="text-xs font-semibold text-gray-400 line-through">₹{shown.mrp}</span>}
-                  <span className="text-2xl font-black text-green-600">₹{shown.price}</span>
-                </span>
-              </button>
-              {/* Several combos of this size: which other book? */}
-              {on && items.length > 1 && (
-                <div className="px-3 pb-3">
-                  <p className="font-deva mb-1.5 text-xs font-bold text-brand-600">{t.pickSecond}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => onChoose(item.id)}
-                        aria-pressed={item.id === chosenId}
-                        className={`font-deva rounded-full border px-3 py-1.5 text-left text-xs font-bold leading-snug ${
-                          item.id === chosenId ? "border-green-600 bg-white text-green-800 ring-1 ring-green-600" : "border-brand-200 bg-white text-brand-700"
-                        }`}
-                      >
-                        + {(offerBooks[item.id] ?? []).filter((b) => b.id !== book.id).map((b) => b.title).join(" + ") || item.title}
-                      </button>
-                    ))}
-                  </div>
+                {tier.size > 1 && tier.saving > 0 && (
+                  <span className="font-deva mt-0.5 block text-xs font-bold text-green-700">
+                    {t.perBook(Math.round(tier.shown.price / tier.size))} · {tier.size === top ? t.save(tier.saving) : t.justMore(tier.extra)}
+                  </span>
+                )}
+              </span>
+              <span className="flex shrink-0 flex-col items-end leading-tight">
+                {tier.shown.mrp > tier.shown.price && <span className="text-xs font-semibold text-gray-400 line-through">₹{tier.shown.mrp}</span>}
+                <span className="text-2xl font-black text-green-600">₹{tier.shown.price}</span>
+              </span>
+            </button>
+            {/* Several products of this size: which one? */}
+            {tier.selected && tier.items.length > 1 && (
+              <div className="px-3 pb-3">
+                <p className="font-deva mb-1.5 text-xs font-bold text-brand-600">{tier.size === 1 ? t.pickBook : t.pickSecond}</p>
+                <div className="flex flex-wrap gap-2">
+                  {tier.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelect(item)}
+                      aria-pressed={item.id === current.id}
+                      className={`font-deva rounded-full border px-3 py-1.5 text-left text-xs font-bold leading-snug ${
+                        item.id === current.id ? "border-green-600 bg-white text-green-800 ring-1 ring-green-600" : "border-brand-200 bg-white text-brand-700"
+                      }`}
+                    >
+                      {chipLabel(item)}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
       <p className="font-deva mt-1.5 text-[10px] font-semibold text-gray-500">{t.taxes}</p>
     </section>

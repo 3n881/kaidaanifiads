@@ -157,6 +157,19 @@ export async function getComboItemIds(comboId: number): Promise<number[]> {
   return (data as { product_id: number }[] | null)?.map((r) => r.product_id) ?? [];
 }
 
+/** The sets (combos) a single book is ticked in — shown on its edit page. */
+export async function getSetsForBook(bookId: number): Promise<{ id: number; title: string; active: boolean }[]> {
+  await requireAdmin();
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("combo_items")
+    .select("products:combo_id(id, title, active)")
+    .eq("product_id", bookId);
+  return ((data ?? []) as unknown as { products: { id: number; title: string; active: boolean } | null }[])
+    .flatMap((row) => (row.products ? [row.products] : []))
+    .sort((a, b) => a.id - b.id);
+}
+
 export async function getAdminOrders(): Promise<AdminOrder[]> {
   await requireAdmin();
   const admin = getSupabaseAdmin();

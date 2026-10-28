@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
-import {
-  getEbooks,
-  getProductBySlug,
-  getRelated,
-  getComboBooks,
-  getCombosContaining,
-} from "@/lib/products";
+import { getEbooks, getProductBySlug, getRelated, getProductFamily } from "@/lib/products";
 
 export const revalidate = 300;
 
@@ -41,22 +35,6 @@ export default async function EbookDetailPage({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
-  const [relatedProducts, comboBooks, comboOffers] = await Promise.all([
-    getRelated(product),
-    product.isCombo ? getComboBooks(product.id) : Promise.resolve([]),
-    product.isCombo ? Promise.resolve([]) : getCombosContaining(product.id),
-  ]);
-  // The books inside each offer (offer cards: "pick the second book", "you get").
-  const offerBooks = Object.fromEntries(
-    await Promise.all(comboOffers.map(async (offer) => [offer.id, await getComboBooks(offer.id)] as const)),
-  );
-  return (
-    <ProductDetail
-      product={product}
-      relatedProducts={relatedProducts}
-      comboBooks={comboBooks}
-      comboOffers={comboOffers}
-      offerBooks={offerBooks}
-    />
-  );
+  const [relatedProducts, family] = await Promise.all([getRelated(product), getProductFamily(product)]);
+  return <ProductDetail product={product} relatedProducts={relatedProducts} family={family.items} members={family.members} />;
 }

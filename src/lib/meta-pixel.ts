@@ -34,7 +34,35 @@ export function isPrivatePath(pathname: string): boolean {
   );
 }
 
-/** Installs Meta's standard queueing stub, loads fbevents.js, inits IDs. */
+let scriptRequested = false;
+
+/** Adds fbevents.js once. Events sent before it arrives wait in the stub's queue. */
+function loadPixelScript(): void {
+  if (scriptRequested) return;
+  scriptRequested = true;
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = "https://connect.facebook.net/en_US/fbevents.js";
+  document.head.appendChild(script);
+}
+
+/**
+ * Page speed (28 Oct): fbevents.js + one config per pixel cost ~0.6 s of main
+ * thread on a slow phone, right while the book cover was being drawn. So the
+ * script is fetched only after the page has loaded and the browser is idle
+ * (at most ~3 s later); a Buy tap or a purchase fetches it at once.
+ */
+function loadPixelScriptWhenIdle(): void {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+  const later = () => {
+    if (w.requestIdleCallback) w.requestIdleCallback(loadPixelScript, { timeout: 3000 });
+    else window.setTimeout(loadPixelScript, 1500);
+  };
+  if (document.readyState === "complete") later();
+  else window.addEventListener("load", later, { once: true });
+}
+
+/** Installs Meta's standard queueing stub and inits IDs; fbevents.js follows when idle. */
 export function initMetaPixel(): void {
   if (!META_PIXEL_IDS.length || window.fbq) return;
   const fbq = function (...args: unknown[]) {
@@ -51,16 +79,33 @@ export function initMetaPixel(): void {
   window.fbq = fbq;
   window._fbq = fbq;
 
-  const script = document.createElement("script");
-  script.async = true;
-  script.src = "https://connect.facebook.net/en_US/fbevents.js";
-  document.head.appendChild(script);
+  loadPixelScriptWhenIdle();
 
   for (const id of META_PIXEL_IDS) {
     // No automatic click/form events: only the events listed below.
     fbq("set", "autoConfig", false, id);
     fbq("init", id);
   }
+}
+
+let quietAddressChange = false;
+
+/**
+ * Shows another product's address without a page load (offer picker on a book
+ * page). The next pathname change is then not a new PageView — the picker
+ * sends ViewContent for the product shown instead.
+ */
+export function replaceProductAddress(path: string): void {
+  if (window.location.pathname === path) return;
+  quietAddressChange = true;
+  window.history.replaceState(null, "", path + window.location.search);
+}
+
+/** True once after replaceProductAddress (MetaPixel skips that PageView). */
+export function takeQuietAddressChange(): boolean {
+  const quiet = quietAddressChange;
+  quietAddressChange = false;
+  return quiet;
 }
 
 export function trackPixel(
@@ -71,6 +116,8 @@ export function trackPixel(
   if (typeof window === "undefined" || !META_PIXEL_IDS.length) return;
   if (isPrivatePath(window.location.pathname)) return;
   initMetaPixel(); // idempotent; events queue until fbevents.js loads
+  // Buying: don't wait for idle (the page may be left for Razorpay / the order page).
+  if (event === "InitiateCheckout" || event === "Purchase") loadPixelScript();
   window.fbq?.("track", event, params ?? {}, eventId ? { eventID: eventId } : undefined);
 }
 

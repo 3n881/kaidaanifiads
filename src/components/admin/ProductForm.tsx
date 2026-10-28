@@ -31,6 +31,8 @@ type ProductFormProps = {
   product?: AdminProduct;
   ebookOptions?: { id: number; title: string }[];
   selectedBookIds?: number[];
+  /** Single book: the sets it is ticked in. */
+  inSets?: { id: number; title: string; active: boolean }[];
   defaultIsCombo?: boolean;
   initialLocale?: Locale;
 };
@@ -39,6 +41,7 @@ export default function ProductForm({
   product,
   ebookOptions = [],
   selectedBookIds = [],
+  inSets = [],
   defaultIsCombo = false,
   initialLocale = "mr",
 }: ProductFormProps) {
@@ -340,18 +343,20 @@ export default function ProductForm({
               <Field id="set_size" label="Books in this set" hint="Shown as “3 Book Set”. Ticked books below override it.">
                 <input id="set_size" name="set_size" type="number" min={2} required defaultValue={product?.set_size ?? (selectedBookIds.length || 2)} className={inputClass} />
               </Field>
-              {/* Collapsed unless already used: ticking a book sends buyers that
-                  book's PDF in addition to the combo PDF above. */}
-              <details open={selectedBookIds.length > 0} className="mt-4 rounded-xl border border-brand-100 p-3">
+              {/* Links the set to its single books (28 Oct): the offer picker on
+                  every linked page. Delivery stays the set's own PDF. */}
+              <details open className="mt-4 rounded-xl border border-brand-100 p-3">
                 <summary className="cursor-pointer text-sm font-bold text-brand-900">
-                  Also send separate books ({selectedBookIds.length} ticked)
+                  Books in this set ({selectedBookIds.length} ticked)
                 </summary>
-                <div className="mt-2 flex gap-2 rounded-lg bg-amber-50 p-2 text-[11px] leading-relaxed text-amber-800">
+                <div className="mt-2 flex gap-2 rounded-lg bg-green-50 p-2 text-[11px] leading-relaxed text-green-900">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
-                    Usually leave this empty — the combo PDF above already has every book.
-                    Tick a book only if it is part of this combo and also sold on its own:
-                    buyers then get its PDF as an extra file.
+                    Tick the single books that are inside this set. The page of each ticked book and of this
+                    set then shows the offer picker (1 book / 2 books / 3 books …) with prices and savings.
+                    Buyers get only this set&apos;s PDF above — upload one merged PDF with every book. Only if
+                    this set has no PDF of its own do buyers get each ticked book&apos;s PDF instead.
+                    &quot;Books in this set&quot; above should match the number ticked.
                   </span>
                 </div>
                 <div className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-brand-100 p-2">
@@ -365,6 +370,33 @@ export default function ProductForm({
                   )}
                 </div>
               </details>
+            </section>
+          )}
+
+          {!isCombo && product && (
+            <section className="rounded-2xl border border-brand-100 bg-white p-5 shadow-[var(--shadow-card)]">
+              <h3 className="text-sm font-bold text-brand-900">In sets ({inSets.length})</h3>
+              {inSets.length ? (
+                <ul className="mt-2 space-y-1">
+                  {inSets.map((set) => (
+                    <li key={set.id}>
+                      <Link href={`/dashboard/products/${set.id}`} className="font-deva text-xs font-semibold text-brand-teal underline underline-offset-2">
+                        #{set.id} {set.title}
+                      </Link>
+                      {!set.active && <span className="ml-1.5 text-[11px] text-brand-400">(hidden)</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-xs text-brand-500">Not in any set — this page shows the plain price and Buy.</p>
+              )}
+              <p className="mt-2 text-[11px] leading-relaxed text-brand-500">
+                To add this book to a set: open the set and tick it under &quot;Books in this set&quot;. New set:{" "}
+                <Link href="/dashboard/products/new?type=combo" className="font-semibold text-brand-teal underline underline-offset-2">
+                  Build a combo pack
+                </Link>{" "}
+                (merged PDF + cover, then tick its books). The offer picker appears on every linked page by itself.
+              </p>
             </section>
           )}
 

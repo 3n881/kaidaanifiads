@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
+import { pixelProduct, takeQuietAddressChange, trackPixel } from "@/lib/meta-pixel";
 import { trackVisit } from "@/lib/visit-tracking";
 
 /**
@@ -14,6 +14,8 @@ import { trackVisit } from "@/lib/visit-tracking";
 export default function MetaPixel() {
   const pathname = usePathname();
   useEffect(() => {
+    // The offer picker swapping the product in place is not a new page.
+    if (takeQuietAddressChange()) return;
     trackPixel("PageView");
     trackVisit("page");
   }, [pathname]);

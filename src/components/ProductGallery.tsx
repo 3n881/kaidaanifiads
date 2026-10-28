@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { BookOpen, ChevronLeft, ChevronRight, Maximize2, Sparkles } from "lucide-react";
 import type { Product } from "@/data/catalog";
@@ -31,15 +31,12 @@ export default function ProductGallery({
   previewUrl,
   labelsLocale = "mr",
   others = [],
-  cover,
 }: {
   product: Product;
   previewUrl?: string | null;
   /** Language of the labels (the edition on show). */
   labelsLocale?: Locale;
   others?: GallerySlide[];
-  /** Shown instead of this book's cover (the ticked 2-book / 3-book set), with its line. */
-  cover?: { image: string; alt: string; label: string };
 }) {
   const g = GALLERY_COPY[labelsLocale];
   // The reader: cover first, then the book's real pages 2–6 (made from its
@@ -57,12 +54,7 @@ export default function ProductGallery({
   const previewPages = Math.min(PREVIEW_PAGES, product.pages || PREVIEW_PAGES);
   const slides = product.coverImage ? others.filter((o) => o.product.coverImage) : [];
   const total = slides.length + 1;
-  const heroImage = cover?.image ?? product.coverImage;
-
-  // A new offer ticked → back to the first picture, so the new cover is seen.
-  useEffect(() => {
-    trackRef.current?.scrollTo({ left: 0, behavior: "smooth" });
-  }, [heroImage]);
+  const heroImage = product.coverImage;
 
   const openReader = () => setReaderAt(0);
   const reader =
@@ -112,16 +104,16 @@ export default function ProductGallery({
             className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain"
             aria-label={g.cover}
           >
-            {/* This book (or the ticked set): the picture opens the sample reader. */}
+            {/* This book: its cover opens the sample reader. */}
             <div className={slideClass}>
-              <picture key={heroImage}>
+              <picture>
                 <source media={WIDE_MEDIA} srcSet={coverSrcSet(heroImage) ?? undefined} sizes={WIDE_COVER_SIZES} />
                 {/* Plain <img> on purpose: Supabase files are pre-sized WebP variants. */}
                 <img
                   src={coverSrc(heroImage)}
                   srcSet={coverSrcSet(heroImage, PHONE_COVER_MAX) ?? undefined}
                   sizes={PHONE_COVER_SIZES}
-                  alt={cover?.alt ?? product.title}
+                  alt={product.title}
                   width={800}
                   height={1067}
                   loading="eager"
@@ -130,11 +122,6 @@ export default function ProductGallery({
                   onClick={openReader}
                 />
               </picture>
-              {cover && (
-                <span className="font-deva pointer-events-none absolute inset-x-0 bottom-0 bg-green-700/90 px-3 py-1.5 text-center text-sm font-extrabold text-white">
-                  {cover.label}
-                </span>
-              )}
               <span className="pointer-events-none absolute right-2 top-2 rounded-md bg-brand-teal px-2 py-1 text-[10px] font-black tracking-wider text-brand-gold">
                 PREVIEW
               </span>

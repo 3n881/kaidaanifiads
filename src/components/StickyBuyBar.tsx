@@ -21,12 +21,10 @@ export default function StickyBuyBar({
   product,
   label,
   options = [],
-  pageBookId,
 }: {
   product: Product;
   label?: string;
   options?: BarOption[];
-  pageBookId?: number;
 }) {
   const { locale } = useLanguage();
 
@@ -73,7 +71,6 @@ export default function StickyBuyBar({
         <div className="min-w-0 flex-1">
           <BuyButton
             product={product}
-            pageBookId={pageBookId}
             label={label ?? UI_COPY[editionLocaleFor(product, locale)].downloadNow}
             className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
           />

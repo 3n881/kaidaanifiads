@@ -6,6 +6,7 @@ import {
   getAdminProductById,
   getEbookOptions,
   getComboItemIds,
+  getSetsForBook,
 } from "@/lib/admin";
 import { normalizeLocale } from "@/lib/i18n";
 
@@ -25,9 +26,10 @@ export default async function EditProductPage({
   const product = await getAdminProductById(Number(id));
   if (!product) notFound();
 
-  const [ebookOptions, selectedBookIds] = await Promise.all([
+  const [ebookOptions, selectedBookIds, inSets] = await Promise.all([
     getEbookOptions(),
     product.is_combo ? getComboItemIds(product.id) : Promise.resolve([]),
+    product.is_combo ? Promise.resolve([]) : getSetsForBook(product.id),
   ]);
 
   return (
@@ -36,6 +38,7 @@ export default async function EditProductPage({
         product={product}
         ebookOptions={ebookOptions}
         selectedBookIds={selectedBookIds}
+        inSets={inSets}
         initialLocale={normalizeLocale(query.lang)}
       />
     </AdminShell>
