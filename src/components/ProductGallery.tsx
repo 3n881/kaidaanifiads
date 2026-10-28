@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BookOpen, ChevronLeft, ChevronRight, Maximize2, Sparkles } from "lucide-react";
 import type { Product } from "@/data/catalog";
@@ -31,12 +31,15 @@ export default function ProductGallery({
   previewUrl,
   labelsLocale = "mr",
   others = [],
+  cover,
 }: {
   product: Product;
   previewUrl?: string | null;
   /** Language of the labels (the edition on show). */
   labelsLocale?: Locale;
   others?: GallerySlide[];
+  /** Shown instead of this book's cover (the ticked 2-book / 3-book set), with its line. */
+  cover?: { image: string; alt: string; label: string };
 }) {
   const g = GALLERY_COPY[labelsLocale];
   // The reader: cover first, then the book's real pages 2–6 (made from its
@@ -47,10 +50,19 @@ export default function ProductGallery({
   const readerList = readerPages.length > 1 && product.coverImage ? images : readerPages;
   const [readerAt, setReaderAt] = useState<number | null>(null);
   const [selected, setSelected] = useState(0);
+  // Covers are only downloaded up to one past the furthest slide reached (the
+  // peeking one), so a first visit costs 2 covers, not every slide (page speed).
+  const [reach, setReach] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
   const previewPages = Math.min(PREVIEW_PAGES, product.pages || PREVIEW_PAGES);
   const slides = product.coverImage ? others.filter((o) => o.product.coverImage) : [];
   const total = slides.length + 1;
+  const heroImage = cover?.image ?? product.coverImage;
+
+  // A new offer ticked → back to the first picture, so the new cover is seen.
+  useEffect(() => {
+    trackRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+  }, [heroImage]);
 
   const openReader = () => setReaderAt(0);
   const reader =
@@ -58,7 +70,7 @@ export default function ProductGallery({
       <SampleReader product={product} previewUrl={previewUrl} pages={readerList} images={images} startPage={readerAt} g={g} onClose={() => setReaderAt(null)} />
     ) : null;
 
-  if (!product.coverImage) {
+  if (!heroImage) {
     return (
       <div>
         <div className="overflow-hidden rounded-2xl shadow-[var(--shadow-cardhover)]">
@@ -82,7 +94,10 @@ export default function ProductGallery({
   };
   const onScroll = () => {
     const el = trackRef.current;
-    if (el) setSelected(Math.min(Math.round(el.scrollLeft / slideWidth()), total - 1));
+    if (!el) return;
+    const at = Math.min(Math.round(el.scrollLeft / slideWidth()), total - 1);
+    setSelected(at);
+    setReach((current) => Math.max(current, at));
   };
   // One cover: full width. More: ~84 % so the next cover peeks in (shows it can be swiped).
   const slideClass = `relative aspect-[3/4] shrink-0 snap-start overflow-hidden rounded-xl bg-brand-900 ${total > 1 ? "w-[84%]" : "w-full"}`;
@@ -97,16 +112,16 @@ export default function ProductGallery({
             className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain"
             aria-label={g.cover}
           >
-            {/* This book: its cover opens the sample reader. */}
+            {/* This book (or the ticked set): the picture opens the sample reader. */}
             <div className={slideClass}>
-              <picture>
-                <source media={WIDE_MEDIA} srcSet={coverSrcSet(product.coverImage) ?? undefined} sizes={WIDE_COVER_SIZES} />
+              <picture key={heroImage}>
+                <source media={WIDE_MEDIA} srcSet={coverSrcSet(heroImage) ?? undefined} sizes={WIDE_COVER_SIZES} />
                 {/* Plain <img> on purpose: Supabase files are pre-sized WebP variants. */}
                 <img
-                  src={coverSrc(product.coverImage)}
-                  srcSet={coverSrcSet(product.coverImage, PHONE_COVER_MAX) ?? undefined}
+                  src={coverSrc(heroImage)}
+                  srcSet={coverSrcSet(heroImage, PHONE_COVER_MAX) ?? undefined}
                   sizes={PHONE_COVER_SIZES}
-                  alt={product.title}
+                  alt={cover?.alt ?? product.title}
                   width={800}
                   height={1067}
                   loading="eager"
@@ -115,29 +130,37 @@ export default function ProductGallery({
                   onClick={openReader}
                 />
               </picture>
+              {cover && (
+                <span className="font-deva pointer-events-none absolute inset-x-0 bottom-0 bg-green-700/90 px-3 py-1.5 text-center text-sm font-extrabold text-white">
+                  {cover.label}
+                </span>
+              )}
               <span className="pointer-events-none absolute right-2 top-2 rounded-md bg-brand-teal px-2 py-1 text-[10px] font-black tracking-wider text-brand-gold">
                 PREVIEW
               </span>
             </div>
 
             {/* Related books: tap = their page. */}
-            {slides.map(({ product: other, label }) => (
+            {slides.map(({ product: other, label }, index) => (
               <Link
                 key={other.id}
                 href={`/${other.isCombo ? "combos" : "ebooks"}/${other.slug}`}
                 className={slideClass}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variants */}
-                <img
-                  src={coverSrc(other.coverImage!)}
-                  srcSet={coverSrcSet(other.coverImage!, PHONE_COVER_MAX) ?? undefined}
-                  sizes={PHONE_COVER_SIZES}
-                  alt={other.title}
-                  width={800}
-                  height={1067}
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-contain"
-                />
+                {index <= reach && (
+                  // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variants
+                  <img
+                    src={coverSrc(other.coverImage!)}
+                    srcSet={coverSrcSet(other.coverImage!, PHONE_COVER_MAX) ?? undefined}
+                    sizes={PHONE_COVER_SIZES}
+                    alt={other.title}
+                    width={800}
+                    height={1067}
+                    loading="lazy"
+                    fetchPriority="low"
+                    className="absolute inset-0 h-full w-full object-contain"
+                  />
+                )}
                 <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-black/70 px-3 py-2 text-white">
                   <span className="min-w-0">
                     <span className="font-deva block text-[11px] font-bold text-brand-gold">{label}</span>

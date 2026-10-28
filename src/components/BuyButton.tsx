@@ -90,15 +90,20 @@ export default function BuyButton({
   className = "",
   label,
   showIcon = true,
+  pageBookId,
 }: {
   product: Product;
   className?: string;
   label?: string;
   showIcon?: boolean;
+  /** Book page this Buy is on, when it sells a combo ticked there: that book's
+   *  own funnel also gets the Buy tap (admin Analytics, per book). */
+  pageBookId?: number;
 }) {
   const { locale } = useLanguage();
   // The edition on sale can differ from the site language (Hindi-only book).
   const editionLocale = editionLocaleFor(product, locale);
+  const productId = product.id;
   product = localizeProduct(product, locale);
   const copy = UI_COPY[locale];
   const [open, setOpen] = useState(false);
@@ -119,7 +124,10 @@ export default function BuyButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          if (pageBookId && pageBookId !== productId) trackVisit("buy_tap", pageBookId);
+          setOpen(true);
+        }}
         // Start fetching checkout.js on first touch/hover (before the click
         // completes) without making every visitor download it.
         onPointerEnter={() => void loadRazorpay()}

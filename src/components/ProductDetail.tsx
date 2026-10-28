@@ -73,13 +73,6 @@ export default function ProductDetail({
   const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
   const offers = comboOffers.map((item) => localizeProduct(item, locale));
   const g = GALLERY_COPY[editionLocale];
-  // Cover slider after this book's cover (client, 28 Oct): a combo's books, else
-  // the combos with this book, else other titles.
-  const slides = comboBooks.length
-    ? comboBooks.map((item, i) => ({ product: item, label: g.bookOf(i + 1, comboBooks.length) }))
-    : offers.length
-      ? offers.map((item) => ({ product: item, label: t.comboBooks(item.setSize ?? 2) }))
-      : related.slice(0, 4).map((item) => ({ product: item, label: g.more }));
   // Offer cards (client, 28 Oct): the biggest set is ticked first; the Buy
   // buttons and the phone's bottom bar always sell what is ticked.
   const biggest = offers.reduce<Product | null>((best, o) => (!best || (o.setSize ?? 0) > (best.setSize ?? 0) ? o : best), null);
@@ -87,6 +80,20 @@ export default function ProductDetail({
   const chosen = offers.find((o) => o.id === choiceId) ?? product;
   // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
   const chosenSize = chosen.isCombo ? chosen.setSize ?? 0 : 1;
+  // The big picture shows what is ticked: this book's cover, or the 2-book /
+  // 3-book set's cover (client, 28 Oct).
+  const heroImage = chosen.coverImage ?? product.coverImage;
+  const heroCover =
+    chosen.isCombo && chosen.coverImage
+      ? { image: chosen.coverImage, alt: chosen.title, label: `${t.setOf(chosenSize || 2)} · ₹${chosen.price}` }
+      : undefined;
+  // Cover slider after the big picture: a combo's books, else the other combos
+  // with this book, else other titles.
+  const slides = comboBooks.length
+    ? comboBooks.map((item, i) => ({ product: item, label: g.bookOf(i + 1, comboBooks.length) }))
+    : offers.length
+      ? offers.filter((item) => item.id !== chosen.id).map((item) => ({ product: item, label: t.comboBooks(item.setSize ?? 2) }))
+      : related.slice(0, 4).map((item) => ({ product: item, label: g.more }));
   // The same choice as buttons in the phone's bottom bar: this book, then one per set size.
   const barOptions = offers.length
     ? [
@@ -117,18 +124,18 @@ export default function ProductDetail({
   // The cover is this page's LCP element — start fetching it from <head>.
   // One preload per screen size, matching the <picture> in ProductGallery
   // (phones max 600 px, larger screens up to 800 px).
-  if (product.coverImage) {
-    const phoneSet = coverSrcSet(product.coverImage, PHONE_COVER_MAX);
-    const wideSet = coverSrcSet(product.coverImage);
+  if (heroImage) {
+    const phoneSet = coverSrcSet(heroImage, PHONE_COVER_MAX);
+    const wideSet = coverSrcSet(heroImage);
     if (phoneSet && wideSet) {
-      preload(coverSrc(product.coverImage), {
+      preload(coverSrc(heroImage), {
         as: "image",
         fetchPriority: "high",
         media: PHONE_MEDIA,
         imageSrcSet: phoneSet,
         imageSizes: PHONE_COVER_SIZES,
       });
-      preload(coverSrc(product.coverImage), {
+      preload(coverSrc(heroImage), {
         as: "image",
         fetchPriority: "high",
         media: WIDE_MEDIA,
@@ -136,7 +143,7 @@ export default function ProductDetail({
         imageSizes: WIDE_COVER_SIZES,
       });
     } else {
-      preload(coverSrc(product.coverImage), { as: "image", fetchPriority: "high" });
+      preload(coverSrc(heroImage), { as: "image", fetchPriority: "high" });
     }
   }
   const pct = discountPercent(product);
@@ -164,7 +171,7 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={chosen} label={chosenSize > 1 ? t.buySetShort(chosenSize) : undefined} options={barOptions} />
+      <StickyBuyBar product={chosen} label={chosenSize > 1 ? t.buySetShort(chosenSize) : undefined} options={barOptions} pageBookId={product.id} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -186,7 +193,7 @@ export default function ProductDetail({
         {/* Preview viewer — full width on phones; the sticky bar keeps price
             and Buy on screen (as on the previous site). */}
         <div className="mx-auto w-full max-w-md lg:sticky lg:top-24 lg:max-w-none lg:self-start">
-          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} others={slides} />
+          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} others={slides} cover={heroCover} />
         </div>
 
         {/* Info — styling follows the original site's book page */}
@@ -273,6 +280,7 @@ export default function ProductDetail({
           <div id="buy-now" className="mb-4 flex flex-col gap-2">
             <BuyButton
               product={chosen}
+              pageBookId={product.id}
               label={buyLabel}
               className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
             />
@@ -346,6 +354,7 @@ export default function ProductDetail({
             <div className="relative z-10 flex flex-col gap-3">
               <BuyButton
                 product={chosen}
+                pageBookId={product.id}
                 label={chosenSize > 1 ? buyLabel : `${copy.downloadNow} (Download Now)`}
                 className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
               />
