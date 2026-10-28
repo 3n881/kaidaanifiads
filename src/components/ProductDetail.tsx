@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { preconnect, preload } from "react-dom";
 import {
@@ -14,6 +15,9 @@ import {
   ChevronDown,
   MessageCircle,
   Package,
+  CheckCircle2,
+  Circle,
+  Check,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import {
@@ -45,12 +49,15 @@ export default function ProductDetail({
   relatedProducts = [],
   comboBooks: sourceComboBooks = [],
   comboOffers = [],
+  offerBooks = {},
 }: {
   product: Product;
   relatedProducts?: Product[];
   comboBooks?: Product[];
-  /** Combos that include this (single) book — offered next to Buy. */
+  /** Combos that include this (single) book — the offer cards. */
   comboOffers?: Product[];
+  /** The books inside each offer, by combo id. */
+  offerBooks?: Record<number, Product[]>;
 }) {
   const { locale } = useLanguage();
   const product = localizeProduct(sourceProduct, locale);
@@ -73,9 +80,17 @@ export default function ProductDetail({
     : offers.length
       ? offers.map((item) => ({ product: item, label: t.comboBooks(item.setSize ?? 2) }))
       : related.slice(0, 4).map((item) => ({ product: item, label: g.more }));
-  // Swipe row under Buy: the combos with this book, else other titles (then
-  // the "you may also like" row at the bottom would repeat it, so it is left out).
-  const alsoBuy = offers.length ? offers : related.slice(0, 6);
+  // Offer cards (client, 28 Oct): the biggest set is ticked first; the Buy
+  // buttons and the phone's bottom bar always sell what is ticked.
+  const biggest = offers.reduce<Product | null>((best, o) => (!best || (o.setSize ?? 0) > (best.setSize ?? 0) ? o : best), null);
+  const [choiceId, setChoiceId] = useState<number | null>(biggest?.id ?? null);
+  const chosen = offers.find((o) => o.id === choiceId) ?? product;
+  // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
+  const chosenSize = chosen.isCombo ? chosen.setSize ?? 0 : 1;
+  const buyLabel = chosenSize > 1 ? t.buySet(chosenSize, chosen.price) : `${copy.downloadNow} · ₹${chosen.price}`;
+  // Swipe row under Buy (books without combos): other titles; the "you may
+  // also like" row at the bottom would repeat it, so that one is left out.
+  const alsoBuy = offers.length ? [] : related.slice(0, 6);
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
@@ -129,7 +144,7 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={product} offers={comboOffers} />
+      <StickyBuyBar product={chosen} label={chosenSize > 1 ? t.buySetShort(chosenSize) : undefined} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -189,7 +204,10 @@ export default function ProductDetail({
             <span className="font-medium text-green-600">{t.instantDelivery}</span>
           </div>
 
-          {/* price */}
+          {/* price — or the offer cards on a book that is also sold in combos */}
+          {offers.length > 0 ? (
+            <OfferCards book={product} offers={offers} offerBooks={offerBooks} chosenId={chosen.id} onChoose={setChoiceId} t={t} />
+          ) : (
           <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-green-100 bg-green-50/60 p-3 md:p-4">
             <div className="flex flex-col">
               {product.mrp > product.price && (
@@ -219,6 +237,7 @@ export default function ProductDetail({
               </div>
             )}
           </div>
+          )}
 
           {/* notices */}
           <div className="font-deva mb-3 space-y-1.5">
@@ -233,9 +252,8 @@ export default function ProductDetail({
           {/* buy */}
           <div id="buy-now" className="mb-4 flex flex-col gap-2">
             <BuyButton
-              product={product}
-              offers={comboOffers}
-              label={`${copy.downloadNow} · ₹${product.price}`}
+              product={chosen}
+              label={buyLabel}
               className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
             />
             <p className="font-deva flex items-center justify-center gap-1 text-center text-[10px] text-brand-500">
@@ -245,9 +263,13 @@ export default function ProductDetail({
             <WhatsAppHint text={t.whatsappHint} />
           </div>
 
-          {alsoBuy.length > 0 && (
-            <AlsoBuyRow book={product} items={alsoBuy} title={offers.length ? t.comboOffer : g.alsoBuy} t={t} g={g} />
+          {/* what's inside: the ticked combo (book page) or this combo (combo page) */}
+          {chosen.isCombo && (offerBooks[chosen.id]?.length ?? 0) > 0 && (
+            <BookChecklist books={offerBooks[chosen.id].map((b) => localizeProduct(b, locale))} price={chosen.price} t={t} />
           )}
+          {product.isCombo && comboBooks.length > 0 && <BookChecklist books={comboBooks} price={product.price} t={t} />}
+
+          {alsoBuy.length > 0 && <AlsoBuyRow book={product} items={alsoBuy} title={g.alsoBuy} t={t} g={g} />}
 
           {/* chips */}
           <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
@@ -288,35 +310,6 @@ export default function ProductDetail({
             </div>
           </div>
 
-          {/* combo contents */}
-          {product.isCombo && comboBooks.length > 0 && (
-            <div className="mt-8">
-              <h3 className="font-deva text-lg font-bold text-brand-900">
-                {t.comboIncludes} ({comboBooks.length})
-              </h3>
-              <ul className="mt-3 space-y-2">
-                {comboBooks.map((b) => (
-                  <li key={b.id}>
-                    <Link
-                      href={`/ebooks/${b.slug}`}
-                      className="flex items-center gap-3 rounded-xl border border-brand-100 bg-white p-3 transition hover:border-brand-300"
-                    >
-                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal">
-                        <BookOpen className="h-4 w-4" />
-                      </span>
-                      <span className="font-deva min-w-0 flex-1 truncate text-sm font-medium text-brand-900">
-                        {b.title}
-                      </span>
-                      <span className="text-xs text-brand-400">
-                        {b.pages} {t.pages}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {/* description */}
           <div className="mt-6">
             <h3 className="font-deva mb-1 text-sm font-bold text-brand-teal sm:text-base">
@@ -332,9 +325,8 @@ export default function ProductDetail({
             <div className="pointer-events-none absolute right-0 top-0 -mr-10 -mt-10 h-28 w-28 rounded-full bg-brand-gold/10 blur-2xl" />
             <div className="relative z-10 flex flex-col gap-3">
               <BuyButton
-                product={product}
-                offers={comboOffers}
-                label={`${copy.downloadNow} (Download Now)`}
+                product={chosen}
+                label={chosenSize > 1 ? buyLabel : `${copy.downloadNow} (Download Now)`}
                 className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
               />
               <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">
@@ -410,6 +402,142 @@ function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string })
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {title}
     </span>
+  );
+}
+
+/** Text-only offer cards: this book, then each combo size (2 books, all 3),
+ *  with the price per book and the saving; a size with several combos asks
+ *  for the second book. One tap ticks it — the Buy buttons follow. */
+function OfferCards({
+  book,
+  offers,
+  offerBooks,
+  chosenId,
+  onChoose,
+  t,
+}: {
+  book: Product;
+  offers: Product[];
+  offerBooks: Record<number, Product[]>;
+  chosenId: number;
+  onChoose: (id: number | null) => void;
+  t: (typeof PRODUCT_COPY)[keyof typeof PRODUCT_COPY];
+}) {
+  const sizes = [...new Set(offers.map((o) => o.setSize ?? 2))].sort((a, b) => a - b);
+  const top = sizes[sizes.length - 1];
+  const tiers = [
+    { size: 1, items: [book] },
+    ...sizes.map((size) => ({ size, items: offers.filter((o) => (o.setSize ?? 2) === size) })),
+  ];
+  return (
+    <section className="mb-3" aria-label={t.offerPick}>
+      <h3 className="font-deva mb-2 text-sm font-extrabold text-brand-teal">{t.offerPick}</h3>
+      <div className="space-y-2" role="radiogroup">
+        {tiers.map(({ size, items }) => {
+          const picked = items.find((i) => i.id === chosenId);
+          const shown = picked ?? items[0];
+          const on = Boolean(picked);
+          const saving = size > 1 ? size * book.price - shown.price : 0;
+          const extra = size > 1 ? shown.price - book.price : 0;
+          return (
+            <div
+              key={size}
+              className={`rounded-2xl border-2 transition ${on ? "border-green-500 bg-green-50" : "border-brand-100 bg-white"}`}
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => onChoose(size === 1 ? null : shown.id)}
+                className="flex w-full items-center gap-3 p-3 text-left"
+              >
+                {on ? (
+                  <CheckCircle2 className="h-6 w-6 shrink-0 text-green-600" aria-hidden="true" />
+                ) : (
+                  <Circle className="h-6 w-6 shrink-0 text-brand-200" aria-hidden="true" />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="font-deva flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] font-extrabold leading-tight text-brand-900">
+                    {size === 1 ? t.thisBookOnly : t.setOf(size)}
+                    {size === top && size > 1 && (
+                      <span className="rounded-md bg-brand-gold px-1.5 py-0.5 text-[10px] font-extrabold text-brand-teal">⭐ {t.bestValue}</span>
+                    )}
+                  </span>
+                  {size > 1 && (
+                    <span className="font-deva mt-0.5 block text-xs font-bold text-green-700">
+                      {t.perBook(Math.round(shown.price / size))} · {size === top ? t.save(saving) : t.justMore(extra)}
+                    </span>
+                  )}
+                </span>
+                <span className="flex shrink-0 flex-col items-end leading-tight">
+                  {shown.mrp > shown.price && <span className="text-xs font-semibold text-gray-400 line-through">₹{shown.mrp}</span>}
+                  <span className="text-2xl font-black text-green-600">₹{shown.price}</span>
+                </span>
+              </button>
+              {/* Several combos of this size: which other book? */}
+              {on && items.length > 1 && (
+                <div className="px-3 pb-3">
+                  <p className="font-deva mb-1.5 text-xs font-bold text-brand-600">{t.pickSecond}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onChoose(item.id)}
+                        aria-pressed={item.id === chosenId}
+                        className={`font-deva rounded-full border px-3 py-1.5 text-left text-xs font-bold leading-snug ${
+                          item.id === chosenId ? "border-green-600 bg-white text-green-800 ring-1 ring-green-600" : "border-brand-200 bg-white text-brand-700"
+                        }`}
+                      >
+                        + {(offerBooks[item.id] ?? []).filter((b) => b.id !== book.id).map((b) => b.title).join(" + ") || item.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="font-deva mt-1.5 text-[10px] font-semibold text-gray-500">{t.taxes}</p>
+    </section>
+  );
+}
+
+/** Text-only "you get" list for a combo, with the price if bought one by one. */
+function BookChecklist({
+  books,
+  price,
+  t,
+}: {
+  books: Product[];
+  price: number;
+  t: (typeof PRODUCT_COPY)[keyof typeof PRODUCT_COPY];
+}) {
+  const sum = books.reduce((total, b) => total + b.price, 0);
+  return (
+    <section className="mb-4 rounded-2xl border border-green-200 bg-white p-3">
+      <h3 className="font-deva mb-2 text-sm font-extrabold text-brand-teal">
+        {t.youGet} ({books.length})
+      </h3>
+      <ul className="space-y-1.5">
+        {books.map((b) => (
+          <li key={b.id}>
+            <Link href={`/ebooks/${b.slug}`} className="font-deva flex items-start gap-2 text-sm font-semibold leading-snug text-brand-900 hover:underline">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
+              <span className="min-w-0 flex-1">{b.title}</span>
+              <span className="shrink-0 text-xs font-medium text-brand-400">
+                {b.pages} {t.pages}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <p className="font-deva mt-2 text-[11px] font-medium text-brand-500">📄 {t.onePdf}</p>
+      {sum > price && (
+        <p className="font-deva mt-2 rounded-lg bg-green-50 px-2.5 py-1.5 text-xs font-bold text-green-800">{t.separately(sum, price)}</p>
+      )}
+    </section>
   );
 }
 

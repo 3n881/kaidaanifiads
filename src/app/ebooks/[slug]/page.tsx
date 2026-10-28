@@ -46,12 +46,17 @@ export default async function EbookDetailPage({
     product.isCombo ? getComboBooks(product.id) : Promise.resolve([]),
     product.isCombo ? Promise.resolve([]) : getCombosContaining(product.id),
   ]);
+  // The books inside each offer (offer cards: "pick the second book", "you get").
+  const offerBooks = Object.fromEntries(
+    await Promise.all(comboOffers.map(async (offer) => [offer.id, await getComboBooks(offer.id)] as const)),
+  );
   return (
     <ProductDetail
       product={product}
       relatedProducts={relatedProducts}
       comboBooks={comboBooks}
       comboOffers={comboOffers}
+      offerBooks={offerBooks}
     />
   );
 }

@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronRight, Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
+import { Check, Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
 import PriceTag from "./PriceTag";
 import { UI_COPY, type Locale } from "@/lib/i18n";
 import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
-import { coverThumbSrc } from "@/lib/covers";
 import { useLanguage } from "./LanguageProvider";
 import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
 import { trackVisit, visitForCheckout } from "@/lib/visit-tracking";
@@ -17,9 +16,8 @@ import { NOT_PAID_COPY } from "@/lib/lead-copy";
 import { BUY_FORM_COPY } from "@/lib/buy-copy";
 import { cleanBuyerName, cleanIndianMobile, loadSavedBuyer, saveBuyer } from "@/lib/buyer";
 
-// choose = this book or a combo that includes it (only when such combos exist)
-// → details = our name + WhatsApp form (2026-10-18) → processing (Razorpay opening / paying) → …
-type Step = "choose" | "details" | "processing" | "error" | "cancelled" | "failed";
+// details = our name + WhatsApp form (first, 2026-10-18) → processing (Razorpay opening / paying) → …
+type Step = "details" | "processing" | "error" | "cancelled" | "failed";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -92,14 +90,11 @@ export default function BuyButton({
   className = "",
   label,
   showIcon = true,
-  offers = [],
 }: {
   product: Product;
   className?: string;
   label?: string;
   showIcon?: boolean;
-  /** Combos that include this book: Buy first asks book or combo. */
-  offers?: Product[];
 }) {
   const { locale } = useLanguage();
   // The edition on sale can differ from the site language (Hindi-only book).
@@ -109,8 +104,6 @@ export default function BuyButton({
   const [open, setOpen] = useState(false);
   // Bumping the key remounts the modal = a fresh checkout attempt.
   const [attempt, setAttempt] = useState(0);
-  // What the buyer picked in the choice step (kept for "Try again").
-  const [choice, setChoice] = useState<Product | null>(null);
   // After paying we go to the order page; pressing Back on a phone restores
   // this page from the back/forward cache exactly as it was left — with the
   // "Opening payment…" spinner still up and no way to close it. A restored
@@ -126,10 +119,7 @@ export default function BuyButton({
     <>
       <button
         type="button"
-        onClick={() => {
-          setChoice(null);
-          setOpen(true);
-        }}
+        onClick={() => setOpen(true)}
         // Start fetching checkout.js on first touch/hover (before the click
         // completes) without making every visitor download it.
         onPointerEnter={() => void loadRazorpay()}
@@ -145,13 +135,11 @@ export default function BuyButton({
       {open && (
         <BuyModal
           key={attempt}
-          baseProduct={product}
-          offers={offers.map((offer) => localizeProduct(offer, locale))}
-          choice={choice}
-          onChoose={setChoice}
+          product={product}
           // The popup speaks the book's language, like the rest of the book page
           // (a Marathi book shows Marathi even when the site is set to Hindi).
           locale={editionLocale}
+          editionLocale={editionLocale}
           onClose={() => setOpen(false)}
           onRetry={() => setAttempt((n) => n + 1)}
         />
@@ -161,27 +149,19 @@ export default function BuyButton({
 }
 
 function BuyModal({
-  baseProduct,
-  offers,
-  choice,
-  onChoose,
+  product,
   locale,
+  editionLocale,
   onClose,
   onRetry,
 }: {
-  baseProduct: Product;
-  offers: Product[];
-  choice: Product | null;
-  onChoose: (product: Product | null) => void;
+  product: Product;
   locale: Locale;
+  editionLocale: Locale;
   onClose: () => void;
   onRetry: () => void;
 }) {
-  // What is being bought: the book, or the combo picked in the choice step.
-  const product = choice ?? baseProduct;
-  // The edition sold: a combo's own edition for the popup's language.
-  const editionLocale = editionLocaleFor(product, locale);
-  const [step, setStep] = useState<Step>(offers.length && !choice ? "choose" : "details");
+  const [step, setStep] = useState<Step>("details");
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
   // Name + WhatsApp number (remembered on this device, src/lib/buyer.ts).
@@ -212,14 +192,13 @@ function BuyModal({
       }
     }, 0);
     // Same moment as before (Buy tapped), so Meta's funnel stays comparable.
-    // The book whose Buy was tapped (a combo picked next is the purchase).
-    trackPixel("InitiateCheckout", pixelProduct({ id: baseProduct.id, title: baseProduct.title, price: baseProduct.price }));
-    trackVisit("buy_tap", baseProduct.id);
+    trackPixel("InitiateCheckout", pixelProduct({ id: product.id, title: product.title, price: product.price }));
+    trackVisit("buy_tap", product.id);
     return () => {
       window.clearTimeout(id);
       document.body.style.overflow = "";
     };
-  }, [baseProduct.id, baseProduct.price, baseProduct.title]);
+  }, [product.id, product.price, product.title]);
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -437,21 +416,9 @@ function BuyModal({
             >
               {product.title}
             </h3>
-            {!compact && step !== "choose" && (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {!compact && (
+              <div className="mt-1">
                 <PriceTag product={product} />
-                {offers.length > 0 && step === "details" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChoose(null);
-                      setStep("choose");
-                    }}
-                    className="font-deva text-xs font-bold text-brand-teal underline underline-offset-2"
-                  >
-                    {form.change}
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -466,18 +433,6 @@ function BuyModal({
             </button>
           )}
         </div>
-
-        {step === "choose" && (
-          <ChooseOffer
-            book={baseProduct}
-            offers={offers}
-            form={form}
-            onPick={(picked) => {
-              onChoose(picked.id === baseProduct.id ? null : picked);
-              setStep("details");
-            }}
-          />
-        )}
 
         {step === "details" && (
           <form onSubmit={submitDetails} noValidate>
@@ -700,7 +655,7 @@ function BuyModal({
           </div>
         )}
 
-        {step !== "details" && step !== "choose" && (
+        {step !== "details" && (
           <p className="mt-4 flex items-center justify-center gap-1.5 border-t border-brand-100 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 text-center text-[10px] leading-relaxed text-brand-400 sm:pb-5">
             <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure Razorpay payment · No account required
           </p>
@@ -708,76 +663,6 @@ function BuyModal({
       </div>
     </div>,
     document.body,
-  );
-}
-
-/** Book or combo: one tap picks it and moves on to the name + WhatsApp form. */
-function ChooseOffer({
-  book,
-  offers,
-  form,
-  onPick,
-}: {
-  book: Product;
-  offers: Product[];
-  form: (typeof BUY_FORM_COPY)[Locale];
-  onPick: (product: Product) => void;
-}) {
-  const biggest = Math.max(...offers.map((offer) => offer.setSize ?? 0));
-  return (
-    <div className="pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5">
-      <p className="font-deva -mt-1 mb-3 text-sm font-semibold text-brand-700">{form.choose}</p>
-      <ul className="space-y-3">
-        {[book, ...offers].map((option) => {
-          const size = option.isCombo ? option.setSize ?? 0 : 1;
-          // Saving against buying the same books one by one at this book's price.
-          const saving = size > 1 ? size * book.price - option.price : 0;
-          const best = size > 1 && size === biggest && offers.length > 1;
-          return (
-            <li key={option.id}>
-              <button
-                type="button"
-                onClick={() => onPick(option)}
-                className={`relative flex w-full items-center gap-3 rounded-2xl border-2 p-2.5 text-left transition active:scale-[0.99] ${
-                  best ? "border-brand-gold bg-amber-50/70 hover:bg-amber-50" : "border-brand-100 bg-white hover:border-brand-300"
-                }`}
-              >
-                {best && (
-                  <span className="font-deva absolute -top-2.5 right-3 rounded-full bg-brand-gold px-2 py-0.5 text-[10px] font-extrabold text-brand-teal shadow-sm">
-                    ⭐ {form.bestValue}
-                  </span>
-                )}
-                <span className="h-14 w-[42px] shrink-0 overflow-hidden rounded-md bg-brand-50 ring-1 ring-brand-100">
-                  {option.coverImage && (
-                    // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP thumbnail
-                    <img src={coverThumbSrc(option.coverImage)} alt="" width={42} height={56} loading="lazy" className="h-full w-full object-cover" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="font-deva block text-[11px] font-bold text-brand-teal">
-                    {size > 1 ? form.books(size) : form.thisBook}
-                  </span>
-                  <span className="font-deva line-clamp-2 text-xs font-semibold leading-snug text-brand-900">{option.title}</span>
-                  {size > 1 && (
-                    <span className="font-deva mt-0.5 block text-[10px] font-bold text-green-700">
-                      {form.perBook(Math.round(option.price / size))}
-                      {saving > 0 && ` · ${form.save(saving)}`}
-                    </span>
-                  )}
-                </span>
-                <span className="flex shrink-0 flex-col items-end leading-tight">
-                  {option.mrp > option.price && (
-                    <span className="text-[11px] font-semibold text-gray-400 line-through">₹{option.mrp}</span>
-                  )}
-                  <span className="text-lg font-black text-green-700">₹{option.price}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-brand-300" aria-hidden="true" />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }
 
