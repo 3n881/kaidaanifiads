@@ -87,6 +87,26 @@ export default function ProductDetail({
   const chosen = offers.find((o) => o.id === choiceId) ?? product;
   // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
   const chosenSize = chosen.isCombo ? chosen.setSize ?? 0 : 1;
+  // The same choice as buttons in the phone's bottom bar: this book, then one per set size.
+  const barOptions = offers.length
+    ? [
+        { key: "1", label: t.pill(1), price: product.price, selected: !chosen.isCombo, onSelect: () => setChoiceId(null) },
+        ...[...new Set(offers.map((o) => o.setSize ?? 2))]
+          .sort((a, b) => a - b)
+          .map((size, index, sizes) => {
+            const group = offers.filter((o) => (o.setSize ?? 2) === size);
+            const current = group.find((o) => o.id === chosen.id) ?? group[0];
+            return {
+              key: String(size),
+              label: t.pill(size),
+              price: current.price,
+              best: index === sizes.length - 1,
+              selected: Boolean(group.find((o) => o.id === chosen.id)),
+              onSelect: () => setChoiceId(current.id),
+            };
+          }),
+      ]
+    : [];
   const buyLabel = chosenSize > 1 ? t.buySet(chosenSize, chosen.price) : `${copy.downloadNow} · ₹${chosen.price}`;
   // Swipe row under Buy (books without combos): other titles; the "you may
   // also like" row at the bottom would repeat it, so that one is left out.
@@ -144,7 +164,7 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={chosen} label={chosenSize > 1 ? t.buySetShort(chosenSize) : undefined} />
+      <StickyBuyBar product={chosen} label={chosenSize > 1 ? t.buySetShort(chosenSize) : undefined} options={barOptions} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -391,7 +411,7 @@ export default function ProductDetail({
         </section>
       )}
       {/* room for the always-on mobile buy bar */}
-      <div className="h-20 lg:hidden" aria-hidden="true" />
+      <div className={`${barOptions.length ? "h-36" : "h-20"} lg:hidden`} aria-hidden="true" />
     </div>
   );
 }

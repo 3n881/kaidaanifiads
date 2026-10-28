@@ -34,6 +34,7 @@ export const PRODUCT_COPY = {
     comboSave: (n: number) => `₹${n} वाचवा`,
     // Offer cards on a book that is also sold in combos (client, 28 Oct).
     offerPick: "ऑफर निवडा",
+    pill: (n: number) => (n === 1 ? "1 पुस्तक" : `${n} पुस्तके`),
     thisBookOnly: "फक्त हे पुस्तक",
     setOf: (n: number) => (n === 3 ? "तिन्ही पुस्तके (संपूर्ण संच)" : n === 2 ? "2 पुस्तके" : `${n} पुस्तके (संपूर्ण संच)`),
     perBook: (price: number) => `प्रति पुस्तक ₹${price}`,
@@ -90,6 +91,7 @@ export const PRODUCT_COPY = {
     comboBooks: (n: number) => `${n} किताबें`,
     comboSave: (n: number) => `₹${n} बचाएँ`,
     offerPick: "ऑफ़र चुनें",
+    pill: (n: number) => (n === 1 ? "1 किताब" : `${n} किताबें`),
     thisBookOnly: "सिर्फ यह किताब",
     setOf: (n: number) => (n === 3 ? "तीनों किताबें (पूरा सेट)" : n === 2 ? "2 किताबें" : `${n} किताबें (पूरा सेट)`),
     perBook: (price: number) => `प्रति किताब ₹${price}`,
@@ -146,6 +148,7 @@ export const PRODUCT_COPY = {
     comboBooks: (n: number) => `${n} books`,
     comboSave: (n: number) => `Save ₹${n}`,
     offerPick: "Choose an offer",
+    pill: (n: number) => (n === 1 ? "1 book" : `${n} books`),
     thisBookOnly: "Just this book",
     setOf: (n: number) => (n === 3 ? "All 3 books (full set)" : `${n} books`),
     perBook: (price: number) => `₹${price} per book`,
