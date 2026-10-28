@@ -13,6 +13,7 @@ import {
   Share2,
   ChevronDown,
   MessageCircle,
+  Package,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import {
@@ -23,7 +24,7 @@ import {
   localizeProduct,
 } from "@/lib/catalog";
 import { SITE } from "@/data/catalog";
-import { coverSrc, coverSrcSet, PHONE_COVER_MAX, PHONE_COVER_SIZES, PHONE_MEDIA, WIDE_COVER_SIZES, WIDE_MEDIA } from "@/lib/covers";
+import { coverSrc, coverSrcSet, coverThumbSrc, PHONE_COVER_MAX, PHONE_COVER_SIZES, PHONE_MEDIA, WIDE_COVER_SIZES, WIDE_MEDIA } from "@/lib/covers";
 import { previewPdfUrl } from "@/lib/previews";
 import { SITE_URL } from "@/lib/supabase/config";
 import BuyButton from "./BuyButton";
@@ -43,10 +44,13 @@ export default function ProductDetail({
   product: sourceProduct,
   relatedProducts = [],
   comboBooks: sourceComboBooks = [],
+  comboOffers = [],
 }: {
   product: Product;
   relatedProducts?: Product[];
   comboBooks?: Product[];
+  /** Combos that include this (single) book — offered next to Buy. */
+  comboOffers?: Product[];
 }) {
   const { locale } = useLanguage();
   const product = localizeProduct(sourceProduct, locale);
@@ -60,6 +64,7 @@ export default function ProductDetail({
   const copy = UI_COPY[editionLocale];
   const t = PRODUCT_COPY[editionLocale];
   const comboBooks = sourceComboBooks.map((item) => localizeProduct(item, locale));
+  const offers = comboOffers.map((item) => localizeProduct(item, locale));
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
   preconnect("https://checkout.razorpay.com");
   preconnect("https://api.razorpay.com");
@@ -113,7 +118,7 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={product} />
+      <StickyBuyBar product={product} offers={comboOffers} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -218,6 +223,7 @@ export default function ProductDetail({
           <div id="buy-now" className="mb-4 flex flex-col gap-2">
             <BuyButton
               product={product}
+              offers={comboOffers}
               label={copy.downloadNow}
               className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
             />
@@ -227,6 +233,8 @@ export default function ProductDetail({
             </p>
             <WhatsAppHint text={t.whatsappHint} />
           </div>
+
+          {offers.length > 0 && <ComboOffers book={product} offers={offers} t={t} />}
 
           {/* chips */}
           <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
@@ -312,6 +320,7 @@ export default function ProductDetail({
             <div className="relative z-10 flex flex-col gap-3">
               <BuyButton
                 product={product}
+                offers={comboOffers}
                 label={`${copy.downloadNow} (Download Now)`}
                 className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
               />
@@ -388,6 +397,66 @@ function Chip({ icon: Icon, title }: { icon: React.ElementType; title: string })
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {title}
     </span>
+  );
+}
+
+/** Under Buy on a single book: the combos that include it, each with its
+ *  saving against buying the books one by one at this book's price. */
+function ComboOffers({
+  book,
+  offers,
+  t,
+}: {
+  book: Product;
+  offers: Product[];
+  t: (typeof PRODUCT_COPY)[keyof typeof PRODUCT_COPY];
+}) {
+  return (
+    <section className="mb-4 rounded-2xl border-2 border-brand-gold/60 bg-amber-50/60 p-3 sm:p-4">
+      <h3 className="font-deva flex items-center gap-1.5 text-sm font-extrabold text-brand-teal sm:text-base">
+        <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {t.comboOffer}
+      </h3>
+      <p className="font-deva mt-0.5 text-[11px] text-brand-500">{t.comboOfferBody}</p>
+      <ul className="mt-3 space-y-2">
+        {offers.map((offer) => {
+          const size = offer.setSize ?? 0;
+          const saving = size > 1 ? size * book.price - offer.price : 0;
+          return (
+            <li key={offer.id}>
+              <Link
+                href={`/combos/${offer.slug}`}
+                className="flex items-center gap-3 rounded-xl border border-amber-200 bg-white p-2 transition hover:border-brand-gold"
+              >
+                <span className="h-14 w-[42px] shrink-0 overflow-hidden rounded-md bg-brand-50 ring-1 ring-brand-100">
+                  {offer.coverImage && (
+                    // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP thumbnail
+                    <img src={coverThumbSrc(offer.coverImage)} alt="" width={42} height={56} loading="lazy" className="h-full w-full object-cover" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  {size > 1 && (
+                    <span className="font-deva block text-[11px] font-bold text-brand-teal">{t.comboBooks(size)}</span>
+                  )}
+                  <span className="font-deva line-clamp-2 text-xs font-semibold leading-snug text-brand-900">{offer.title}</span>
+                  {saving > 0 && (
+                    <span className="font-deva mt-0.5 inline-block rounded bg-green-100 px-1.5 text-[10px] font-bold text-green-800">
+                      {t.comboSave(saving)}
+                    </span>
+                  )}
+                </span>
+                <span className="flex shrink-0 flex-col items-end leading-tight">
+                  {offer.mrp > offer.price && (
+                    <span className="text-[11px] font-semibold text-gray-400 line-through">₹{offer.mrp}</span>
+                  )}
+                  <span className="text-lg font-black text-green-700">₹{offer.price}</span>
+                  <span className="font-deva text-[10px] font-bold text-brand-teal">{t.comboView} ›</span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

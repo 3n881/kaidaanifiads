@@ -20,6 +20,14 @@ export const BUY_FORM_COPY: Record<Locale, {
   needAgree: string;
   privacy: string;
   edit: string;
+  /** Choice step before the form, on a book that is also sold in combos. */
+  choose: string;
+  thisBook: string;
+  books: (n: number) => string;
+  perBook: (price: number) => string;
+  save: (amount: number) => string;
+  bestValue: string;
+  change: string;
 }> = {
   mr: {
     heading: "पुस्तक WhatsApp वर मिळवण्यासाठी माहिती भरा",
@@ -35,6 +43,13 @@ export const BUY_FORM_COPY: Record<Locale, {
     needAgree: "पुढे जाण्यासाठी ही चौकट निवडा.",
     privacy: "तुमचा नंबर फक्त पुस्तक पाठवण्यासाठी आणि ऑर्डरच्या मदतीसाठी वापरला जातो.",
     edit: "नाव / नंबर बदला",
+    choose: "काय घ्यायचे ते निवडा",
+    thisBook: "फक्त हे पुस्तक",
+    books: (n) => `${n} पुस्तकांचा संच`,
+    perBook: (price) => `प्रति पुस्तक फक्त ₹${price}`,
+    save: (amount) => `₹${amount} बचत`,
+    bestValue: "सर्वात जास्त बचत",
+    change: "बदला",
   },
   hi: {
     heading: "किताब WhatsApp पर पाने के लिए जानकारी भरें",
@@ -50,6 +65,13 @@ export const BUY_FORM_COPY: Record<Locale, {
     needAgree: "आगे बढ़ने के लिए यह बॉक्स चुनें।",
     privacy: "आपका नंबर केवल किताब भेजने और ऑर्डर में मदद के लिए इस्तेमाल होता है।",
     edit: "नाम / नंबर बदलें",
+    choose: "क्या लेना है चुनें",
+    thisBook: "सिर्फ यह किताब",
+    books: (n) => `${n} किताबों का सेट`,
+    perBook: (price) => `प्रति किताब सिर्फ ₹${price}`,
+    save: (amount) => `₹${amount} बचत`,
+    bestValue: "सबसे ज़्यादा बचत",
+    change: "बदलें",
   },
   en: {
     heading: "Enter your details to get the book on WhatsApp",
@@ -65,6 +87,13 @@ export const BUY_FORM_COPY: Record<Locale, {
     needAgree: "Please tick this box to continue.",
     privacy: "Your number is used only to send the book and to help with your order.",
     edit: "Change name / number",
+    choose: "Choose what to buy",
+    thisBook: "Just this book",
+    books: (n) => `Set of ${n} books`,
+    perBook: (price) => `Only ₹${price} per book`,
+    save: (amount) => `Save ₹${amount}`,
+    bestValue: "Best value",
+    change: "Change",
   },
 };
 

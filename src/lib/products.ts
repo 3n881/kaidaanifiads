@@ -248,7 +248,23 @@ export async function getComboBooks(comboId: number): Promise<Product[]> {
   return (data as unknown as { products: ProductRow | null }[])
     .map((r) => r.products)
     .filter((p): p is ProductRow => Boolean(p))
+    .sort((a, b) => a.id - b.id)
     .map(rowToProduct);
+}
+
+/** Visible combos that include this book (via combo_items), smallest set
+ *  first — the "save with a combo" offer on a single book's page. */
+export async function getCombosContaining(bookId: number): Promise<Product[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await getSupabase()
+    .from("combo_items")
+    .select("combo_id")
+    .eq("product_id", bookId);
+  if (error || !data?.length) return [];
+  const ids = new Set(data.map((r) => Number(r.combo_id)));
+  return (await getCombos())
+    .filter((p) => ids.has(p.id))
+    .sort((a, b) => (a.setSize ?? 0) - (b.setSize ?? 0) || a.price - b.price || a.id - b.id);
 }
 
 /** Related products for a detail page: every other title (ebooks and

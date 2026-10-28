@@ -13,7 +13,7 @@ import { useLanguage } from "./LanguageProvider";
  * anywhere while the preview viewer takes the first screen. Sits above the
  * site's BottomNav.
  */
-export default function StickyBuyBar({ product }: { product: Product }) {
+export default function StickyBuyBar({ product, offers = [] }: { product: Product; offers?: Product[] }) {
   const { locale } = useLanguage();
 
   useEffect(() => {
@@ -37,6 +37,7 @@ export default function StickyBuyBar({ product }: { product: Product }) {
         <div className="min-w-0 flex-1">
           <BuyButton
             product={product}
+            offers={offers}
             label={UI_COPY[editionLocaleFor(product, locale)].downloadNow}
             className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
           />

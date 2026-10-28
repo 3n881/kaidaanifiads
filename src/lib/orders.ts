@@ -42,8 +42,8 @@ export function orderPageUrl(orderId: string): string {
 
 /**
  * The PDFs a purchase of `productId` unlocks. A single ebook delivers its own
- * PDF; a combo delivers each member book's PDF (plus its own, if one was
- * uploaded). Items without a PDF are skipped. Throws
+ * PDF; a combo delivers its own merged PDF, or — when it has none — each
+ * member book's PDF. Items without a PDF are skipped. Throws
  * DatabaseUnavailableError when Supabase fails (never "no items").
  */
 export async function getDeliverableItems(
@@ -60,8 +60,16 @@ export async function getDeliverableItems(
   if (error) throw new DatabaseUnavailableError("load product", error);
   if (!product) return [];
 
+  const pathForLocale = (row: ItemRow) => {
+    if (locale === "hi") return row.pdf_path_hi;
+    if (locale === "en") return row.pdf_path_en;
+    return row.pdf_path_mr || row.pdf_path;
+  };
+
   const rows: ItemRow[] = [product];
-  if (product.is_combo) {
+  // A combo with its own (merged) PDF delivers just that file; its combo_items
+  // then only link the member books for the book pages' combo offers.
+  if (product.is_combo && !pathForLocale(product)) {
     const { data: members, error: membersError } = await admin
       .from("combo_items")
       .select("products:product_id(id, slug, title, title_mr, title_hi, title_en, pdf_path, pdf_path_mr, pdf_path_hi, pdf_path_en)")
@@ -71,12 +79,6 @@ export async function getDeliverableItems(
       if (m.products) rows.push(m.products);
     }
   }
-
-  const pathForLocale = (row: ItemRow) => {
-    if (locale === "hi") return row.pdf_path_hi;
-    if (locale === "en") return row.pdf_path_en;
-    return row.pdf_path_mr || row.pdf_path;
-  };
 
   return rows.flatMap((row) => {
     const pdfPath = pathForLocale(row);
