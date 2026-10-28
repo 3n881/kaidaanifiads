@@ -122,7 +122,7 @@ export default function ProductCard({
                 ₹{product.mrp}
               </span>
             )}
-            <span className="flex items-center gap-0.5 text-2xl font-extrabold leading-none text-red-600 sm:text-[26px]">
+            <span className="flex items-center gap-0.5 text-2xl font-extrabold leading-none text-green-600 sm:text-[26px]">
               <span className="text-base">₹</span>
               {product.price}
             </span>

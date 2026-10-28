@@ -255,7 +255,7 @@ export default function MyBooksClient({ combos }: { combos: Product[] }) {
                     <div className="min-w-0">
                       <p className="font-deva line-clamp-2 text-sm font-bold leading-snug text-gray-900">{combo.title}</p>
                       <p className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-base font-black text-red-600">₹{combo.price}</span>
+                        <span className="text-base font-black text-green-600">₹{combo.price}</span>
                         {combo.mrp > combo.price && <span className="text-xs text-gray-400 line-through">₹{combo.mrp}</span>}
                       </p>
                     </div>

@@ -13,7 +13,7 @@ export default function PriceTag({
     <div className="flex items-baseline gap-2">
       <span className="text-sm text-brand-400 line-through">₹{product.mrp}</span>
       <span
-        className={`font-extrabold text-brand-700 ${
+        className={`font-extrabold text-green-600 ${
           size === "lg" ? "text-3xl" : "text-xl"
         }`}
       >

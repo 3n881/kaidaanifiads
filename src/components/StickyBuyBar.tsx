@@ -32,7 +32,7 @@ export default function StickyBuyBar({ product, offers = [] }: { product: Produc
       <div className="mx-auto mt-1 flex max-w-md items-center gap-3">
         <div className="shrink-0 leading-tight">
           <span className="block text-xs text-brand-400 line-through">₹{product.mrp}</span>
-          <span className="block text-xl font-extrabold text-brand-700">₹{product.price}</span>
+          <span className="block text-xl font-extrabold text-green-600">₹{product.price}</span>
         </div>
         <div className="min-w-0 flex-1">
           <BuyButton
