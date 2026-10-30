@@ -14,7 +14,6 @@ import {
   Share2,
   ChevronDown,
   MessageCircle,
-  Package,
   CheckCircle2,
   Circle,
   Check,
@@ -41,7 +40,7 @@ import ProductGallery from "./ProductGallery";
 import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
 import { replaceProductAddress } from "@/lib/meta-pixel";
-import { GALLERY_COPY, PRODUCT_COPY } from "@/lib/product-copy";
+import { PRODUCT_COPY } from "@/lib/product-copy";
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
 
@@ -74,7 +73,6 @@ export default function ProductDetail({
   // Labels follow the edition on show (a Hindi-only book reads in Hindi).
   const copy = UI_COPY[editionLocale];
   const t = PRODUCT_COPY[editionLocale];
-  const g = GALLERY_COPY[editionLocale];
   const group = family.map((item) => localizeProduct(item, locale));
   const byId = new Map(group.map((item) => [item.id, item]));
   const sizeOf = (item: Product) => (item.isCombo ? item.setSize ?? members[item.id]?.length ?? 0 : 1);
@@ -87,13 +85,6 @@ export default function ProductDetail({
     setSelectedId(item.id);
     replaceProductAddress(`/${item.isCombo ? "combos" : "ebooks"}/${item.slug}`);
   };
-  // Cover slider after the big picture: a set's books, else the sets with this
-  // book, else other titles.
-  const slides = comboBooks.length
-    ? comboBooks.map((item, i) => ({ product: item, label: g.bookOf(i + 1, comboBooks.length) }))
-    : group.length
-      ? group.filter((item) => item.isCombo && item.id !== product.id).map((item) => ({ product: item, label: t.comboBooks(sizeOf(item)) }))
-      : related.slice(0, 4).map((item) => ({ product: item, label: g.more }));
   // The same choice as buttons in the phone's bottom bar (seen without scrolling).
   const barOptions = tiers.map((tier) => ({
     key: String(tier.size),
@@ -105,9 +96,6 @@ export default function ProductDetail({
   }));
   // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
   const buyLabel = productSize > 1 ? t.buySet(productSize, product.price) : `${copy.downloadNow} · ₹${product.price}`;
-  // Swipe row under Buy (books without a group): other titles; the "you may
-  // also like" row at the bottom would repeat it, so that one is left out.
-  const alsoBuy = group.length ? [] : related.slice(0, 6);
   // The first screen is the opened product's cover (server-rendered, preloaded).
   const heroImage = openedProduct.coverImage;
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
@@ -185,7 +173,7 @@ export default function ProductDetail({
         {/* Preview viewer — full width on phones; the sticky bar keeps price
             and Buy on screen (as on the previous site). */}
         <div className="mx-auto w-full max-w-md lg:sticky lg:top-24 lg:max-w-none lg:self-start">
-          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} others={slides} />
+          <ProductGallery key={`${product.id}-${locale}`} product={product} previewUrl={previewUrl} labelsLocale={editionLocale} />
         </div>
 
         {/* Info — styling follows the original site's book page */}
@@ -288,7 +276,6 @@ export default function ProductDetail({
           {/* what's inside a set */}
           {product.isCombo && comboBooks.length > 0 && <BookChecklist books={comboBooks} price={product.price} t={t} />}
 
-          {alsoBuy.length > 0 && <AlsoBuyRow book={product} items={alsoBuy} title={g.alsoBuy} t={t} g={g} />}
 
           {/* chips */}
           <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
@@ -390,7 +377,7 @@ export default function ProductDetail({
       </div>
 
       {/* Related products */}
-      {group.length > 0 && related.length > 0 && (
+      {related.length > 0 && (
         <section className="cv-auto mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
@@ -604,67 +591,6 @@ function BookChecklist({
       {sum > price && (
         <p className="font-deva mt-2 rounded-lg bg-green-50 px-2.5 py-1.5 text-xs font-bold text-green-800">{t.separately(sum, price)}</p>
       )}
-    </section>
-  );
-}
-
-/** Under Buy: a swipe row of books / combos, each with its own big Buy
- *  (client, 28 Oct). For a combo with this book, the saving against buying
- *  the books one by one at this book's price. */
-function AlsoBuyRow({
-  book,
-  items,
-  title,
-  t,
-  g,
-}: {
-  book: Product;
-  items: Product[];
-  title: string;
-  t: (typeof PRODUCT_COPY)[keyof typeof PRODUCT_COPY];
-  g: (typeof GALLERY_COPY)[keyof typeof GALLERY_COPY];
-}) {
-  return (
-    <section className="mb-4 rounded-2xl border-2 border-brand-gold/60 bg-amber-50/60 py-3">
-      <h3 className="font-deva flex items-center gap-1.5 px-3 text-sm font-extrabold text-brand-teal sm:text-base">
-        <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {title}
-      </h3>
-      <ul className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-3 px-3 pb-1">
-        {items.map((item) => {
-          const size = item.isCombo ? item.setSize ?? 0 : 1;
-          const saving = item.isCombo && !book.isCombo && size > 1 ? size * book.price - item.price : 0;
-          const href = `/${item.isCombo ? "combos" : "ebooks"}/${item.slug}`;
-          return (
-            <li key={item.id} className="flex w-[62%] max-w-[230px] shrink-0 snap-start flex-col rounded-xl border border-amber-200 bg-white p-2">
-              <Link href={href} className="block">
-                <span className="relative block aspect-[3/4] overflow-hidden rounded-lg bg-brand-50">
-                  {item.coverImage && (
-                    // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
-                    <img src={coverSrc(item.coverImage)} alt={item.title} width={400} height={533} loading="lazy" className="h-full w-full object-cover" />
-                  )}
-                  {saving > 0 && (
-                    <span className="font-deva absolute left-1.5 top-1.5 rounded-md bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      {t.comboSave(saving)}
-                    </span>
-                  )}
-                </span>
-                {size > 1 && <span className="font-deva mt-1.5 block text-[11px] font-bold text-brand-teal">{t.comboBooks(size)}</span>}
-                <span className="font-deva mt-0.5 line-clamp-2 text-xs font-semibold leading-snug text-brand-900">{item.title}</span>
-              </Link>
-              <span className="mt-auto flex items-baseline gap-1.5 pt-1.5">
-                {item.mrp > item.price && <span className="text-[11px] font-semibold text-gray-400 line-through">₹{item.mrp}</span>}
-                <span className="text-xl font-black text-green-600">₹{item.price}</span>
-              </span>
-              <BuyButton
-                product={item}
-                showIcon={false}
-                label={g.buyNow}
-                className="font-deva mt-1.5 flex min-h-11 w-full items-center justify-center rounded-lg bg-brand-gold px-3 py-2 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
-              />
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }

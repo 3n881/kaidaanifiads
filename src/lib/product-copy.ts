@@ -30,8 +30,6 @@ export const PRODUCT_COPY = {
       { label: "माझी पुस्तके", en: "My Books" },
     ],
     comboIncludes: "या कॉम्बोमध्ये समाविष्ट पुस्तके",
-    comboBooks: (n: number) => `${n} पुस्तके`,
-    comboSave: (n: number) => `₹${n} वाचवा`,
     // Offer cards on a book that is also sold in combos (client, 28 Oct).
     offerPick: "ऑफर निवडा",
     pill: (n: number) => (n === 1 ? "1 पुस्तक" : `${n} पुस्तके`),
@@ -89,8 +87,6 @@ export const PRODUCT_COPY = {
       { label: "मेरी किताबें", en: "My Books" },
     ],
     comboIncludes: "इस कॉम्बो में शामिल किताबें",
-    comboBooks: (n: number) => `${n} किताबें`,
-    comboSave: (n: number) => `₹${n} बचाएँ`,
     offerPick: "ऑफ़र चुनें",
     pill: (n: number) => (n === 1 ? "1 किताब" : `${n} किताबें`),
     thisBookOnly: "सिर्फ यह किताब",
@@ -147,8 +143,6 @@ export const PRODUCT_COPY = {
       { label: "My Books", en: "" },
     ],
     comboIncludes: "Books in this combo",
-    comboBooks: (n: number) => `${n} books`,
-    comboSave: (n: number) => `Save ₹${n}`,
     offerPick: "Choose an offer",
     pill: (n: number) => (n === 1 ? "1 book" : `${n} books`),
     thisBookOnly: "Just this book",
@@ -186,9 +180,9 @@ export const PRODUCT_COPY = {
 
 /** Preview viewer labels — same language rule as PRODUCT_COPY. */
 export const GALLERY_COPY = {
-  mr: { page: "पान", prev: "मागील", next: "पुढील", prevPage: "मागील पान", nextPage: "पुढील पान", swipe: "स्वाईप करा ›", cover: "कव्हर", freePreview: (n: number) => `पहिली ${n} पाने मोफत वाचा (Preview)`, readLarge: "मोठ्या आकारात वाचा", close: "बंद करा", reader: "नमुना प्रत वाचक", buy: "खरेदी करा", buyFull: "संपूर्ण पुस्तक खरेदी करा", loading: "पाने उघडत आहेत…", failed: "नमुना पाने उघडता आली नाहीत. कृपया पुन्हा प्रयत्न करा.", zoomIn: "मोठे करा", zoomOut: "लहान करा", rotate: "फिरवा", bookOf: (i: number, n: number) => `पुस्तक ${i} / ${n}`, alsoIn: "हे पुस्तक असलेला संच", more: "हे पण पहा", view: "पहा", alsoBuy: "हे पण घ्या", buyNow: "खरेदी करा" },
-  hi: { page: "पृष्ठ", prev: "पिछला", next: "अगला", prevPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", swipe: "स्वाइप करें ›", cover: "कवर", freePreview: (n: number) => `पहले ${n} पृष्ठ मुफ्त पढ़ें (Preview)`, readLarge: "बड़े आकार में पढ़ें", close: "बंद करें", reader: "नमूना प्रति रीडर", buy: "खरीदें", buyFull: "पूरी किताब खरीदें", loading: "पृष्ठ खुल रहे हैं…", failed: "नमूना पृष्ठ नहीं खुल सके। कृपया फिर से कोशिश करें।", zoomIn: "बड़ा करें", zoomOut: "छोटा करें", rotate: "घुमाएँ", bookOf: (i: number, n: number) => `किताब ${i} / ${n}`, alsoIn: "यह किताब वाला सेट", more: "यह भी देखें", view: "देखें", alsoBuy: "यह भी लें", buyNow: "खरीदें" },
-  en: { page: "Page", prev: "Previous", next: "Next", prevPage: "Previous page", nextPage: "Next page", swipe: "Swipe ›", cover: "Cover", freePreview: (n: number) => `Read the first ${n} pages free`, readLarge: "Read full screen", close: "Close", reader: "Sample reader", buy: "Buy", buyFull: "Buy the full book", loading: "Opening pages…", failed: "Could not open the sample pages. Please try again.", zoomIn: "Zoom in", zoomOut: "Zoom out", rotate: "Rotate", bookOf: (i: number, n: number) => `Book ${i} of ${n}`, alsoIn: "A set with this book", more: "Also see", view: "View", alsoBuy: "Also get", buyNow: "Buy" },
+  mr: { page: "पान", prev: "मागील", next: "पुढील", prevPage: "मागील पान", nextPage: "पुढील पान", swipe: "स्वाईप करा ›", cover: "कव्हर", freePreview: (n: number) => `पहिली ${n} पाने मोफत वाचा (Preview)`, readLarge: "मोठ्या आकारात वाचा", close: "बंद करा", reader: "नमुना प्रत वाचक", buy: "खरेदी करा", buyFull: "संपूर्ण पुस्तक खरेदी करा", loading: "पाने उघडत आहेत…", failed: "नमुना पाने उघडता आली नाहीत. कृपया पुन्हा प्रयत्न करा.", zoomIn: "मोठे करा", zoomOut: "लहान करा", rotate: "फिरवा" },
+  hi: { page: "पृष्ठ", prev: "पिछला", next: "अगला", prevPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", swipe: "स्वाइप करें ›", cover: "कवर", freePreview: (n: number) => `पहले ${n} पृष्ठ मुफ्त पढ़ें (Preview)`, readLarge: "बड़े आकार में पढ़ें", close: "बंद करें", reader: "नमूना प्रति रीडर", buy: "खरीदें", buyFull: "पूरी किताब खरीदें", loading: "पृष्ठ खुल रहे हैं…", failed: "नमूना पृष्ठ नहीं खुल सके। कृपया फिर से कोशिश करें।", zoomIn: "बड़ा करें", zoomOut: "छोटा करें", rotate: "घुमाएँ" },
+  en: { page: "Page", prev: "Previous", next: "Next", prevPage: "Previous page", nextPage: "Next page", swipe: "Swipe ›", cover: "Cover", freePreview: (n: number) => `Read the first ${n} pages free`, readLarge: "Read full screen", close: "Close", reader: "Sample reader", buy: "Buy", buyFull: "Buy the full book", loading: "Opening pages…", failed: "Could not open the sample pages. Please try again.", zoomIn: "Zoom in", zoomOut: "Zoom out", rotate: "Rotate" },
 } satisfies Record<Locale, unknown>;
 
 export type GalleryCopy = (typeof GALLERY_COPY)[Locale];
