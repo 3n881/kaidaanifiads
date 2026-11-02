@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
 import { getEbooks, getProductBySlug, getRelated, getProductFamily } from "@/lib/products";
-import { getBuyersThisWeek } from "@/lib/social-proof";
+import { getTotalPurchases } from "@/lib/social-proof";
 
 export const revalidate = 300;
 
@@ -36,6 +36,6 @@ export default async function EbookDetailPage({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
-  const [relatedProducts, family, buyers] = await Promise.all([getRelated(product), getProductFamily(product), getBuyersThisWeek()]);
-  return <ProductDetail product={product} relatedProducts={relatedProducts} family={family.items} members={family.members} buyers={buyers} />;
+  const [relatedProducts, family, purchases] = await Promise.all([getRelated(product), getProductFamily(product), getTotalPurchases()]);
+  return <ProductDetail product={product} relatedProducts={relatedProducts} family={family.items} members={family.members} purchases={purchases} />;
 }

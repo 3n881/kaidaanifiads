@@ -1,42 +1,35 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabase/server";
-import { SALES_START } from "./sales";
 
-// Book page: "N people bought this in the last 7 days" — real paid orders,
-// one per WhatsApp number per book (a buyer who paid twice counts once).
-// Only the counts leave the server. Read at most every 10 min (book pages are
-// ISR, 5 min), never per visit.
+// Book page: "13,450+ book purchases so far" — every captured payment in the
+// client's Razorpay account (original site + ours) when the owner read it,
+// plus our paid orders since then, so nothing is counted twice. Rounded DOWN
+// to the 50, never more than is true. Read at most every 10 min (book pages
+// are ISR, 5 min), never per visit.
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** Razorpay → Transactions → Payments, status Captured, all time (owner, 2 Nov 2026). */
+const RAZORPAY_CAPTURED = { count: 13450, at: "2026-11-02T07:00:00Z" };
 
-async function readBuyersThisWeek(): Promise<Record<number, number>> {
-  const since = new Date(Math.max(Date.now() - WEEK_MS, Date.parse(SALES_START))).toISOString();
-  const { data, error } = await getSupabaseAdmin()
+async function readTotalPurchases(): Promise<number> {
+  const { count, error } = await getSupabaseAdmin()
     .from("orders")
-    .select("id, product_id, buyer_contact, whatsapp_number")
+    .select("id", { count: "exact", head: true })
     .eq("status", "paid")
-    .gte("created_at", since)
-    .limit(20000);
+    .gte("paid_at", RAZORPAY_CAPTURED.at);
   if (error) throw new Error(error.message);
-  const buyers = new Map<number, Set<string>>();
-  for (const o of data ?? []) {
-    if (o.product_id === null) continue;
-    const phone = String(o.buyer_contact || o.whatsapp_number || "").replace(/\D/g, "").slice(-10);
-    const set = buyers.get(o.product_id) ?? new Set<string>();
-    set.add(phone.length === 10 ? phone : o.id);
-    buyers.set(o.product_id, set);
-  }
-  return Object.fromEntries([...buyers].map(([id, set]) => [id, set.size]));
+  return RAZORPAY_CAPTURED.count + (count ?? 0);
 }
 
-const cachedBuyersThisWeek = unstable_cache(readBuyersThisWeek, ["buyers-this-week-v1"], { revalidate: 600 });
+const cachedTotalPurchases = unstable_cache(readTotalPurchases, ["total-purchases-v1"], { revalidate: 600 });
 
-/** Product id → people who bought it in the last 7 days. Empty on any error (the line just hides). */
-export async function getBuyersThisWeek(): Promise<Record<number, number>> {
+/** All-time purchases, rounded down to the 50. Falls back to the Razorpay count (never hides). */
+export async function getTotalPurchases(): Promise<number> {
+  let total = RAZORPAY_CAPTURED.count;
   try {
-    return await cachedBuyersThisWeek();
+    total = await cachedTotalPurchases();
   } catch {
-    return {};
+    // Build machines have no database key; the page refreshes within 5 min.
   }
+  return Math.floor(total / 50) * 50;
 }
