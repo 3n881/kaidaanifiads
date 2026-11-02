@@ -262,6 +262,10 @@ export interface OrdersView {
     notDownloaded: number;
   };
   dropOff: { cancelled: number; failed: number; pending: number };
+  /** Same numbers per person: retries of one book by one number count once (see `groupAttempts`). */
+  people: PeopleStats;
+  /** Order id → "this was try N" for the 2nd and later attempts of a person (cards show a tag). */
+  attemptNo: Record<string, number>;
   /** Rows per status tab (for the tab labels). */
   tabCounts: Record<OrderStatusFilter, number>;
   rows: OrderRow[];
@@ -313,7 +317,71 @@ export function periodRange(f: ReturnType<typeof parseOrderFilters>, now: number
 
 const change = (now: number, before: number) => (before > 0 ? ((now - before) / before) * 100 : null);
 
-type SummaryRow = Pick<OrderRow, "status" | "amount" | "download_count" | "refunded_amount" | "checkout_closed_at">;
+type SummaryRow = Pick<
+  OrderRow,
+  "id" | "product_id" | "status" | "amount" | "download_count" | "refunded_amount" | "checkout_closed_at" | "created_at" | "buyer_contact" | "whatsapp_number"
+>;
+
+export interface PeopleStats {
+  /** People who tapped Buy (attempts grouped per number + book). */
+  total: number;
+  /** People with at least one paid attempt. */
+  paid: number;
+  /** paid ÷ total, null when nobody tried. */
+  conversion: number | null;
+  /** People who never paid, by how their LAST attempt ended. */
+  dropOff: { cancelled: number; failed: number; pending: number };
+  /** People whose attempt failed / was closed first and who then paid. */
+  retriedThenPaid: number;
+}
+
+/** Retries closer than this to the person's previous attempt belong to the same person. */
+const SAME_PERSON_GAP_MS = DAY_MS;
+
+/**
+ * Groups attempts into people: same WhatsApp number + same book, each attempt
+ * within 24 h of the previous one. Attempts without a number (before the
+ * 18 Oct Buy popup) count as one person each. Rows stay untouched — this only
+ * changes how they are counted.
+ */
+export function groupAttempts(rows: SummaryRow[]): { people: PeopleStats; attemptNo: Record<string, number> } {
+  const sorted = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const open = new Map<string, { last: number; attempts: SummaryRow[] }>();
+  const groups: SummaryRow[][] = [];
+  const attemptNo: Record<string, number> = {};
+  for (const r of sorted) {
+    const phone = (r.buyer_contact || r.whatsapp_number || "").replace(/\D/g, "").slice(-10);
+    const at = Date.parse(r.created_at);
+    if (phone.length < 10) {
+      groups.push([r]);
+      continue;
+    }
+    const key = `${phone}:${r.product_id}`;
+    const g = open.get(key);
+    if (g && at - g.last <= SAME_PERSON_GAP_MS) {
+      g.attempts.push(r);
+      g.last = at;
+      attemptNo[r.id] = g.attempts.length;
+    } else {
+      const fresh = { last: at, attempts: [r] };
+      open.set(key, fresh);
+      groups.push(fresh.attempts);
+    }
+  }
+
+  const people: PeopleStats = { total: groups.length, paid: 0, conversion: null, dropOff: { cancelled: 0, failed: 0, pending: 0 }, retriedThenPaid: 0 };
+  for (const g of groups) {
+    const firstPaid = g.findIndex((r) => r.status === "paid");
+    if (firstPaid >= 0) {
+      people.paid += 1;
+      if (firstPaid > 0) people.retriedThenPaid += 1;
+    } else {
+      people.dropOff[dropOffKind(g[g.length - 1]) ?? "pending"] += 1;
+    }
+  }
+  people.conversion = people.total ? people.paid / people.total : null;
+  return { people, attemptNo };
+}
 
 /** Admin-only: the Orders page (KPIs, drop-off, tabs, list). `rowLimit` is raised for the CSV export. */
 export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters>, rowLimit = ROW_LIMIT): Promise<OrdersView> {
@@ -324,7 +392,7 @@ export async function getOrdersView(filters: ReturnType<typeof parseOrderFilters
 
 const cachedOrdersView = unstable_cache(
   (filters: ReturnType<typeof parseOrderFilters>) => readOrdersView(filters, ROW_LIMIT),
-  ["admin-orders-view-v1"],
+  ["admin-orders-view-v2"],
   { revalidate: ADMIN_CACHE_SECONDS, tags: [ADMIN_DATA_TAG] },
 );
 
@@ -345,7 +413,7 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
 
   const COLUMNS =
     "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name, reminder_count, reminder_last_at, failure_reason, failure_description, failure_method";
-  const SUMMARY = "status, amount, download_count, refunded_amount, checkout_closed_at";
+  const SUMMARY = "id, product_id, status, amount, download_count, refunded_amount, checkout_closed_at, created_at, buyer_contact, whatsapp_number";
 
   let summary = admin.from("orders").select(SUMMARY).limit(50000);
   if (start) summary = summary.gte("created_at", start);
@@ -400,6 +468,7 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
   const unpaid = s.filter((r) => r.status !== "paid");
   const dropOff = { cancelled: 0, failed: 0, pending: 0 };
   for (const r of unpaid) dropOff[dropOffKind(r) ?? "pending"] += 1;
+  const { people, attemptNo } = groupAttempts(s);
 
   const prev = previousRes ? ((previousRes.data ?? []) as Array<Pick<SummaryRow, "status" | "amount" | "refunded_amount">>) : null;
   const prevPaid = prev?.filter((r) => r.status === "paid") ?? [];
@@ -424,6 +493,8 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
       notDownloaded,
     },
     dropOff,
+    people,
+    attemptNo,
     tabCounts: {
       all: s.length,
       paid: paid.length,

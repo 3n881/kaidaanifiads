@@ -431,7 +431,7 @@ function LostSection({ data }: { data: Analytics }) {
               [
                 ["failed", "Payment failed"],
                 ["cancelled", "Closed the payment window"],
-                ["pending", "Left without closing"],
+                ["pending", "Left without paying"],
               ] as const
             ).map(([k, label]) => ({
               label,

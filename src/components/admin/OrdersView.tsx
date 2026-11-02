@@ -65,6 +65,7 @@ const TABS: Array<[OrderStatusFilter, string]> = [
   ["notdownloaded", "Not downloaded"],
 ];
 
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const istTime = (iso: string) =>
   new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
@@ -100,6 +101,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
   const toList = (change: Partial<Filters>) => `${href(change)}#recent-sales`;
   const exportHref = `/dashboard/orders/export${query({}) ? `?${query({})}` : ""}`;
   const k = view.kpis;
+  const ppl = view.people;
   const periodName = PERIODS.find(([p]) => p === view.period)?.[1] ?? "All";
   const shown = view.tabCounts[view.status];
 
@@ -122,11 +124,18 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
         <KpiCard label="Avg order" value={k.avgOrder === null ? "—" : rupees(k.avgOrder)} icon={ShoppingBasket} tone="purple" foot="Per paid order" />
         <KpiCard
           label="Conversion"
-          value={k.conversion === null ? "—" : `${(k.conversion * 100).toFixed(1)}%`}
+          value={ppl.conversion === null ? "—" : `${(ppl.conversion * 100).toFixed(1)}%`}
           icon={Target}
           tone="orange"
           valueClass="text-orange-600"
-          foot={`Paid / all attempts (${k.attempts})`}
+          foot={
+            <>
+              {ppl.paid} of {ppl.total} people paid
+              <span className="block text-[11px] text-brand-400">
+                {k.attempts} attempts · {k.conversion === null ? "—" : `${(k.conversion * 100).toFixed(1)}%`} per attempt
+              </span>
+            </>
+          }
         />
       </div>
 
@@ -153,10 +162,18 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
             <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">{k.recoveryCount} not paid</span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-            <DropTile href={toList({ status: "cancelled" })} icon={LogOut} value={view.dropOff.cancelled} label="Closed payment window" tone="amber" />
-            <DropTile href={toList({ status: "failed" })} icon={CreditCard} value={view.dropOff.failed} label="Payment failed" tone="red" />
-            <DropTile href={toList({ status: "pending" })} icon={UserX} value={view.dropOff.pending} label="Left without closing" tone="purple" className="col-span-2 sm:col-span-1" />
+            <DropTile href={toList({ status: "cancelled" })} icon={LogOut} value={view.dropOff.cancelled} people={ppl.dropOff.cancelled} label="Closed payment window" tone="amber" />
+            <DropTile href={toList({ status: "failed" })} icon={CreditCard} value={view.dropOff.failed} people={ppl.dropOff.failed} label="Payment failed" tone="red" />
+            <DropTile href={toList({ status: "pending" })} icon={UserX} value={view.dropOff.pending} people={ppl.dropOff.pending} label="Left without paying" tone="purple" className="col-span-2 sm:col-span-1" />
           </div>
+          <p className="mt-2 text-xs font-semibold text-amber-900">
+            Big number = attempts; &quot;people&quot; = one number on one book within 24 h, counted once by how their last try ended.
+            {ppl.retriedThenPaid > 0 && (
+              <span className="mt-1 block text-green-700">
+                ✓ {ppl.retriedThenPaid} {ppl.retriedThenPaid === 1 ? "person" : "people"} failed or closed first, then paid
+              </span>
+            )}
+          </p>
           <p className="mt-3 text-[11px] leading-snug text-amber-800/80">
             Failed payments have the buyer&apos;s number (WhatsApp reminder goes out after 10 min). Razorpay shares no number when the window is closed before paying.
             &quot;Closed payment window&quot; is counted from 17 Oct; older ones show as &quot;left&quot;.
@@ -288,7 +305,7 @@ export default function OrdersView({ view, products, basePath = "/dashboard/orde
         ) : (
           <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {view.rows.map((o) => (
-              <OrderCard key={o.id} o={o} product={o.product_id === null ? undefined : byId.get(o.product_id)} reminders />
+              <OrderCard key={o.id} o={o} product={o.product_id === null ? undefined : byId.get(o.product_id)} reminders attempt={view.attemptNo[o.id]} />
             ))}
           </ul>
         )}
@@ -363,10 +380,11 @@ const DROP_TONES = {
   purple: "border-purple-200 bg-purple-50 text-purple-700",
 } as const;
 
-function DropTile({ href, icon: Icon, value, label, tone, className = "" }: {
+function DropTile({ href, icon: Icon, value, people, label, tone, className = "" }: {
   href: string;
   icon: React.ElementType;
   value: number;
+  people: number;
   label: string;
   tone: keyof typeof DROP_TONES;
   className?: string;
@@ -377,6 +395,9 @@ function DropTile({ href, icon: Icon, value, label, tone, className = "" }: {
         <Icon className="h-5 w-5" aria-hidden="true" /> {value}
       </span>
       <span className="mt-1 block text-xs font-bold leading-tight sm:text-sm">{label}</span>
+      <span className="mt-0.5 block text-[11px] font-semibold opacity-80">
+        {people} {people === 1 ? "person" : "people"}
+      </span>
     </Link>
   );
 }
@@ -430,7 +451,7 @@ function FailureSummary({ rows }: { rows: OrderRow[] }) {
 }
 
 /** `reminders`: show the tick + "Remind" on pending / cancelled / failed orders (Orders page only). */
-export function OrderCard({ o, product, reminders = false }: { o: OrderRow; product?: AdminProduct; reminders?: boolean }) {
+export function OrderCard({ o, product, reminders = false, attempt }: { o: OrderRow; product?: AdminProduct; reminders?: boolean; attempt?: number }) {
   const phone = o.buyer_contact || o.whatsapp_number;
   const remindable = reminders && isRemindable(o);
   // Name from the Buy popup (2026-10-18); older orders were "Guest".
@@ -471,6 +492,11 @@ export function OrderCard({ o, product, reminders = false }: { o: OrderRow; prod
           {buyerName && phone && <p className="text-sm font-semibold text-green-700">{phone}</p>}
           <p className="mt-0.5 text-xs text-brand-500">
             {istTime(o.paid_at ?? o.created_at)} · <span className="font-mono">#{shortOrderId(o.id)}</span>
+            {attempt && (
+              <span className="ml-1.5 rounded bg-brand-50 px-1.5 py-px text-[10px] font-bold text-brand-600 ring-1 ring-brand-100">
+                {ordinal(attempt)} try
+              </span>
+            )}
           </p>
           <p className="font-deva mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-brand-800">{title}</p>
           <p className="font-deva mt-0.5 text-[11px] text-brand-400">
