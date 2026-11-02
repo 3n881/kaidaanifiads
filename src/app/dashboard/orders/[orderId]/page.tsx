@@ -7,7 +7,7 @@ import OrderActions from "@/components/admin/OrderActions";
 import { getAdminProducts } from "@/lib/admin";
 import { orderPageUrl } from "@/lib/orders";
 import { failureLabel } from "@/lib/payment-failure";
-import { getOrderDetail, SALES_START } from "@/lib/sales";
+import { getOrderDetail, isLeft, SALES_START } from "@/lib/sales";
 import { getOrderWhatsAppLog } from "@/lib/whatsapp-log";
 
 export const metadata: Metadata = { title: "Admin — Order", robots: { index: false, follow: false } };
@@ -33,7 +33,9 @@ export default async function OrderDetailPage({ params }: PageProps<"/dashboard/
     ? { label: order.refund_status === "full" ? "Refunded" : "Part refunded", className: "bg-purple-100 text-purple-700" }
     : paid ? { label: "Paid", className: "bg-green-100 text-green-700" }
     : order.status === "failed" ? { label: "Failed", className: "bg-danger-500/10 text-danger-600" }
-    : { label: "Not paid", className: "bg-brand-100 text-brand-600" };
+    : order.checkout_closed_at ? { label: "Closed payment window", className: "bg-gray-100 text-gray-600" }
+    : isLeft(order) ? { label: "Left without paying", className: "bg-gray-100 text-gray-600" }
+    : { label: "Pending", className: "bg-amber-100 text-amber-800" };
 
   // Colour = meaning: green success, red failure, amber waiting/attention,
   // purple refund, blue neutral start.

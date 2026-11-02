@@ -29,6 +29,7 @@ import { coverThumbSrc } from "@/lib/covers";
 import { failureLabel } from "@/lib/payment-failure";
 import {
   dropOffKind,
+  isLeft,
   shortOrderId,
   type OrderPeriod,
   type OrderRow,
@@ -57,7 +58,7 @@ const COMPARED: Partial<Record<OrderPeriod, string>> = {
 const TABS: Array<[OrderStatusFilter, string]> = [
   ["all", "All"],
   ["paid", "Paid"],
-  ["pending", "Pending"],
+  ["pending", "Left without paying"],
   ["failed", "Failed"],
   ["cancelled", "Cancelled"],
   ["refunded", "Refunded"],
@@ -385,6 +386,7 @@ const BADGES = {
   failed: ["FAILED", "bg-red-100 text-danger-600"],
   cancelled: ["CANCELLED", "bg-gray-100 text-gray-600"],
   pending: ["PENDING", "bg-amber-100 text-amber-800"],
+  left: ["LEFT WITHOUT PAYING", "bg-gray-100 text-gray-600"],
   refunded: ["REFUNDED", "bg-purple-100 text-purple-700"],
   partial: ["PART REFUND", "bg-purple-100 text-purple-700"],
 } as const;
@@ -433,7 +435,8 @@ export function OrderCard({ o, product, reminders = false }: { o: OrderRow; prod
   const remindable = reminders && isRemindable(o);
   // Name from the Buy popup (2026-10-18); older orders were "Guest".
   const buyerName = o.name && o.name !== "Guest" && o.name !== "Customer" ? o.name : null;
-  const kind = o.refund_status === "full" ? "refunded" : o.refund_status === "partial" ? "partial" : (dropOffKind(o) ?? "paid");
+  const drop = dropOffKind(o);
+  const kind = o.refund_status === "full" ? "refunded" : o.refund_status === "partial" ? "partial" : drop === "pending" && isLeft(o) ? "left" : (drop ?? "paid");
   const [badge, badgeClass] = BADGES[kind];
   const locale = (o.locale ?? "mr") as "mr" | "hi" | "en";
   const title = product ? product[`title_${locale}`] || product.title_mr || product.title || `#${product.id}` : o.product_id === null ? "—" : `#${o.product_id}`;

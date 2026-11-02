@@ -220,6 +220,15 @@ export function shortOrderId(id: string): string {
   return id.replace(/-/g, "").slice(0, 6).toUpperCase();
 }
 
+/**
+ * A "pending" order older than 30 min = the buyer left Razorpay without paying
+ * or closing it (same cut-off as the order page). Label only: the status stays
+ * `created`, so the cron still catches a late payment for 48 h.
+ */
+export function isLeft(o: Pick<OrderRow, "status" | "created_at">): boolean {
+  return o.status === "created" && Date.now() - new Date(o.created_at).getTime() > 30 * 60 * 1000;
+}
+
 /** Drop-off group of an unpaid order (migration 011). */
 export function dropOffKind(o: Pick<OrderRow, "status" | "checkout_closed_at">): "failed" | "cancelled" | "pending" | null {
   if (o.status === "paid") return null;
