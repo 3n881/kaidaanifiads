@@ -146,11 +146,13 @@ function PeriodCard({ title, note, stats, href, tone }: { title: string; note?: 
                   </span>
                 )}
               </span>
-              <span title="Paid ÷ Buy taps that opened Razorpay">
-                <b className="block text-base text-orange-600">{pct(stats.conversion)}</b>of {stats.checkouts} tries
+              <span title="People who paid ÷ people who tried (one number on one book within 24 h = one person)">
+                <b className="block text-base text-orange-600">{pct(stats.people.conversion)}</b>of {stats.people.total} people
+                <span className="block text-brand-400">{stats.checkouts} tries</span>
               </span>
-              <span>
-                <b className="block text-base text-danger-600">{stats.failed}</b>failed
+              <span title="People who never paid and whose last try failed">
+                <b className="block text-base text-danger-600">{stats.people.dropOff.failed}</b>failed
+                <span className="block text-brand-400">{stats.failed} tries</span>
               </span>
             </p>
             {stats.refunds > 0 && <p className="text-[11px] text-purple-700">After {stats.refunds} refund{stats.refunds === 1 ? "" : "s"} (−{inr(stats.refundedAmount)})</p>}
@@ -165,7 +167,7 @@ function Attention({ sales }: { sales: SalesOverview }) {
   const tiles = [
     { href: "/dashboard/orders?status=notdownloaded", icon: Download, value: sales.paidNotDownloaded.length, label: "Paid, not downloaded", hint: "Resend on WhatsApp", tone: "amber" },
     { href: "/dashboard/orders?status=paid", icon: MessageCircleOff, value: sales.whatsappMissing.length, label: "WhatsApp not sent", hint: "Use Resend", tone: "red" },
-    { href: "/dashboard/orders?period=today&status=failed", icon: CreditCard, value: sales.failedToday.length, label: "Failed today", hint: "Have their number", tone: "purple" },
+    { href: "/dashboard/orders?period=today&status=failed", icon: CreditCard, value: sales.failedToday.length, label: "Failed today", hint: "People, have their number", tone: "purple" },
     { href: "/dashboard/messages", icon: Inbox, value: sales.newMessages, label: "New messages", hint: "Contact form", tone: "blue" },
   ] as const;
   const waiting = tiles.reduce((sum, t) => sum + t.value, 0);

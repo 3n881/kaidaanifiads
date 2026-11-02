@@ -50,6 +50,8 @@ export interface PeriodStats {
   refundedAmount: number;
   /** paid ÷ checkouts, null when there were no checkouts. */
   conversion: number | null;
+  /** Same per person: retries of one book by one number count once (`groupAttempts`). */
+  people: PeopleStats;
   /** % change vs the comparison period (null: nothing to compare). */
   revenueChange: number | null;
   paidChange: number | null;
@@ -75,7 +77,7 @@ export interface SalesOverview {
   readAt: string;
 }
 
-function stats(rows: SalesOrder[], before?: SalesOrder[]): PeriodStats {
+function stats(rows: OrderRow[], before?: SalesOrder[]): PeriodStats {
   const net = (r: SalesOrder) => Number(r.amount || 0) - Number(r.refunded_amount || 0);
   const paidRows = rows.filter((r) => r.status === "paid");
   const revenue = paidRows.reduce((sum, r) => sum + net(r), 0);
@@ -89,9 +91,23 @@ function stats(rows: SalesOrder[], before?: SalesOrder[]): PeriodStats {
     refunds: paidRows.filter((r) => Number(r.refunded_amount || 0) > 0).length,
     refundedAmount: paidRows.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0),
     conversion: rows.length ? paidRows.length / rows.length : null,
+    people: groupAttempts(rows).people,
     revenueChange: prevPaid ? pctChange(revenue, prevPaid.reduce((sum, r) => sum + net(r), 0)) : null,
     paidChange: prevPaid ? pctChange(paidRows.length, prevPaid.length) : null,
   };
+}
+
+/** Newest attempt per number + book (rows are newest first); no number = kept as is. */
+function onePerPerson(rows: OrderRow[]): OrderRow[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const phone = (r.buyer_contact || r.whatsapp_number || "").replace(/\D/g, "").slice(-10);
+    if (phone.length < 10) return true;
+    const key = `${phone}:${r.product_id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Start of today in India, as a UTC timestamp. */
@@ -108,7 +124,7 @@ export async function getSalesOverview(): Promise<SalesOverview> {
   return cachedSalesOverview();
 }
 
-const cachedSalesOverview = unstable_cache(() => computeSalesOverview(getSupabaseAdmin()), ["admin-sales-overview-v1"], {
+const cachedSalesOverview = unstable_cache(() => computeSalesOverview(getSupabaseAdmin()), ["admin-sales-overview-v2"], {
   revalidate: ADMIN_CACHE_SECONDS,
   tags: [ADMIN_DATA_TAG],
 });
@@ -171,7 +187,7 @@ export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseA
     all: stats(rows),
     paidNotDownloaded: paid.filter((r) => !r.download_count && paidAgo(r, 15 * 60 * 1000)).slice(0, 20),
     whatsappMissing: paid.filter((r) => !r.whatsapp_sends && paidAgo(r, 5 * 60 * 1000)).slice(0, 20),
-    failedToday: since(todayStart).filter((r) => r.status === "failed" && !paidLater(r)).slice(0, 20),
+    failedToday: onePerPerson(since(todayStart).filter((r) => r.status === "failed" && !paidLater(r))).slice(0, 20),
     newMessages: messagesRes.count ?? 0,
     interested: {
       active: (leadsRes.data ?? []).length,
