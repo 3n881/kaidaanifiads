@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductDetail from "@/components/ProductDetail";
 import { getCombos, getComboBySlug, getRelated, getProductFamily } from "@/lib/products";
+import { getBuyersThisWeek } from "@/lib/social-proof";
 
 export const revalidate = 300;
 
@@ -32,6 +33,6 @@ export default async function ComboDetailPage({
   const { slug } = await params;
   const product = await getComboBySlug(slug);
   if (!product) notFound();
-  const [relatedProducts, family] = await Promise.all([getRelated(product), getProductFamily(product)]);
-  return <ProductDetail product={product} relatedProducts={relatedProducts} family={family.items} members={family.members} />;
+  const [relatedProducts, family, buyers] = await Promise.all([getRelated(product), getProductFamily(product), getBuyersThisWeek()]);
+  return <ProductDetail product={product} relatedProducts={relatedProducts} family={family.items} members={family.members} buyers={buyers} />;
 }

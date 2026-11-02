@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
+import { Check, CreditCard, Download, Loader2, MessageCircle, Pencil, ShieldCheck, Smartphone, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
@@ -18,6 +18,8 @@ import { cleanBuyerName, cleanIndianMobile, loadSavedBuyer, saveBuyer } from "@/
 
 // details = our name + WhatsApp form (first, 2026-10-18) → processing (Razorpay opening / paying) → …
 type Step = "details" | "processing" | "error" | "cancelled" | "failed";
+// Razorpay opens on this method (prefill.method); none = its usual list (UPI first).
+type PayMethod = "card";
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -33,7 +35,7 @@ interface RazorpayOptions {
   description?: string;
   order_id: string;
   theme?: { color?: string };
-  prefill?: { name?: string; contact?: string };
+  prefill?: { name?: string; contact?: string; method?: PayMethod };
   readonly?: { contact?: boolean; email?: boolean; name?: boolean };
   hidden?: { contact?: boolean; email?: boolean };
   handler: (res: RazorpayResponse) => void;
@@ -57,7 +59,7 @@ interface CheckoutData {
 
 type RazorpayCtor = new (options: RazorpayOptions) => {
   open: () => void;
-  on: (event: "payment.failed", handler: (response: { error?: { description?: string } }) => void) => void;
+  on: (event: "payment.failed", handler: (response: { error?: { description?: string; reason?: string } }) => void) => void;
 };
 
 declare global {
@@ -104,6 +106,8 @@ export default function BuyButton({
   const [open, setOpen] = useState(false);
   // Bumping the key remounts the modal = a fresh checkout attempt.
   const [attempt, setAttempt] = useState(0);
+  // "Pay by card" on the didn't-pay screens retries with Razorpay opened on cards.
+  const [method, setMethod] = useState<PayMethod | undefined>();
   // After paying we go to the order page; pressing Back on a phone restores
   // this page from the back/forward cache exactly as it was left — with the
   // "Opening payment…" spinner still up and no way to close it. A restored
@@ -140,8 +144,12 @@ export default function BuyButton({
           // (a Marathi book shows Marathi even when the site is set to Hindi).
           locale={editionLocale}
           editionLocale={editionLocale}
+          method={method}
           onClose={() => setOpen(false)}
-          onRetry={() => setAttempt((n) => n + 1)}
+          onRetry={(next) => {
+            setMethod(next);
+            setAttempt((n) => n + 1);
+          }}
         />
       )}
     </>
@@ -152,14 +160,16 @@ function BuyModal({
   product,
   locale,
   editionLocale,
+  method,
   onClose,
   onRetry,
 }: {
   product: Product;
   locale: Locale;
   editionLocale: Locale;
+  method?: PayMethod;
   onClose: () => void;
-  onRetry: () => void;
+  onRetry: (method?: PayMethod) => void;
 }) {
   const [step, setStep] = useState<Step>("details");
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +186,8 @@ function BuyModal({
   // keeps its window open for a retry; when the buyer then closes it, we know
   // it was a failure (help screen), not a plain cancel (stay-in-touch box).
   const failedRef = useRef<string | null>(null);
+  // Razorpay's reason for the last failure (payment_timed_out = UPI request not approved in time).
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -301,8 +313,10 @@ function BuyModal({
           // Number from our popup: filled in and locked, so Razorpay doesn't
           // ask again. No e-mail needed (Razorpay's e-mail field hidden).
           ...(data.prefill
-            ? { prefill: data.prefill, readonly: { contact: true }, hidden: { email: true } }
-            : {}),
+            ? { prefill: { ...data.prefill, ...(method ? { method } : {}) }, readonly: { contact: true }, hidden: { email: true } }
+            : method
+              ? { prefill: { method } }
+              : {}),
           handler: async (payment: RazorpayResponse) => {
             setStep("processing");
             // Sent from the book page, before redirecting: the order page URL
@@ -345,6 +359,8 @@ function BuyModal({
         });
         razorpay.on("payment.failed", (response) => {
           failedRef.current = response?.error?.description || "failed";
+          const why = `${response?.error?.reason ?? ""} ${response?.error?.description ?? ""}`;
+          setTimedOut(/timed?[_ ]?out|in time/i.test(why));
         });
         razorpay.open();
         trackVisit("razorpay_open", product.id, true);
@@ -352,7 +368,7 @@ function BuyModal({
         fail(UI_COPY[locale].checkoutFailed);
       }
     },
-    [fail, locale, editionLocale, product.id, product.price, product.slug, product.title],
+    [fail, locale, editionLocale, method, product.id, product.price, product.slug, product.title],
   );
 
   const copy = UI_COPY[locale];
@@ -547,6 +563,7 @@ function BuyModal({
                 </>
               )}
 
+              {!compact && method !== "card" && <UpiHint text={form.upiHint} />}
             </div>
 
             {/* Pinned to the bottom of the popup: the Terms notice + pay button stay visible while typing */}
@@ -590,6 +607,7 @@ function BuyModal({
             <p className="font-deva text-xs text-brand-500">
               {copy.noAccount}
             </p>
+            {method !== "card" && <UpiHint text={form.upiHint} />}
           </div>
         )}
 
@@ -597,9 +615,10 @@ function BuyModal({
           <div className="flex flex-col gap-3 py-2 text-center">
             <p className="font-deva text-base font-bold text-brand-900">{notPaid.cancelledTitle}</p>
             <p className="font-deva -mt-2 text-xs text-brand-500">{notPaid.cancelledBody}</p>
-            <button type="button" onClick={onRetry} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
+            <button type="button" onClick={() => onRetry(method)} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
               {copy.retry}
             </button>
+            {method !== "card" && <CardButton label={notPaid.payByCard} onClick={() => onRetry("card")} />}
             <button type="button" onClick={onClose} className="w-full rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50">
               {copy.close}
             </button>
@@ -611,10 +630,12 @@ function BuyModal({
             <X className="mx-auto h-10 w-10 rounded-full bg-danger-500/10 p-2 text-danger-600" aria-hidden="true" />
             <p className="font-deva text-base font-bold text-brand-900">{notPaid.failedTitle}</p>
             <p className="font-deva rounded-xl bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">{notPaid.failedSafe}</p>
-            <p className="font-deva text-xs text-brand-600">{notPaid.failedTip}</p>
-            <button type="button" onClick={onRetry} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
-              {copy.retry}
+            <p className="font-deva text-xs leading-relaxed text-brand-600">{timedOut ? notPaid.timedOutTip : notPaid.failedTip}</p>
+            {/* Try again keeps the way they were paying; the card button only while on UPI. */}
+            <button type="button" onClick={() => onRetry(method)} className="font-deva w-full rounded-xl bg-brand-teal px-4 py-3 text-sm font-bold text-white hover:bg-brand-teal/90">
+              {method === "card" ? copy.retry : notPaid.retryUpi}
             </button>
+            {method !== "card" && <CardButton label={notPaid.payByCard} onClick={() => onRetry("card")} />}
             <a
               href={`https://wa.me/${SITE.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Payment failed — ${product.title}`)}`}
               target="_blank"
@@ -640,7 +661,7 @@ function BuyModal({
             </p>
             <button
               type="button"
-              onClick={onRetry}
+              onClick={() => onRetry(method)}
               className="font-deva mt-1 w-full rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-teal/90"
             >
               {copy.retry}
@@ -663,6 +684,27 @@ function BuyModal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** "Approve in your UPI app within 5 min" — UPI's own time limit, said before it runs out. */
+function UpiHint({ text }: { text: string }) {
+  return (
+    <p className="font-deva flex items-start gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-left text-xs font-semibold leading-snug text-blue-800">
+      <Smartphone className="mt-px h-4 w-4 shrink-0" aria-hidden="true" /> {text}
+    </p>
+  );
+}
+
+function CardButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-brand-teal/30 bg-white px-4 py-2.5 text-sm font-bold text-brand-teal hover:bg-brand-teal/5"
+    >
+      <CreditCard className="h-4 w-4" aria-hidden="true" /> {label}
+    </button>
   );
 }
 

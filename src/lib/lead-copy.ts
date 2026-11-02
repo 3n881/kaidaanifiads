@@ -24,6 +24,10 @@ export const NOT_PAID_COPY: Record<Locale, {
   failedTitle: string;
   failedSafe: string;
   failedTip: string;
+  /** The UPI request expired (Razorpay reason payment_timed_out). */
+  timedOutTip: string;
+  retryUpi: string;
+  payByCard: string;
   help: string;
 }> = {
   mr: {
@@ -41,6 +45,9 @@ export const NOT_PAID_COPY: Record<Locale, {
     failedTitle: "पेमेंट अयशस्वी झाले",
     failedSafe: "तुमच्या खात्यातून पैसे कापले गेले असतील तर ते ५–७ दिवसांत आपोआप परत येतील.",
     failedTip: "दुसरे UPI ॲप, डेबिट/क्रेडिट कार्ड किंवा नेटबँकिंग वापरून पहा.",
+    timedOutTip: "UPI ॲपमधील विनंती वेळेत मंजूर झाली नाही. पुन्हा प्रयत्न करा आणि GPay / PhonePe उघडून लगेच मंजूर करा — किंवा कार्डने भरा.",
+    retryUpi: "पुन्हा प्रयत्न करा (कोणतेही UPI ॲप)",
+    payByCard: "डेबिट / क्रेडिट कार्डने भरा",
     help: "मदत हवी? WhatsApp करा",
   },
   hi: {
@@ -58,6 +65,9 @@ export const NOT_PAID_COPY: Record<Locale, {
     failedTitle: "भुगतान विफल रहा",
     failedSafe: "अगर आपके खाते से पैसे कट गए हैं, तो वे 5–7 दिनों में अपने-आप वापस आ जाएंगे।",
     failedTip: "दूसरा UPI ऐप, डेबिट/क्रेडिट कार्ड या नेटबैंकिंग आज़माएं।",
+    timedOutTip: "UPI ऐप में रिक्वेस्ट समय पर मंज़ूर नहीं हुई। फिर कोशिश करें और GPay / PhonePe खोलकर तुरंत मंज़ूर करें — या कार्ड से भरें।",
+    retryUpi: "फिर कोशिश करें (कोई भी UPI ऐप)",
+    payByCard: "डेबिट / क्रेडिट कार्ड से भरें",
     help: "मदद चाहिए? WhatsApp करें",
   },
   en: {
@@ -75,6 +85,9 @@ export const NOT_PAID_COPY: Record<Locale, {
     failedTitle: "Payment failed",
     failedSafe: "If money was deducted from your account, it is refunded automatically in 5–7 days.",
     failedTip: "Try another UPI app, a debit/credit card or net banking.",
+    timedOutTip: "The request in your UPI app wasn't approved in time. Try again and approve it right away in GPay / PhonePe — or pay by card.",
+    retryUpi: "Try again (any UPI app)",
+    payByCard: "Pay by debit / credit card",
     help: "Need help? WhatsApp us",
   },
 };

@@ -20,6 +20,7 @@ export const PRODUCT_COPY = {
     buyNote: "सुरक्षित पेमेंट | UPI, Card, Netbanking · Login / Account ची गरज नाही",
     // Razorpay's popup asks for a mobile number in its own words; say why first.
     whatsappHint: "पुस्तकाची PDF तुमच्या WhatsApp नंबरवर लगेच येईल.",
+    boughtThisWeek: (n: number) => `गेल्या 7 दिवसांत ${n} जणांनी हे घेतले`,
     pages: "पाने",
     instantDownload: "लगेच डाउनलोड",
     howToBuy: "खरेदी करण्याची पद्धत / How to Buy",
@@ -77,6 +78,7 @@ export const PRODUCT_COPY = {
     noRefund: "⚠️ PDF डाउनलोड के बाद Refund संभव नहीं है।",
     buyNote: "सुरक्षित भुगतान | UPI, Card, Netbanking · Login / Account की ज़रूरत नहीं",
     whatsappHint: "किताब की PDF आपके WhatsApp नंबर पर तुरंत आएगी।",
+    boughtThisWeek: (n: number) => `पिछले 7 दिनों में ${n} लोगों ने यह ली`,
     pages: "पृष्ठ",
     instantDownload: "तुरंत डाउनलोड",
     howToBuy: "खरीदने की प्रक्रिया / How to Buy",
@@ -133,6 +135,7 @@ export const PRODUCT_COPY = {
     noRefund: "⚠️ Refunds are not possible once the PDF has been downloaded.",
     buyNote: "Secure payment | UPI, Card, Netbanking · No login / account needed",
     whatsappHint: "The book PDF arrives on your WhatsApp number right away.",
+    boughtThisWeek: (n: number) => `${n} people bought this in the last 7 days`,
     pages: "pages",
     instantDownload: "Instant download",
     howToBuy: "How to Buy",

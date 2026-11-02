@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Circle,
   Check,
+  Users,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import {
@@ -42,6 +43,7 @@ import { UI_COPY } from "@/lib/i18n";
 import { replaceProductAddress } from "@/lib/meta-pixel";
 import { PRODUCT_COPY } from "@/lib/product-copy";
 
+const SOCIAL_PROOF_MIN = 5;
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
 
 export default function ProductDetail({
@@ -49,6 +51,7 @@ export default function ProductDetail({
   relatedProducts = [],
   family = [],
   members = {},
+  buyers = {},
 }: {
   product: Product;
   relatedProducts?: Product[];
@@ -56,6 +59,8 @@ export default function ProductDetail({
   family?: Product[];
   /** Book ids of each set in `family`. */
   members?: Record<number, number[]>;
+  /** Product id → people who bought it in the last 7 days (real paid orders, `getBuyersThisWeek`). */
+  buyers?: Record<number, number>;
 }) {
   const { locale } = useLanguage();
   // Offer picker (client, 28 Oct): the page opens on the product of its address
@@ -127,6 +132,8 @@ export default function ProductDetail({
     }
   }
   const pct = discountPercent(product);
+  // Shown only from 5 buyers on, so a quiet week doesn't read as "nobody buys this".
+  const boughtThisWeek = (buyers[product.id] ?? 0) >= SOCIAL_PROOF_MIN ? buyers[product.id] : null;
   const backHref = product.isCombo ? "/combos" : "/ebooks";
   const backLabel = product.isCombo ? t.combos : t.ebooks;
   const jsonLd = {
@@ -258,6 +265,12 @@ export default function ProductDetail({
 
           {/* buy */}
           <div id="buy-now" className="mb-4 flex flex-col gap-2">
+            {boughtThisWeek && (
+              <p className="font-deva flex items-center justify-center gap-1.5 rounded-lg border border-green-100 bg-green-50 px-3 py-1.5 text-center text-xs font-bold text-green-800 sm:text-sm">
+                <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {t.boughtThisWeek(boughtThisWeek)}
+              </p>
+            )}
             <BuyButton
               product={product}
               label={buyLabel}
