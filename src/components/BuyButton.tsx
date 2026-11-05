@@ -453,8 +453,6 @@ function BuyModal({
         {step === "details" && (
           <form onSubmit={submitDetails} noValidate>
             <div className={compact ? "space-y-3" : "space-y-4"}>
-              {!compact && <p className="font-deva -mt-1 text-sm font-semibold text-brand-700">{form.heading}</p>}
-
               {!editing ? (
                 // Returning buyer: details from last time, one tap to pay.
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
@@ -516,7 +514,7 @@ function BuyModal({
                     )}
                   </div>
 
-                  {/* WhatsApp number — highlighted: the PDF is sent here */}
+                  {/* WhatsApp number */}
                   <div className="rounded-2xl border-2 border-green-500/70 bg-green-50/70 p-3">
                     <label htmlFor="buyer-phone" className="font-deva mb-1.5 flex items-center gap-1.5 text-sm font-bold text-green-800">
                       <WhatsAppGlyph className="h-4 w-4" /> {form.whatsapp} <span className="text-danger-600" aria-hidden="true">*</span>
@@ -547,17 +545,13 @@ function BuyModal({
                         }}
                         placeholder={form.phonePlaceholder}
                         aria-invalid={showPhone}
-                        aria-describedby={showPhone ? "buyer-phone-error" : "buyer-phone-hint"}
+                        aria-describedby={showPhone ? "buyer-phone-error" : undefined}
                         className="h-full min-w-0 flex-1 bg-transparent px-3 text-lg font-semibold tracking-wide text-brand-900 outline-none placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-brand-300"
                       />
                       {phoneOk && <Check className="mr-3 h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />}
                     </div>
-                    {showPhone ? (
+                    {showPhone && (
                       <p id="buyer-phone-error" role="alert" className="font-deva mt-1.5 text-xs font-semibold text-danger-600">{form.badPhone}</p>
-                    ) : (
-                      <p id="buyer-phone-hint" className="font-deva mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-green-800">
-                        <span aria-hidden="true">📲</span> {form.whatsappHint}
-                      </p>
                     )}
                   </div>
                 </>

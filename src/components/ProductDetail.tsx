@@ -80,7 +80,6 @@ export default function ProductDetail({
   const group = family.map((item) => localizeProduct(item, locale));
   const byId = new Map(group.map((item) => [item.id, item]));
   const sizeOf = (item: Product) => (item.isCombo ? item.setSize ?? members[item.id]?.length ?? 0 : 1);
-  const productSize = sizeOf(product);
   const comboBooks = (members[product.id] ?? []).flatMap((id) => byId.get(id) ?? []);
   // The single book the buyer is "on": the shown one, or the opened one while a set is shown.
   const anchorId = !product.isCombo ? product.id : !openedProduct.isCombo ? openedProduct.id : null;
@@ -98,8 +97,9 @@ export default function ProductDetail({
     selected: tier.selected,
     onSelect: () => select(tier.shown),
   }));
-  // "2 / 3 books — get them" only when the set size is known (older combos may not have one).
-  const buyLabel = productSize > 1 ? t.buySet(productSize, product.price) : `${copy.downloadNow} · ₹${product.price}`;
+  // Keep the purchase action consistent for single books and combo packs.
+  // The selected product's localized download text and current price always follow the selection.
+  const buyLabel = `${copy.downloadNow} · ₹${product.price}`;
   // The first screen is the opened product's cover (server-rendered, preloaded).
   const heroImage = openedProduct.coverImage;
   // Warm the TLS connection so the Razorpay popup opens faster on Buy.
@@ -155,7 +155,7 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={product} label={productSize > 1 ? t.buySetShort(productSize) : undefined} options={barOptions} />
+      <StickyBuyBar product={product} label={copy.downloadNow} options={barOptions} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -342,7 +342,7 @@ export default function ProductDetail({
             <div className="relative z-10 flex flex-col gap-3">
               <BuyButton
                 product={product}
-                label={productSize > 1 ? buyLabel : `${copy.downloadNow} (Download Now)`}
+                label={buyLabel}
                 className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
               />
               <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">

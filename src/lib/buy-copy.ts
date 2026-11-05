@@ -6,11 +6,9 @@
 import type { Locale } from "./i18n";
 
 export const BUY_FORM_COPY: Record<Locale, {
-  heading: string;
   name: string;
   namePlaceholder: string;
   whatsapp: string;
-  whatsappHint: string;
   phonePlaceholder: string;
   pay: (price: number) => string;
   badName: string;
@@ -24,11 +22,9 @@ export const BUY_FORM_COPY: Record<Locale, {
   upiHint: string;
 }> = {
   mr: {
-    heading: "पुस्तक WhatsApp वर मिळवण्यासाठी माहिती भरा",
     name: "तुमचे नाव",
     namePlaceholder: "उदा. राहुल पाटील",
     whatsapp: "WhatsApp नंबर",
-    whatsappHint: "पुस्तकाची PDF याच WhatsApp नंबरवर पाठवली जाईल",
     phonePlaceholder: "10 अंकी नंबर",
     pay: (price) => `पुढे जा — ₹${price} पेमेंट करा`,
     badName: "कृपया तुमचे योग्य नाव लिहा — फक्त अक्षरे, किमान २ (अंक किंवा चिन्हे नको).",
@@ -40,11 +36,9 @@ export const BUY_FORM_COPY: Record<Locale, {
     upiHint: "UPI ने पैसे भरत असाल तर GPay / PhonePe मध्ये आलेली विनंती 5 मिनिटांत मंजूर करा आणि इथे परत या.",
   },
   hi: {
-    heading: "किताब WhatsApp पर पाने के लिए जानकारी भरें",
     name: "आपका नाम",
     namePlaceholder: "जैसे राहुल शर्मा",
     whatsapp: "WhatsApp नंबर",
-    whatsappHint: "किताब की PDF इसी WhatsApp नंबर पर भेजी जाएगी",
     phonePlaceholder: "10 अंकों का नंबर",
     pay: (price) => `आगे बढ़ें — ₹${price} भुगतान करें`,
     badName: "कृपया अपना सही नाम लिखें — केवल अक्षर, कम से कम 2 (अंक या चिह्न नहीं)।",
@@ -56,11 +50,9 @@ export const BUY_FORM_COPY: Record<Locale, {
     upiHint: "UPI से भुगतान कर रहे हैं तो GPay / PhonePe में आई रिक्वेस्ट 5 मिनट में मंज़ूर करें और यहाँ वापस आएँ।",
   },
   en: {
-    heading: "Enter your details to get the book on WhatsApp",
     name: "Your name",
     namePlaceholder: "e.g. Rahul Patil",
     whatsapp: "WhatsApp number",
-    whatsappHint: "The book PDF is sent to this WhatsApp number",
     phonePlaceholder: "10-digit number",
     pay: (price) => `Continue — pay ₹${price}`,
     badName: "Please enter your real name — letters only, at least 2 (no digits or symbols).",
