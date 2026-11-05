@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import WhatsAppFab from "@/components/WhatsAppFab";
 import BottomNav from "@/components/BottomNav";
 import BackToTop from "@/components/BackToTop";
+import BuyerActivityToast from "@/components/BuyerActivityToast";
 import AdminChromeGate from "@/components/AdminChromeGate";
 import MetaPixel from "@/components/MetaPixel";
 import LanguageProvider from "@/components/LanguageProvider";
@@ -96,6 +97,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </main>
           <AdminChromeGate>
             <Footer />
+            <BuyerActivityToast />
             <WhatsAppFab />
             <BackToTop />
             <BottomNav />
