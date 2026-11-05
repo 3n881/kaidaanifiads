@@ -17,8 +17,8 @@ import type { Locale } from "@/lib/i18n";
 /**
  * Book preview viewer, laid out like the previous site: page counter and
  * PREVIEW badge on the image, arrows / swipe, previous–next buttons, the
- * "first pages free" bar and an in-page sample reader that shows the free
- * first pages of the book's own PDF (`previewUrl`) — never a new tab.
+ * sample-pages bar and an in-page reader. Owner-supplied preview images take
+ * priority over generated PDF pages, so each book can have its own count.
  */
 export default function ProductGallery({
   product,
@@ -31,18 +31,22 @@ export default function ProductGallery({
   labelsLocale?: Locale;
 }) {
   const g = GALLERY_COPY[labelsLocale];
-  // After the cover: the book's real pages 2–6 (made from its PDF) when
-  // available, otherwise the owner's preview images.
+  // After the cover: use the owner's curated previews when present. Only
+  // books without them fall back to the generated first pages of their PDF.
   const readerPages = product.readerPages ?? [];
-  const extra = readerPages.length > 1 ? readerPages.slice(1, 6) : (product.galleryImages ?? []).slice(0, 5);
-  const images = product.coverImage ? [product.coverImage, ...extra] : [];
-  // The reader shows the same pages as the viewer: cover first, then pages
-  // 2–6 (page 1 of the PDF is usually its own printed cover).
-  const readerList = readerPages.length > 1 && product.coverImage ? images : readerPages;
+  const curatedPages = product.galleryImages ?? [];
+  const generatedPages = product.coverImage
+    ? readerPages.slice(1, PREVIEW_PAGES)
+    : readerPages.slice(0, PREVIEW_PAGES);
+  const samplePages = curatedPages.length > 0 ? curatedPages : generatedPages;
+  const images = product.coverImage ? [product.coverImage, ...samplePages] : samplePages;
+  // Keep the full-screen reader in sync with the carousel and bypass the
+  // generated preview PDF whenever curated images were supplied.
+  const readerList = images;
   const [selected, setSelected] = useState(0);
   const [readerAt, setReaderAt] = useState<number | null>(null);
   const total = images.length;
-  const previewPages = Math.min(PREVIEW_PAGES, product.pages || PREVIEW_PAGES);
+  const previewPages = curatedPages.length || Math.min(PREVIEW_PAGES, product.pages || PREVIEW_PAGES);
   const go = (step: number) =>
     setSelected((current) => Math.min(Math.max(current + step, 0), total - 1));
   const swipe = useSwipe(go);
@@ -81,9 +85,9 @@ export default function ProductGallery({
               width={800}
               height={1067}
               loading={selected === 0 ? "eager" : "lazy"}
-              fetchPriority={selected === 0 ? "high" : "auto"}
+              fetchPriority={selected === 0 ? "high" : undefined}
               className="absolute inset-0 h-full w-full cursor-pointer object-contain"
-              onClick={() => setReaderAt(readerPages.length || !previewUrl ? selected : 0)}
+              onClick={() => setReaderAt(selected)}
             />
           </picture>
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white">
@@ -124,7 +128,7 @@ export default function ProductGallery({
         g={g}
         previewPages={previewPages}
         previewUrl={previewUrl}
-        onOpen={() => setReaderAt(previewUrl ? 0 : selected)}
+        onOpen={() => setReaderAt(0)}
       />
 
       {total > 1 && (
