@@ -12,6 +12,7 @@ import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
 import { useLanguage } from "./LanguageProvider";
 import { pixelProduct, trackPixel } from "@/lib/meta-pixel";
 import { trackVisit, visitForCheckout } from "@/lib/visit-tracking";
+import { startOrderPresence } from "@/lib/order-presence";
 import { NOT_PAID_COPY } from "@/lib/lead-copy";
 import { BUY_FORM_COPY } from "@/lib/buy-copy";
 import { cleanBuyerName, cleanIndianMobile, loadSavedBuyer, saveBuyer } from "@/lib/buyer";
@@ -188,6 +189,9 @@ function BuyModal({
   const failedRef = useRef<string | null>(null);
   // Razorpay's reason for the last failure (payment_timed_out = UPI request not approved in time).
   const [timedOut, setTimedOut] = useState(false);
+  // Stops the "buyer still here" pings (src/lib/order-presence.ts).
+  const stopPresence = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopPresence.current?.(), []);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -318,6 +322,7 @@ function BuyModal({
               ? { prefill: { method } }
               : {}),
           handler: async (payment: RazorpayResponse) => {
+            stopPresence.current?.();
             setStep("processing");
             // Sent from the book page, before redirecting: the order page URL
             // holds the access token and never loads the pixel. eventID =
@@ -346,6 +351,7 @@ function BuyModal({
           },
           modal: {
             ondismiss: () => {
+              stopPresence.current?.();
               // Admin drop-off numbers only (closed the window vs left); fire and forget.
               void fetch("/api/orders/closed", {
                 method: "POST",
@@ -364,6 +370,10 @@ function BuyModal({
         });
         razorpay.open();
         trackVisit("razorpay_open", product.id, true);
+        // "Still here" pings while Razorpay is open: silence + no open payment
+        // = left → payment reminders start soon (src/lib/reminders.ts).
+        stopPresence.current?.();
+        stopPresence.current = startOrderPresence(data.orderId, data.accessToken);
       } catch {
         fail(UI_COPY[locale].checkoutFailed);
       }

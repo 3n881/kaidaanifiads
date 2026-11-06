@@ -10,10 +10,14 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 // "Payment not completed" WhatsApp reminders (Interakt `pending_followup_v2`).
 // Client's schedule (2026-11-06): 3 per unpaid attempt, at 0 / 10 / 30 s —
 //   1st: right away when the payment FAILS (webhook payment.failed) or the
-//        buyer CLOSES Razorpay (/api/orders/closed). A buyer who just LEAVES
-//        (no close, no failure — nothing tells us) gets it LEFT_DELAY_SECONDS
-//        after Buy, unless a payment is still open in Razorpay (UPI app open:
-//        then the payment.failed webhook starts the burst when UPI times out).
+//        buyer CLOSES Razorpay (/api/orders/closed). A buyer who just LEAVES:
+//        the Buy popup pings /api/orders/alive every 10 s while Razorpay is
+//        open and the page is on screen (migration 017 `last_seen_at`); 30 s
+//        of silence = left → burst, unless a payment is still open in Razorpay
+//        (buyer in the UPI app: then the payment.failed webhook starts it when
+//        UPI times out). Still pinging after 10 min → reminded anyway. No pings
+//        at all (page from before this release, migration not applied) → 3 min
+//        after Buy (LEFT_DELAY_SECONDS).
 //   2nd: 10 s after the 1st;  3rd: 30 s after the 1st (gaps 10, 20 s —
 //   REMINDER_GAPS_SECONDS). First asked as 0 / 5 / 13 s, widened the same day.
 // Live data 19 Oct–6 Nov (330 paid): median Buy→paid 32 s, 98 % within 3 min,
@@ -40,6 +44,12 @@ const GAPS_SECONDS = seconds(process.env.REMINDER_GAPS_SECONDS, "10,20");
 export const MAX_REMINDERS = 1 + GAPS_SECONDS.length;
 /** Buyer left without closing Razorpay or failing: 1st reminder this long after Buy. */
 export const LEFT_DELAY_SECONDS = seconds(process.env.LEFT_REMINDER_DELAY_SECONDS, "180")[0] ?? 180;
+/** "Left" = no ping from the buyer's page for this long (pings every 10 s). */
+const SILENCE_SECONDS = 30;
+/** A page still pinging this long after Buy gets its reminders anyway. */
+const LEFT_MAX_SECONDS = 600;
+/** How often the server looks at a fresh attempt's pings. */
+const LEFT_POLL_MS = 10_000;
 // No FIRST reminder for an attempt older than this (no messages hours late, e.g.
 // right after a deploy).
 const START_WITHIN_HOURS = 3;
@@ -47,8 +57,13 @@ const WINDOW_HOURS = 24;
 // A burst never waits longer than this between two messages in one process.
 const MAX_BURST_WAIT_MS = 60_000;
 
-const COLUMNS =
+const BASE_COLUMNS =
   "id, name, status, created_at, product_id, locale, buyer_contact, checkout_closed_at, reminder_count, reminder_last_at, razorpay_order_id, amount, products(slug, is_combo, title, title_mr, title_hi, title_en)";
+// Migration 017 adds last_seen_at; until it is applied, read without it.
+let hasSeenColumn = true;
+const columns = () => (hasSeenColumn ? `${BASE_COLUMNS}, last_seen_at` : BASE_COLUMNS);
+const isMissingColumn = (error: { code?: string } | null) => error?.code === "42703";
+const COLUMNS = BASE_COLUMNS; // admin reminders don't need last_seen_at
 
 interface ReminderOrder {
   id: string;
@@ -63,6 +78,7 @@ interface ReminderOrder {
   reminder_last_at: string | null;
   razorpay_order_id: string | null;
   amount: number;
+  last_seen_at?: string | null;
   products: {
     slug: string;
     is_combo: boolean | null;
@@ -74,7 +90,9 @@ interface ReminderOrder {
 }
 
 /** When this attempt's next reminder is due (epoch ms), or null when none is left. */
-export function nextDueAt(order: Pick<ReminderOrder, "reminder_count" | "created_at" | "checkout_closed_at" | "status" | "reminder_last_at">): number | null {
+export function nextDueAt(
+  order: Pick<ReminderOrder, "reminder_count" | "created_at" | "checkout_closed_at" | "status" | "reminder_last_at" | "last_seen_at">,
+): number | null {
   const count = order.reminder_count ?? 0;
   if (count >= MAX_REMINDERS) return null;
   if (count === 0) {
@@ -82,7 +100,12 @@ export function nextDueAt(order: Pick<ReminderOrder, "reminder_count" | "created
     if (created < Date.now() - START_WITHIN_HOURS * 3600_000) return null;
     if (order.checkout_closed_at) return Date.parse(order.checkout_closed_at); // closed → now
     if (order.status === "failed") return created; // failed → now
-    return created + LEFT_DELAY_SECONDS * 1000; // left → give a running payment time
+    // Left: 30 s after the buyer's page went quiet (capped at 10 min after Buy);
+    // no pings at all → 3 min after Buy.
+    if (order.last_seen_at) {
+      return Math.min(Date.parse(order.last_seen_at) + SILENCE_SECONDS * 1000, created + LEFT_MAX_SECONDS * 1000);
+    }
+    return created + LEFT_DELAY_SECONDS * 1000;
   }
   const last = Date.parse(order.reminder_last_at ?? order.created_at);
   return last + GAPS_SECONDS[count - 1] * 1000;
@@ -93,15 +116,21 @@ export async function sendPaymentReminders(): Promise<{ due: number; sent: numbe
   if (!isReminderConfigured) return { due: 0, sent: 0 };
   const admin = getSupabaseAdmin();
   const now = Date.now();
-  const { data, error } = await admin
-    .from("orders")
-    .select(COLUMNS)
-    .in("status", ["created", "failed"])
-    .not("buyer_contact", "is", null)
-    .lt("reminder_count", MAX_REMINDERS)
-    .gte("created_at", new Date(now - WINDOW_HOURS * 3600_000).toISOString())
-    .order("created_at", { ascending: false })
-    .limit(300);
+  const query = () =>
+    admin
+      .from("orders")
+      .select(columns())
+      .in("status", ["created", "failed"])
+      .not("buyer_contact", "is", null)
+      .lt("reminder_count", MAX_REMINDERS)
+      .gte("created_at", new Date(now - WINDOW_HOURS * 3600_000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(300);
+  let { data, error } = await query();
+  if (isMissingColumn(error) && hasSeenColumn) {
+    hasSeenColumn = false;
+    ({ data, error } = await query());
+  }
   if (error) throw new DatabaseUnavailableError("reminder candidates", error);
   const candidates = (data ?? []) as unknown as ReminderOrder[];
 
@@ -125,7 +154,12 @@ export async function sendPaymentReminders(): Promise<{ due: number; sent: numbe
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function loadOrder(orderId: string): Promise<ReminderOrder | null> {
-  const { data, error } = await getSupabaseAdmin().from("orders").select(COLUMNS).eq("id", orderId).maybeSingle();
+  const query = () => getSupabaseAdmin().from("orders").select(columns()).eq("id", orderId).maybeSingle();
+  let { data, error } = await query();
+  if (isMissingColumn(error) && hasSeenColumn) {
+    hasSeenColumn = false;
+    ({ data, error } = await query());
+  }
   if (error || !data) return null;
   return data as unknown as ReminderOrder;
 }
@@ -164,21 +198,42 @@ export async function runReminderBurst(orderId: string): Promise<number> {
 /** @deprecated name kept for older callers — same as runReminderBurst. */
 export const sendReminderNowIfDue = runReminderBurst;
 
-// "Left" timers: buyer tapped Buy and then nothing (no close, no failure).
-// In-process; a restart drops them and the cron sends instead (≤ 10 min late).
-const leftTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// "Left" watch: buyer tapped Buy and then nothing (no close, no failure).
+// Looks at the attempt's pings every 10 s from 30 s after Buy; starts the
+// burst once the page has been quiet for 30 s (or 3 min with no pings at all,
+// 10 min at most). In-process; a restart drops it and the cron sends instead
+// (≤ 10 min late). A close / failure starts its own burst and ends the watch.
+const leftWatches = new Set<string>();
 
-/** After a new Razorpay order: start the burst LEFT_DELAY_SECONDS later if nothing else has. */
 export function scheduleLeftReminder(orderId: string): void {
-  if (!isReminderConfigured || leftTimers.has(orderId)) return;
-  const timer = setTimeout(() => {
-    leftTimers.delete(orderId);
-    runReminderBurst(orderId).catch((error) =>
-      console.error("[reminders] left-timer burst failed", orderId, error instanceof Error ? error.message : error),
-    );
-  }, LEFT_DELAY_SECONDS * 1000 + 500);
-  timer.unref?.();
-  leftTimers.set(orderId, timer);
+  if (!isReminderConfigured || leftWatches.has(orderId)) return;
+  leftWatches.add(orderId);
+  const stop = () => leftWatches.delete(orderId);
+  const tick = async () => {
+    try {
+      const order = await loadOrder(orderId);
+      // Paid, failed or closed (those start their own burst), already reminded, or gone.
+      if (!order || order.status !== "created" || order.checkout_closed_at || (order.reminder_count ?? 0) > 0) return stop();
+      const at = nextDueAt(order);
+      if (at === null) return stop();
+      const wait = at - Date.now();
+      if (wait <= LEFT_POLL_MS) {
+        stop();
+        if (wait > 0) await sleep(wait);
+        await runReminderBurst(orderId);
+        return;
+      }
+      later(LEFT_POLL_MS);
+    } catch (error) {
+      stop();
+      console.error("[reminders] left watch failed", orderId, error instanceof Error ? error.message : error);
+    }
+  };
+  const later = (ms: number) => {
+    const timer = setTimeout(() => void tick(), ms);
+    timer.unref?.();
+  };
+  later(SILENCE_SECONDS * 1000);
 }
 
 type RemindResult = "sent" | "refused" | "lost_claim" | "finished" | "paying" | "unreachable";
