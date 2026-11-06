@@ -237,12 +237,15 @@ export function shortOrderId(id: string): string {
 }
 
 /**
- * A "pending" order older than 30 min = the buyer left Razorpay without paying
- * or closing it (same cut-off as the order page). Label only: the status stays
- * `created`, so the cron still catches a late payment for 48 h.
+ * A "pending" order the buyer walked away from (Razorpay neither paid nor
+ * closed): as soon as the automatic payment reminders started — they only
+ * start once the buyer's page went quiet with no payment open in Razorpay
+ * (src/lib/reminders.ts, 6 Nov) — or, without reminders, after 30 min.
+ * Label only: the status stays `created`, so a late payment is still caught.
  */
-export function isLeft(o: Pick<OrderRow, "status" | "created_at">): boolean {
-  return o.status === "created" && Date.now() - new Date(o.created_at).getTime() > 30 * 60 * 1000;
+export function isLeft(o: Pick<OrderRow, "status" | "created_at" | "checkout_closed_at" | "reminder_count">): boolean {
+  if (o.status !== "created" || o.checkout_closed_at) return false;
+  return (o.reminder_count ?? 0) > 0 || Date.now() - new Date(o.created_at).getTime() > 30 * 60 * 1000;
 }
 
 /** Drop-off group of an unpaid order (migration 011). */
