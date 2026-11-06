@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, CreditCard, Download, Loader2, MessageCircle, Pencil, ShieldCheck, Smartphone, X } from "lucide-react";
+import { Check, CreditCard, Download, Loader2, MessageCircle, Pencil, ShieldCheck, X } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { SITE } from "@/data/catalog";
 import { saveOrder } from "@/lib/purchases";
@@ -567,7 +567,6 @@ function BuyModal({
                 </>
               )}
 
-              {!compact && method !== "card" && <UpiHint text={form.upiHint} />}
             </div>
 
             {/* Pinned to the bottom of the popup: the Terms notice + pay button stay visible while typing */}
@@ -611,7 +610,6 @@ function BuyModal({
             <p className="font-deva text-xs text-brand-500">
               {copy.noAccount}
             </p>
-            {method !== "card" && <UpiHint text={form.upiHint} />}
           </div>
         )}
 
@@ -688,15 +686,6 @@ function BuyModal({
       </div>
     </div>,
     document.body,
-  );
-}
-
-/** "Approve in your UPI app within 5 min" — UPI's own time limit, said before it runs out. */
-function UpiHint({ text }: { text: string }) {
-  return (
-    <p className="font-deva flex items-start gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-left text-xs font-semibold leading-snug text-blue-800">
-      <Smartphone className="mt-px h-4 w-4 shrink-0" aria-hidden="true" /> {text}
-    </p>
   );
 }
 

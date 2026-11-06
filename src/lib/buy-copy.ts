@@ -18,8 +18,6 @@ export const BUY_FORM_COPY: Record<Locale, {
   needAgree: string;
   privacy: string;
   edit: string;
-  /** Under the fields and while Razorpay opens: UPI requests expire (~5 min). */
-  upiHint: string;
 }> = {
   mr: {
     name: "तुमचे नाव",
@@ -33,7 +31,6 @@ export const BUY_FORM_COPY: Record<Locale, {
     needAgree: "पुढे जाण्यासाठी ही चौकट निवडा.",
     privacy: "तुमचा नंबर फक्त पुस्तक पाठवण्यासाठी आणि ऑर्डरच्या मदतीसाठी वापरला जातो.",
     edit: "नाव / नंबर बदला",
-    upiHint: "UPI ने पैसे भरत असाल तर GPay / PhonePe मध्ये आलेली विनंती 5 मिनिटांत मंजूर करा आणि इथे परत या.",
   },
   hi: {
     name: "आपका नाम",
@@ -47,7 +44,6 @@ export const BUY_FORM_COPY: Record<Locale, {
     needAgree: "आगे बढ़ने के लिए यह बॉक्स चुनें।",
     privacy: "आपका नंबर केवल किताब भेजने और ऑर्डर में मदद के लिए इस्तेमाल होता है।",
     edit: "नाम / नंबर बदलें",
-    upiHint: "UPI से भुगतान कर रहे हैं तो GPay / PhonePe में आई रिक्वेस्ट 5 मिनट में मंज़ूर करें और यहाँ वापस आएँ।",
   },
   en: {
     name: "Your name",
@@ -61,7 +57,6 @@ export const BUY_FORM_COPY: Record<Locale, {
     needAgree: "Please tick this box to continue.",
     privacy: "Your number is used only to send the book and to help with your order.",
     edit: "Change name / number",
-    upiHint: "Paying by UPI? Approve the request in GPay / PhonePe within 5 minutes, then come back here.",
   },
 };
 
