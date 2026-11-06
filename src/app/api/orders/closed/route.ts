@@ -1,15 +1,15 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { verifyOrderAccessToken } from "@/lib/razorpay";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { sendReminderNowIfDue } from "@/lib/reminders";
+import { runReminderBurst } from "@/lib/reminders";
 
 export const runtime = "nodejs";
 
 /**
  * The buyer closed the Razorpay window without paying (BuyButton ondismiss).
  * Stamps checkout_closed_at once, on an unpaid order, with its signed access
- * token (admin drop-off numbers, migration 011), and sends the 1st payment
- * reminder on WhatsApp right away (owner, 2026-10-18; src/lib/reminders.ts).
+ * token (admin drop-off numbers, migration 011), and sends the 3 payment
+ * reminders on WhatsApp right away: at 0 / 10 / 30 s (client 2026-11-06; src/lib/reminders.ts).
  * Best effort — never blocks the buyer.
  */
 export async function POST(req: NextRequest) {
@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
   else
     after(async () => {
       try {
-        await sendReminderNowIfDue(orderId);
+        await runReminderBurst(orderId);
       } catch (reminderError) {
-        console.error("[reminders] close-time send failed", orderId, reminderError instanceof Error ? reminderError.message : reminderError);
+        console.error("[reminders] close-time burst failed", orderId, reminderError instanceof Error ? reminderError.message : reminderError);
       }
     });
   return NextResponse.json({ ok: !error }, { headers: { "Cache-Control": "private, no-store" } });

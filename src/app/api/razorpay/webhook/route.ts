@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
+import { runReminderBurst } from "@/lib/reminders";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { markOrderPaid, normalizePhone } from "@/lib/orders";
@@ -121,6 +122,15 @@ async function handle(req: NextRequest) {
         .eq("id", order.id)
         .is("buyer_contact", null);
     }
+    // 3 "payment not completed" WhatsApps right away (at 0 / 10 / 30 s; client,
+    // 6 Nov) — after the answer, so Razorpay gets its 200 at once.
+    after(async () => {
+      try {
+        await runReminderBurst(order.id);
+      } catch (reminderError) {
+        console.error("[reminders] failure-time burst failed", order.id, reminderError instanceof Error ? reminderError.message : reminderError);
+      }
+    });
     return NextResponse.json({ ok: true });
   }
 

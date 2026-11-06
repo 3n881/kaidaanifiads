@@ -14,6 +14,7 @@ import { editionLocaleFor } from "@/lib/catalog";
 import { collectMetaSignals } from "@/lib/meta-capi";
 import { cleanBuyerName, cleanIndianMobile } from "@/lib/buyer";
 import { saveLead } from "@/lib/leads";
+import { scheduleLeftReminder } from "@/lib/reminders";
 import { agreeText } from "@/lib/buy-copy";
 import { cleanId, cleanVisitSource, isMissingSchema } from "@/lib/visit-events";
 
@@ -180,6 +181,11 @@ async function handle(req: NextRequest) {
     console.error("[checkout] order insert failed", error);
     return NextResponse.json({ error: BUSY_MESSAGE, retryable: true }, { status: 503 });
   }
+
+  // Buyer leaves without closing Razorpay or failing → 3 payment reminders start
+  // a few minutes after Buy (src/lib/reminders.ts LEFT_DELAY_SECONDS) unless a
+  // close / failure / payment happened first.
+  if (buyerPhone) scheduleLeftReminder(orderId);
 
   // Ticked "send me offers" box in the Buy popup → interested buyer (migration
   // 012, source 'checkout'). After the response; never blocks a checkout.

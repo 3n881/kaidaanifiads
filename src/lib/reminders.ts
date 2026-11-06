@@ -8,36 +8,47 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 
 // ---------------------------------------------------------------------------
 // "Payment not completed" WhatsApp reminders (Interakt `pending_followup_v2`).
-// Owner's schedule (2026-10-18, migration 013): 2 per unpaid attempt —
-//   1st: right away when the buyer closes Razorpay (/api/orders/closed), or
-//        FIRST_DELAY_MINUTES after a failed / abandoned attempt (the cron);
-//   2nd: 1 h after the 1st. (Same evening it was briefly 4: +10, +30, +60 min.)
-// No daily cap per phone: two pending books get their own reminders. Several
-// Buy taps on the SAME book by one phone → only the newest attempt is reminded.
-// Never to a phone that owns that book (paid before or since). Every new order
-// carries the number typed in our Buy popup; older ones only Razorpay's contact
-// on a failed payment. The cron runs this after the reconcile sweep, so an
-// order Razorpay actually captured is already `paid`.
+// Client's schedule (2026-11-06): 3 per unpaid attempt, at 0 / 10 / 30 s —
+//   1st: right away when the payment FAILS (webhook payment.failed) or the
+//        buyer CLOSES Razorpay (/api/orders/closed). A buyer who just LEAVES
+//        (no close, no failure — nothing tells us) gets it LEFT_DELAY_SECONDS
+//        after Buy, unless a payment is still open in Razorpay (UPI app open:
+//        then the payment.failed webhook starts the burst when UPI times out).
+//   2nd: 10 s after the 1st;  3rd: 30 s after the 1st (gaps 10, 20 s —
+//   REMINDER_GAPS_SECONDS). First asked as 0 / 5 / 13 s, widened the same day.
+// Live data 19 Oct–6 Nov (330 paid): median Buy→paid 32 s, 98 % within 3 min,
+// 99.7 % within 5 min; 91 % of failures are UPI `payment_timed_out`, which
+// Razorpay reports ~12 min after Buy.
+// Before EVERY message: still unpaid, newest attempt on that book by that
+// phone, the phone doesn't own the book, Razorpay asked live (paid → marked
+// paid + PDF, no message; payment open → wait). So a buyer who pays between
+// messages gets no further reminder.
+// The burst runs in the server process; the 10-min cron finishes any burst a
+// restart / deploy cut short (that message then arrives late, not twice).
+// History: 18 Oct 2 reminders (right away / 10 min, then +1 h).
 // ---------------------------------------------------------------------------
 
-/** Minutes between reminders (1→2, …). Default "60" = 2 reminders; e.g. "10,30,60" = 4. */
-const GAPS_MINUTES = (process.env.REMINDER_GAPS_MINUTES || "60")
-  .split(",")
-  .map((v) => Number(v.trim()))
-  .filter((v) => Number.isFinite(v) && v > 0);
-export const MAX_REMINDERS = 1 + GAPS_MINUTES.length;
-// Before the 1st reminder when the buyer did NOT close Razorpay (failed, or left
-// the app): they may still be paying in their UPI app. Same env as before.
-const FIRST_DELAY_MINUTES = Number(
-  process.env.PAYMENT_FAILED_REMINDER_DELAY_MINUTES || process.env.PAYMENT_REMINDER_DELAY_MINUTES || 10,
-);
+function seconds(value: string | undefined, fallback: string): number[] {
+  return (value || fallback)
+    .split(",")
+    .map((v) => Number(v.trim()))
+    .filter((v) => Number.isFinite(v) && v > 0);
+}
+
+/** Seconds between reminders (1→2, 2→3, …). Default "10,20" = 3 reminders at 0 / 10 / 30 s. */
+const GAPS_SECONDS = seconds(process.env.REMINDER_GAPS_SECONDS, "10,20");
+export const MAX_REMINDERS = 1 + GAPS_SECONDS.length;
+/** Buyer left without closing Razorpay or failing: 1st reminder this long after Buy. */
+export const LEFT_DELAY_SECONDS = seconds(process.env.LEFT_REMINDER_DELAY_SECONDS, "180")[0] ?? 180;
 // No FIRST reminder for an attempt older than this (no messages hours late, e.g.
-// right after a deploy); a started sequence finishes within ~1 h anyway.
+// right after a deploy).
 const START_WITHIN_HOURS = 3;
 const WINDOW_HOURS = 24;
+// A burst never waits longer than this between two messages in one process.
+const MAX_BURST_WAIT_MS = 60_000;
 
 const COLUMNS =
-  "id, name, status, created_at, product_id, locale, buyer_contact, checkout_closed_at, reminder_count, reminder_last_at, products(slug, is_combo, title, title_mr, title_hi, title_en)";
+  "id, name, status, created_at, product_id, locale, buyer_contact, checkout_closed_at, reminder_count, reminder_last_at, razorpay_order_id, amount, products(slug, is_combo, title, title_mr, title_hi, title_en)";
 
 interface ReminderOrder {
   id: string;
@@ -50,6 +61,8 @@ interface ReminderOrder {
   checkout_closed_at: string | null;
   reminder_count: number;
   reminder_last_at: string | null;
+  razorpay_order_id: string | null;
+  amount: number;
   products: {
     slug: string;
     is_combo: boolean | null;
@@ -61,20 +74,21 @@ interface ReminderOrder {
 }
 
 /** When this attempt's next reminder is due (epoch ms), or null when none is left. */
-export function nextDueAt(order: ReminderOrder): number | null {
+export function nextDueAt(order: Pick<ReminderOrder, "reminder_count" | "created_at" | "checkout_closed_at" | "status" | "reminder_last_at">): number | null {
   const count = order.reminder_count ?? 0;
   if (count >= MAX_REMINDERS) return null;
   if (count === 0) {
     const created = Date.parse(order.created_at);
     if (created < Date.now() - START_WITHIN_HOURS * 3600_000) return null;
-    // Closed Razorpay → right away; otherwise give a running UPI payment time.
-    return order.checkout_closed_at ? Date.parse(order.checkout_closed_at) : created + FIRST_DELAY_MINUTES * 60_000;
+    if (order.checkout_closed_at) return Date.parse(order.checkout_closed_at); // closed → now
+    if (order.status === "failed") return created; // failed → now
+    return created + LEFT_DELAY_SECONDS * 1000; // left → give a running payment time
   }
   const last = Date.parse(order.reminder_last_at ?? order.created_at);
-  return last + GAPS_MINUTES[count - 1] * 60_000;
+  return last + GAPS_SECONDS[count - 1] * 1000;
 }
 
-/** Cron: every due reminder of every pending attempt. */
+/** Cron: every due reminder of every pending attempt (one step per attempt per run). */
 export async function sendPaymentReminders(): Promise<{ due: number; sent: number }> {
   if (!isReminderConfigured) return { due: 0, sent: 0 };
   const admin = getSupabaseAdmin();
@@ -104,42 +118,79 @@ export async function sendPaymentReminders(): Promise<{ due: number; sent: numbe
   }
 
   let sent = 0;
-  for (const order of due) if (await remind(order)) sent++;
+  for (const order of due) if ((await remind(order)) === "sent") sent++;
   return { due: due.length, sent };
 }
 
-/**
- * The buyer just closed Razorpay (/api/orders/closed): send the 1st reminder
- * now instead of waiting for the cron. Best effort; the cron covers misses.
- */
-export async function sendReminderNowIfDue(orderId: string): Promise<boolean> {
-  if (!isReminderConfigured) return false;
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("orders").select(COLUMNS).eq("id", orderId).maybeSingle();
-  if (error || !data) return false;
-  const order = data as unknown as ReminderOrder;
-  if (!order.buyer_contact || (order.status !== "created" && order.status !== "failed")) return false;
-  // A newer attempt on the same book by this phone takes over the sequence.
-  const { count: newer } = await admin
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .eq("buyer_contact", order.buyer_contact)
-    .eq("product_id", order.product_id)
-    .gt("created_at", order.created_at);
-  if ((newer ?? 0) > 0) return false;
-  const at = nextDueAt(order);
-  return at !== null && at <= Date.now() ? remind(order) : false;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function loadOrder(orderId: string): Promise<ReminderOrder | null> {
+  const { data, error } = await getSupabaseAdmin().from("orders").select(COLUMNS).eq("id", orderId).maybeSingle();
+  if (error || !data) return null;
+  return data as unknown as ReminderOrder;
 }
 
-async function remind(order: ReminderOrder): Promise<boolean> {
+/**
+ * The whole sequence for one attempt, right now: 1st message, then the 2nd and
+ * 3rd after their gaps (seconds). Called when the payment fails (webhook), the
+ * buyer closes Razorpay, or the "left" timer fires. Stops as soon as the buyer
+ * pays / owns the book / tries again, or a payment is open in Razorpay. Two
+ * overlapping bursts (close + failure) can't double a message: each one is
+ * claimed in the database first. Best effort — the cron covers anything missed.
+ */
+export async function runReminderBurst(orderId: string): Promise<number> {
+  if (!isReminderConfigured) return 0;
+  let sent = 0;
+  // Each message can take a wait + a send, plus a lost claim — bounded either way.
+  for (let step = 0; step < MAX_REMINDERS * 3 + 2; step++) {
+    const order = await loadOrder(orderId);
+    if (!order || !order.buyer_contact || (order.status !== "created" && order.status !== "failed")) break;
+    const at = nextDueAt(order);
+    if (at === null) break;
+    const wait = at - Date.now();
+    if (wait > MAX_BURST_WAIT_MS) break; // not due soon (e.g. "left" timer) — the timer / cron sends it
+    if (wait > 0) {
+      await sleep(wait);
+      continue; // re-read after waiting: paid / closed / another burst may have moved on
+    }
+    const result = await remind(order);
+    if (result === "sent" || result === "refused") sent += result === "sent" ? 1 : 0;
+    else if (result === "lost_claim") continue; // another burst sent this step; follow it
+    else break; // finished, or a payment is open / Razorpay can't be asked
+  }
+  return sent;
+}
+
+/** @deprecated name kept for older callers — same as runReminderBurst. */
+export const sendReminderNowIfDue = runReminderBurst;
+
+// "Left" timers: buyer tapped Buy and then nothing (no close, no failure).
+// In-process; a restart drops them and the cron sends instead (≤ 10 min late).
+const leftTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** After a new Razorpay order: start the burst LEFT_DELAY_SECONDS later if nothing else has. */
+export function scheduleLeftReminder(orderId: string): void {
+  if (!isReminderConfigured || leftTimers.has(orderId)) return;
+  const timer = setTimeout(() => {
+    leftTimers.delete(orderId);
+    runReminderBurst(orderId).catch((error) =>
+      console.error("[reminders] left-timer burst failed", orderId, error instanceof Error ? error.message : error),
+    );
+  }, LEFT_DELAY_SECONDS * 1000 + 500);
+  timer.unref?.();
+  leftTimers.set(orderId, timer);
+}
+
+type RemindResult = "sent" | "refused" | "lost_claim" | "finished" | "paying" | "unreachable";
+
+async function remind(order: ReminderOrder): Promise<RemindResult> {
   const admin = getSupabaseAdmin();
-  if (!order.products) return false;
+  if (!order.products) return "finished";
 
   // A NEWER attempt on this book by this number exists (pending, finished or
   // paid) → this older one is finished. Checked against the database, not just
   // the cron's candidate list: on 18 Oct an older attempt started its own
-  // reminders once the newer one had finished its 2 (the candidate list only
-  // held attempts with reminders left) — 4 messages for one book.
+  // reminders once the newer one had finished — 4 messages for one book.
   const { count: newer, error: newerError } = await admin
     .from("orders")
     .select("id", { count: "exact", head: true })
@@ -149,7 +200,7 @@ async function remind(order: ReminderOrder): Promise<boolean> {
   if (newerError) throw new DatabaseUnavailableError("reminder newer check", newerError);
   if ((newer ?? 0) > 0) {
     await admin.from("orders").update({ reminder_count: MAX_REMINDERS }).eq("id", order.id).lt("reminder_count", MAX_REMINDERS);
-    return false;
+    return "finished";
   }
 
   // Owns the book (paid for it before or since) → this attempt is finished.
@@ -162,11 +213,19 @@ async function remind(order: ReminderOrder): Promise<boolean> {
   if (ownedError) throw new DatabaseUnavailableError("reminder owned check", ownedError);
   if ((owned ?? 0) > 0) {
     await admin.from("orders").update({ reminder_count: MAX_REMINDERS }).eq("id", order.id);
-    return false;
+    return "finished";
   }
 
-  // Claim this reminder first (count n → n+1), so an overlapping run or the
-  // close-time send can never send the same reminder twice.
+  // Ask Razorpay now. Paid → marked paid + PDF sent, no reminder. A payment
+  // still open (UPI app waiting for approval, retry in the popup) → wait: its
+  // failure webhook or the cron continues. Unreachable → the cron tries later.
+  const razorpay = await checkOrderWithRazorpay({ id: order.id, razorpay_order_id: order.razorpay_order_id, amount: order.amount });
+  if (razorpay === "paid") return "finished";
+  if (razorpay === "in_progress") return "paying";
+  if (razorpay === "unreachable") return "unreachable";
+
+  // Claim this reminder first (count n → n+1, still unpaid), so an overlapping
+  // burst or the cron can never send the same reminder twice.
   const count = order.reminder_count ?? 0;
   const nowIso = new Date().toISOString();
   const { data: claimed, error: claimError } = await admin
@@ -182,7 +241,7 @@ async function remind(order: ReminderOrder): Promise<boolean> {
     .select("id")
     .maybeSingle();
   if (claimError) throw new DatabaseUnavailableError("claim reminder", claimError);
-  if (!claimed) return false;
+  if (!claimed) return "lost_claim";
 
   const ok = await sendReminderMessage(order);
   await logWhatsApp({
@@ -196,8 +255,9 @@ async function remind(order: ReminderOrder): Promise<boolean> {
     ok,
   });
   if (!ok) console.error("[reminders] Interakt refused", order.id, `#${count + 1}`);
-  return ok;
+  return ok ? "sent" : "refused";
 }
+
 
 function sendReminderMessage(order: ReminderOrder): Promise<boolean> {
   const products = order.products!;
@@ -242,7 +302,7 @@ export async function sendAdminReminder(orderId: string, by: string): Promise<Ad
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("orders")
-    .select(`${COLUMNS}, razorpay_order_id, amount`)
+    .select(COLUMNS)
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new DatabaseUnavailableError("admin reminder order", error);
