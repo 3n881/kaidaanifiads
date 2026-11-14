@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabase/server";
+import { fetchAll } from "./supabase/fetch-all";
 import { requireAdmin } from "./auth";
 
 /**
@@ -131,20 +132,26 @@ const cachedSalesOverview = unstable_cache(() => computeSalesOverview(getSupabas
 
 /** The calculation itself (no auth check — callers must be admin-guarded). */
 export async function computeSalesOverview(admin: ReturnType<typeof getSupabaseAdmin>): Promise<SalesOverview> {
+  // Every order since go-live (paged: Supabase returns ≤ 1,000 rows per request).
   const [ordersRes, messagesRes, leadsRes] = await Promise.all([
-    admin
-      .from("orders")
-      .select(
-        "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status, razorpay_payment_id, whatsapp_number, checkout_closed_at, name",
-      )
-      .gte("created_at", SALES_START)
-      .order("created_at", { ascending: false })
-      .limit(20000),
+    fetchAll<OrderRow>(() =>
+      admin
+        .from("orders")
+        .select(
+          "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, refunded_amount, refund_status, razorpay_payment_id, whatsapp_number, checkout_closed_at, name",
+        )
+        .gte("created_at", SALES_START)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
+    ),
     admin.from("contact_messages").select("id", { count: "exact", head: true }).eq("handled", false),
-    admin.from("leads").select("created_at").is("opted_out_at", null).limit(20000),
+    fetchAll<{ created_at: string }>(() =>
+      admin.from("leads").select("created_at").is("opted_out_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }),
+    ),
   ]);
   if (ordersRes.error) throw new Error(ordersRes.error.message);
-  const rows = (ordersRes.data ?? []) as OrderRow[];
+  // Newest first (latest paid orders, cards).
+  const rows = [...ordersRes.data].reverse();
 
   const now = Date.now();
   const todayStart = startOfTodayIst(now);
@@ -434,20 +441,33 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
     "id, product_id, amount, locale, status, created_at, paid_at, download_count, whatsapp_sends, buyer_contact, razorpay_payment_id, whatsapp_number, refunded_amount, refund_status, checkout_closed_at, name, reminder_count, reminder_last_at, failure_reason, failure_description, failure_method";
   const SUMMARY = "id, product_id, status, amount, download_count, refunded_amount, checkout_closed_at, created_at, buyer_contact, whatsapp_number";
 
-  let summary = admin.from("orders").select(SUMMARY).limit(50000);
-  if (start) summary = summary.gte("created_at", start);
-  if (end) summary = summary.lt("created_at", end);
+  // KPIs / tabs count every order in the period (paged: ≤ 1,000 rows per request).
+  const summary = fetchAll<SummaryRow>(() => {
+    let q = admin.from("orders").select(SUMMARY);
+    if (start) q = q.gte("created_at", start);
+    if (end) q = q.lt("created_at", end);
+    return q.order("created_at", { ascending: true }).order("id", { ascending: true });
+  });
 
   let previous = null;
   if (range.prevStart !== null && range.prevEnd !== null) {
     const prevStart = lower(range.prevStart)!;
     const prevEnd = iso(range.prevEnd);
     previous = prevStart < prevEnd
-      ? admin.from("orders").select("status, amount, refunded_amount").gte("created_at", prevStart).lt("created_at", prevEnd).limit(50000)
+      ? fetchAll<Pick<SummaryRow, "status" | "amount" | "refunded_amount">>(() =>
+          admin
+            .from("orders")
+            .select("status, amount, refunded_amount")
+            .gte("created_at", prevStart)
+            .lt("created_at", prevEnd)
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true }),
+        )
       : null;
   }
 
-  let list = admin.from("orders").select(COLUMNS).order("created_at", { ascending: false }).limit(rowLimit + 1);
+  const listQuery = () => {
+  let list = admin.from("orders").select(COLUMNS);
   if (start) list = list.gte("created_at", start);
   if (end) list = list.lt("created_at", end);
   if (filters.status === "notdownloaded") list = list.eq("status", "paid").eq("download_count", 0);
@@ -474,13 +494,17 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
       list = list.ilike("name", `%${name}%`);
     } else if (term) list = list.ilike("razorpay_payment_id", `%${term}%`);
   }
+  return list.order("created_at", { ascending: false }).order("id", { ascending: false });
+  };
+  // Newest first; the CSV export asks for up to 5,000 (paged, ≤ 1,000 per request).
+  const list = fetchAll<OrderRow>(listQuery, rowLimit + 1);
 
   const [summaryRes, previousRes, listRes] = await Promise.all([summary, previous, list]);
   if (summaryRes.error) throw new Error(summaryRes.error.message);
   if (previousRes?.error) throw new Error(previousRes.error.message);
   if (listRes.error) throw new Error(listRes.error.message);
 
-  const s = (summaryRes.data ?? []) as SummaryRow[];
+  const s = summaryRes.data;
   const net = (r: Pick<SummaryRow, "amount" | "refunded_amount">) => Number(r.amount || 0) - Number(r.refunded_amount || 0);
   const paid = s.filter((r) => r.status === "paid");
   const revenue = paid.reduce((sum, r) => sum + net(r), 0);
@@ -489,12 +513,12 @@ async function readOrdersView(filters: ReturnType<typeof parseOrderFilters>, row
   for (const r of unpaid) dropOff[dropOffKind(r) ?? "pending"] += 1;
   const { people, attemptNo } = groupAttempts(s);
 
-  const prev = previousRes ? ((previousRes.data ?? []) as Array<Pick<SummaryRow, "status" | "amount" | "refunded_amount">>) : null;
+  const prev = previousRes ? previousRes.data : null;
   const prevPaid = prev?.filter((r) => r.status === "paid") ?? [];
   const refundedRows = paid.filter((r) => Number(r.refunded_amount || 0) > 0);
   const notDownloaded = paid.filter((r) => !r.download_count).length;
 
-  const rows = (listRes.data ?? []) as OrderRow[];
+  const rows = listRes.data.slice(0, rowLimit + 1);
   return {
     ...filters,
     kpis: {
@@ -573,11 +597,14 @@ export interface LeadView {
 export async function getLeadsView(): Promise<{ leads: LeadView[]; total: number; active: number; bought: number; followups: number; optedOut: number }> {
   await requireAdmin();
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("leads")
-    .select("id, created_at, phone, product_id, locale, source, consent_at, followup_sent_at, opted_out_at")
-    .order("created_at", { ascending: false })
-    .limit(2000);
+  // All sign-ups (paged: ≤ 1,000 rows per request), newest first.
+  const { data, error } = await fetchAll<Omit<LeadView, "boughtLater">>(() =>
+    admin
+      .from("leads")
+      .select("id, created_at, phone, product_id, locale, source, consent_at, followup_sent_at, opted_out_at")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
+  );
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Omit<LeadView, "boughtLater">[];
 

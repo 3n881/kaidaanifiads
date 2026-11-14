@@ -63,27 +63,58 @@ export const LOG_KINDS = ["all", "pdf", "reminder", "reminder_admin", "offer"] a
 export type LogKindFilter = (typeof LOG_KINDS)[number];
 const DAY_MS = 24 * 3600_000;
 
-/** Admin-only: the message record, newest first (filters from the URL). */
-export async function getWhatsAppLog(filters: { kind: LogKindFilter; period: "today" | "week" | "all"; failed: boolean; q: string }) {
-  await requireAdmin();
-  let query = getSupabaseAdmin().from("whatsapp_log").select("*").order("created_at", { ascending: false }).limit(500);
-  if (filters.kind !== "all") query = query.eq("kind", filters.kind);
-  if (filters.failed) query = query.eq("ok", false);
+type LogFilters = { kind: LogKindFilter; period: "today" | "week" | "all"; failed: boolean; q: string };
+
+/** The URL filters applied to any whatsapp_log query (list or count). */
+type Filterable = { eq: (c: string, v: unknown) => Filterable; gte: (c: string, v: string) => Filterable; ilike: (c: string, v: string) => Filterable };
+function applyLogFilters<Q>(query: Q, filters: LogFilters): Q {
+  // Typed loosely on purpose: Supabase's builder types are too deep for a generic constraint.
+  let q = query as unknown as Filterable;
+  if (filters.kind !== "all") q = q.eq("kind", filters.kind);
+  if (filters.failed) q = q.eq("ok", false);
   if (filters.period !== "all") {
     const now = Date.now();
     const ist = 5.5 * 3600_000;
     const start = filters.period === "today" ? Math.floor((now + ist) / DAY_MS) * DAY_MS - ist : now - 7 * DAY_MS;
-    query = query.gte("created_at", new Date(start).toISOString());
+    q = q.gte("created_at", new Date(start).toISOString());
   }
   const digits = filters.q.replace(/\D/g, "").slice(-10);
-  if (digits.length >= 3) query = query.ilike("phone", `%${digits}%`);
-  else if (/\p{L}{2,}/u.test(filters.q)) query = query.ilike("name", `%${filters.q.replace(/[%_*,()"\\]/g, " ").trim()}%`);
+  if (digits.length >= 3) q = q.ilike("phone", `%${digits}%`);
+  else if (/\p{L}{2,}/u.test(filters.q)) q = q.ilike("name", `%${filters.q.replace(/[%_*,()"\\]/g, " ").trim()}%`);
+  return q as unknown as Q;
+}
+
+/** Admin-only: the message record, newest first (filters from the URL), at most 500 cards. */
+export async function getWhatsAppLog(filters: LogFilters) {
+  await requireAdmin();
+  const query = applyLogFilters(getSupabaseAdmin().from("whatsapp_log").select("*"), filters)
+    .order("created_at", { ascending: false })
+    .limit(500);
   const { data, error } = await query;
   if (error) {
     if (error.code === "42P01") return [] as WhatsAppLogRow[];
     throw new Error(error.message);
   }
   return (data ?? []) as WhatsAppLogRow[];
+}
+
+/**
+ * Admin-only: exact totals for the same filters (the list shows at most 500
+ * cards, so counting the cards under-reported "All": 500 instead of 6,479).
+ */
+export async function getWhatsAppCounts(filters: LogFilters): Promise<{ total: number; delivered: number }> {
+  await requireAdmin();
+  const admin = getSupabaseAdmin();
+  const count = (onlyOk: boolean) => {
+    let q = applyLogFilters(admin.from("whatsapp_log").select("id", { count: "exact", head: true }), filters);
+    if (onlyOk) q = q.eq("ok", true);
+    return q;
+  };
+  const [total, delivered] = await Promise.all([count(false), count(true)]);
+  if (total.error?.code === "42P01") return { total: 0, delivered: 0 };
+  if (total.error) throw new Error(total.error.message);
+  if (delivered.error) throw new Error(delivered.error.message);
+  return { total: total.count ?? 0, delivered: delivered.count ?? 0 };
 }
 
 /**

@@ -5,7 +5,7 @@ import { BellRing, CheckCircle2, FileDown, Megaphone, MessageCircle, Search, Use
 import AdminShell from "@/components/admin/AdminShell";
 import { getAdminProducts } from "@/lib/admin";
 import { ResendAllRefused, ResendRefusedButton } from "@/components/admin/RefusedResend";
-import { getRefusedStates, getWhatsAppLog, LOG_KINDS, type LogKindFilter, type WhatsAppKind } from "@/lib/whatsapp-log";
+import { getRefusedStates, getWhatsAppCounts, getWhatsAppLog, LOG_KINDS, type LogKindFilter, type WhatsAppKind } from "@/lib/whatsapp-log";
 
 export const metadata: Metadata = {
   title: "Admin — WhatsApp",
@@ -44,7 +44,11 @@ export default async function WhatsAppLogPage({ searchParams }: PageProps<"/dash
   const period = (["today", "week", "all"] as const).find((p) => p === one("period")) ?? "today";
   const failed = one("failed") === "1";
   const q = one("q").trim().slice(0, 60);
-  const [rows, products] = await Promise.all([getWhatsAppLog({ kind, period, failed, q }), getAdminProducts()]);
+  const [rows, counts, products] = await Promise.all([
+    getWhatsAppLog({ kind, period, failed, q }),
+    getWhatsAppCounts({ kind, period, failed, q }),
+    getAdminProducts(),
+  ]);
   const states = await getRefusedStates(rows);
   // One "send again" per order and message type (newest refused row; rows are newest first).
   const openKeys = new Set<string>();
@@ -68,14 +72,15 @@ export default async function WhatsAppLogPage({ searchParams }: PageProps<"/dash
     const qs = params.toString();
     return `/dashboard/whatsapp${qs ? `?${qs}` : ""}`;
   };
-  const okCount = rows.filter((r) => r.ok).length;
+  // Exact totals for the filters (the cards below stop at 500).
+  const refusedCount = counts.total - counts.delivered;
 
   return (
     <AdminShell active="whatsapp" title="WhatsApp" description="Every WhatsApp message the store sent: book PDFs, automatic payment reminders, reminders sent from the dashboard, offers.">
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Messages" value={rows.length} />
-        <Stat label="Delivered to WhatsApp" value={okCount} tone="text-green-700" />
-        <Stat label="Refused" value={rows.length - okCount} tone={rows.length - okCount ? "text-danger-600" : "text-brand-400"} />
+        <Stat label="Messages" value={counts.total} />
+        <Stat label="Delivered to WhatsApp" value={counts.delivered} tone="text-green-700" />
+        <Stat label="Refused" value={refusedCount} tone={refusedCount ? "text-danger-600" : "text-brand-400"} />
       </div>
 
       <nav aria-label="Period" className="no-scrollbar mt-4 flex gap-1 overflow-x-auto rounded-xl bg-brand-50/70 p-1">
@@ -159,7 +164,7 @@ export default async function WhatsAppLogPage({ searchParams }: PageProps<"/dash
           })}
         </ul>
       )}
-      {rows.length >= 500 && <p className="mt-3 text-xs text-brand-500">Showing the latest 500. Narrow it with the period, type or search.</p>}
+      {rows.length >= 500 && <p className="mt-3 text-xs text-brand-500">Showing the latest 500 of {counts.total.toLocaleString("en-IN")}. Narrow it with the period, type or search.</p>}
     </AdminShell>
   );
 }

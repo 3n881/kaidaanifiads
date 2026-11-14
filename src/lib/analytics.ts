@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabase/server";
+import { fetchAll } from "./supabase/fetch-all";
 import { requireAdmin } from "./auth";
 import { failureLabel } from "./payment-failure";
 import { isMissingSchema } from "./visit-events";
@@ -198,23 +199,28 @@ const cachedAnalytics = unstable_cache(
 async function computeAnalytics(filters: ReturnType<typeof parseOrderFilters>): Promise<Analytics> {
   const admin = getSupabaseAdmin();
   const now = Date.now();
+  // Every order + WhatsApp record (paged: Supabase returns ≤ 1,000 rows per request).
   const [ordersRes, logRes, productsRes] = await Promise.all([
-    admin
-      .from("orders")
-      .select(
-        "id, product_id, amount, locale, status, created_at, paid_at, buyer_contact, whatsapp_number, refunded_amount, checkout_closed_at, download_count, whatsapp_sends, reminder_count, failure_reason, failure_description, failure_method, meta_fbc",
-      )
-      .gte("created_at", SALES_START)
-      .order("created_at", { ascending: true })
-      .limit(50000),
-    admin.from("whatsapp_log").select("order_id, kind, ok, created_at").order("created_at", { ascending: true }).limit(50000),
+    fetchAll<OrderRow>(() =>
+      admin
+        .from("orders")
+        .select(
+          "id, product_id, amount, locale, status, created_at, paid_at, buyer_contact, whatsapp_number, refunded_amount, checkout_closed_at, download_count, whatsapp_sends, reminder_count, failure_reason, failure_description, failure_method, meta_fbc",
+        )
+        .gte("created_at", SALES_START)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
+    ),
+    fetchAll<LogRow>(() =>
+      admin.from("whatsapp_log").select("order_id, kind, ok, created_at").order("created_at", { ascending: true }).order("id", { ascending: true }),
+    ),
     admin.from("products").select("id, is_combo, title, title_mr"),
   ]);
   if (ordersRes.error) throw new Error(ordersRes.error.message);
   if (productsRes.error) throw new Error(productsRes.error.message);
-  const all = (ordersRes.data ?? []) as OrderRow[];
+  const all = ordersRes.data;
   // The WhatsApp record is optional (migration 014): without it those numbers stay empty.
-  const log = (logRes.error ? [] : logRes.data ?? []) as LogRow[];
+  const log = logRes.error ? [] : logRes.data;
   const products = (productsRes.data ?? []) as ProductRow[];
   const isCombo = new Map(products.map((p) => [p.id, p.is_combo]));
 
@@ -460,21 +466,25 @@ async function computeAnalytics(filters: ReturnType<typeof parseOrderFilters>): 
 async function readTraffic(admin: ReturnType<typeof getSupabaseAdmin>, all: OrderRow[], start: number, end: number): Promise<Traffic> {
   const empty: Traffic = { ready: false, since: null, funnel: FUNNEL_STEPS.map(() => 0), books: [], campaigns: [], ads: [], untrackedSales: 0 };
   const [funnelRes, firstRes, attrRes, spendRes] = await Promise.all([
-    admin.rpc("analytics_funnel", { p_start: new Date(start).toISOString(), p_end: new Date(end).toISOString() }),
+    // Grouped rows from the database; paged too in case campaigns × steps pass 1,000.
+    fetchAll<FunnelRow>(() => admin.rpc("analytics_funnel", { p_start: new Date(start).toISOString(), p_end: new Date(end).toISOString() })),
     admin.from("events").select("created_at").order("created_at", { ascending: true }).limit(1),
-    admin
-      .from("orders")
-      .select("id, visit_id, utm_source, utm_campaign, utm_content, from_ad, referrer_host")
-      .not("visit_id", "is", null)
-      .limit(50000),
+    fetchAll<AttributionRow>(() =>
+      admin
+        .from("orders")
+        .select("id, visit_id, utm_source, utm_campaign, utm_content, from_ad, referrer_host")
+        .not("visit_id", "is", null)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
+    ),
     admin.from("campaign_spend").select("campaign, spend"),
   ]);
   for (const res of [funnelRes, firstRes, attrRes, spendRes]) {
     if (res.error && isMissingSchema(res.error.code)) return empty;
     if (res.error) throw new Error(res.error.message);
   }
-  const rows = (funnelRes.data ?? []) as FunnelRow[];
-  const attribution = (attrRes.data ?? []) as AttributionRow[];
+  const rows = funnelRes.data;
+  const attribution = attrRes.data;
   const spendOf = new Map(((spendRes.data ?? []) as Array<{ campaign: string; spend: number }>).map((r) => [r.campaign, Number(r.spend)]));
   const since = (firstRes.data?.[0] as { created_at: string } | undefined)?.created_at ?? null;
   const reached = (list: FunnelRow[], step: number) => list.filter((r) => r.step >= step).reduce((s, r) => s + Number(r.visits), 0);
