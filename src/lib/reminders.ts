@@ -13,9 +13,11 @@ import { localizedTitle, normalizeLocale } from "./i18n";
 //        buyer CLOSES Razorpay (/api/orders/closed). A buyer who just LEAVES:
 //        the Buy popup pings /api/orders/alive every 10 s while Razorpay is
 //        open and the page is on screen (migration 017 `last_seen_at`); 30 s
-//        of silence = left → burst, unless a payment is still open in Razorpay
-//        (buyer in the UPI app: then the payment.failed webhook starts it when
-//        UPI times out). Still pinging after 10 min → reminded anyway. No pings
+//        of silence = left → burst. A payment still open in Razorpay = buyer in
+//        the UPI app: wait until they have been away UPI_APP_WAIT_SECONDS (60 s)
+//        without paying, then remind (before 15 Nov: until UPI timed out,
+//        ~12 min). Live data 7–14 Nov (456 UPI-app payers): in the app median
+//        23 s, 97 % paid within 60 s, 99 % within 2 min. Still pinging after 10 min → reminded anyway. No pings
 //        at all (page from before this release, migration not applied) → 3 min
 //        after Buy (LEFT_DELAY_SECONDS).
 //   2nd: 10 s after the 1st;  3rd: 30 s after the 1st (gaps 10, 20 s —
@@ -50,6 +52,10 @@ const SILENCE_SECONDS = 30;
 const LEFT_MAX_SECONDS = 600;
 /** How often the server looks at a fresh attempt's pings. */
 const LEFT_POLL_MS = 10_000;
+/** Buyer away in the UPI app (payment open in Razorpay): remind after this long without paying. */
+const UPI_APP_WAIT_SECONDS = 60;
+/** The left watch gives up this long after Buy (the cron / failure webhook take over). */
+const LEFT_WATCH_MAX_MS = 15 * 60_000;
 // No FIRST reminder for an attempt older than this (no messages hours late, e.g.
 // right after a deploy).
 const START_WITHIN_HOURS = 3;
@@ -201,7 +207,8 @@ export const sendReminderNowIfDue = runReminderBurst;
 // "Left" watch: buyer tapped Buy and then nothing (no close, no failure).
 // Looks at the attempt's pings every 10 s from 30 s after Buy; starts the
 // burst once the page has been quiet for 30 s (or 3 min with no pings at all,
-// 10 min at most). In-process; a restart drops it and the cron sends instead
+// 10 min at most). If a payment is open in Razorpay (UPI app), it looks again
+// once the buyer has been away 60 s. In-process; a restart drops it and the cron sends instead
 // (≤ 10 min late). A close / failure starts its own burst and ends the watch.
 const leftWatches = new Set<string>();
 
@@ -218,10 +225,15 @@ export function scheduleLeftReminder(orderId: string): void {
       if (at === null) return stop();
       const wait = at - Date.now();
       if (wait <= LEFT_POLL_MS) {
-        stop();
         if (wait > 0) await sleep(wait);
         await runReminderBurst(orderId);
-        return;
+        // Nothing sent because a payment is open in Razorpay (buyer in the UPI
+        // app) or Razorpay didn't answer → look again once they've been away 60 s.
+        const after = await loadOrder(orderId);
+        if (!after || after.status !== "created" || after.checkout_closed_at || (after.reminder_count ?? 0) > 0) return stop();
+        if (Date.now() > Date.parse(after.created_at) + LEFT_WATCH_MAX_MS) return stop();
+        const seen = after.last_seen_at ? Date.parse(after.last_seen_at) : Date.now();
+        return later(Math.max(LEFT_POLL_MS / 10, seen + UPI_APP_WAIT_SECONDS * 1000 + 500 - Date.now()));
       }
       later(LEFT_POLL_MS);
     } catch (error) {
@@ -272,11 +284,16 @@ async function remind(order: ReminderOrder): Promise<RemindResult> {
   }
 
   // Ask Razorpay now. Paid → marked paid + PDF sent, no reminder. A payment
-  // still open (UPI app waiting for approval, retry in the popup) → wait: its
-  // failure webhook or the cron continues. Unreachable → the cron tries later.
+  // still open (UPI app waiting for approval, retry in the popup) → wait, unless
+  // the buyer's page has been quiet for UPI_APP_WAIT_SECONDS: then they're
+  // sitting in the UPI app without approving (97 % of UPI-app payers approve
+  // within 60 s) → remind. Unreachable → the watch / cron try later.
   const razorpay = await checkOrderWithRazorpay({ id: order.id, razorpay_order_id: order.razorpay_order_id, amount: order.amount });
   if (razorpay === "paid") return "finished";
-  if (razorpay === "in_progress") return "paying";
+  if (razorpay === "in_progress") {
+    const awayMs = order.last_seen_at ? Date.now() - Date.parse(order.last_seen_at) : null;
+    if (awayMs === null || awayMs < UPI_APP_WAIT_SECONDS * 1000) return "paying";
+  }
   if (razorpay === "unreachable") return "unreachable";
 
   // Claim this reminder first (count n → n+1, still unpaid), so an overlapping
