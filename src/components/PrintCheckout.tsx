@@ -228,9 +228,11 @@ export default function PrintCheckout({ product: source }: { product: Product })
       </div>
       <dl className="font-deva space-y-1.5 border-t border-brand-50 pt-3 text-sm">
         <div className="flex justify-between"><dt className="text-brand-600">{pt.bookLine}</dt><dd className="font-semibold text-brand-900">₹{PRINT_PRICE}</dd></div>
-        <div className="flex justify-between"><dt className="text-brand-600">{pt.delivery}</dt><dd className="font-semibold text-green-700">{pt.free}</dd></div>
-        {payment === "cod" && (
+        {/* Delivery is free only when paid online; Cash on Delivery = ₹50 delivery charge. */}
+        {payment === "cod" ? (
           <div className="flex justify-between"><dt className="text-brand-600">{pt.codFee}</dt><dd className="font-semibold text-brand-900">₹{COD_FEE}</dd></div>
+        ) : (
+          <div className="flex justify-between"><dt className="text-brand-600">{pt.delivery}</dt><dd className="font-semibold text-green-700">{pt.free}</dd></div>
         )}
         <div className="flex justify-between border-t border-brand-50 pt-2 text-base"><dt className="font-extrabold text-brand-900">{pt.total}</dt><dd className="font-black text-green-600">₹{total}</dd></div>
       </dl>
@@ -356,7 +358,7 @@ export default function PrintCheckout({ product: source }: { product: Product })
             {summary}
             {button()}
             <p className="font-deva flex items-center justify-center gap-1 text-center text-[11px] text-brand-500">
-              <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" /> {pt.onlineNote}
+              <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" /> {payment === "cod" ? pt.codNote(COD_FEE) : pt.onlineNote}
             </p>
           </div>
         </aside>
