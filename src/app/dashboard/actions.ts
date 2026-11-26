@@ -633,3 +633,19 @@ export async function signOutAction() {
   await supabase.auth.signOut();
   redirect("/dashboard/login");
 }
+
+/** Printed-book orders: move an order along (Confirmed / Shipped with courier + tracking / Delivered / Cancelled). */
+export async function updatePrintOrderAction(
+  id: string,
+  change: { status?: import("@/lib/print-orders").PrintStatus; courier?: string; tracking?: string; note?: string },
+): Promise<{ ok: boolean; message?: string }> {
+  const { updatePrintOrder, PRINT_STATUSES } = await import("@/lib/print-orders");
+  if (change.status && !(PRINT_STATUSES as readonly string[]).includes(change.status)) return { ok: false, message: "Unknown status" };
+  try {
+    await updatePrintOrder(id, change);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Saving failed" };
+  }
+  revalidatePath("/dashboard/print-orders");
+  return { ok: true };
+}

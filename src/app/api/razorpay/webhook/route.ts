@@ -1,5 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { runReminderBurst } from "@/lib/reminders";
+import { isPrintRazorpayOrder, markPrintOrderFailed, markPrintOrderPaid } from "@/lib/print-orders";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { markOrderPaid, normalizePhone } from "@/lib/orders";
@@ -84,6 +85,14 @@ async function handle(req: NextRequest) {
     .maybeSingle();
   if (lookupError) throw new DatabaseUnavailableError("webhook order lookup", lookupError);
   if (!order) {
+    // Printed-book orders (migration 018) have their own table.
+    if (await isPrintRazorpayOrder(rzpOrderId)) {
+      if (event.event === "payment.failed") await markPrintOrderFailed(rzpOrderId);
+      else if ((event.event === "payment.captured" || event.event === "order.paid") && payment.id) {
+        await markPrintOrderPaid({ razorpayOrderId: rzpOrderId, razorpayPaymentId: payment.id, amountPaise: payment.amount });
+      }
+      return NextResponse.json({ ok: true });
+    }
     console.error("[webhook] unknown razorpay order", rzpOrderId);
     return NextResponse.json({ ok: true });
   }

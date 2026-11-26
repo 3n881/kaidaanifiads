@@ -1,15 +1,16 @@
 import Link from "@/components/admin/AdminLink";
 import Image from "next/image";
-import { BarChart3, BookOpen, ClipboardCheck, ExternalLink, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings, ShoppingBag, Users } from "lucide-react";
+import { BarChart3, BookOpen, ClipboardCheck, ExternalLink, Inbox, LayoutDashboard, LogOut, MessageCircle, Package, Settings, ShoppingBag, Users } from "lucide-react";
 import { signOutAction } from "@/app/dashboard/actions";
 
-export type AdminSection = "overview" | "analytics" | "products" | "orders" | "whatsapp" | "leads" | "messages" | "setup" | "launch";
+export type AdminSection = "overview" | "analytics" | "products" | "orders" | "print" | "whatsapp" | "leads" | "messages" | "setup" | "launch";
 
 const navigation = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Overview", key: "overview" },
   { href: "/dashboard/analytics", icon: BarChart3, label: "Analytics", key: "analytics" },
   { href: "/dashboard/products", icon: BookOpen, label: "Products", key: "products" },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Orders", key: "orders" },
+  { href: "/dashboard/print-orders", icon: Package, label: "Printed", key: "print" },
   { href: "/dashboard/whatsapp", icon: MessageCircle, label: "WhatsApp", key: "whatsapp" },
   { href: "/dashboard/leads", icon: Users, label: "Leads", key: "leads" },
   { href: "/dashboard/messages", icon: Inbox, label: "Messages", key: "messages" },
@@ -37,7 +38,7 @@ export default function AdminShell({ active, title, description, action, childre
             <form action={signOutAction}><button type="submit" aria-label="Sign out" className="rounded-lg p-2 text-danger-600 hover:bg-danger-500/10"><LogOut className="h-4 w-4" /></button></form>
           </div>
         </div>
-        {/* Phones: 2 rows (5 + 4, icon above the label, every page visible, no sideways scrolling); wider screens: one row. */}
+        {/* Phones: 2 rows (5 + 5, icon above the label, every page visible, no sideways scrolling); wider screens: one row. */}
         <nav className="mx-auto grid max-w-7xl grid-cols-5 gap-1 px-2 pb-2 sm:flex sm:flex-wrap sm:px-4" aria-label="Dashboard navigation">
           {navigation.map((item) => (
             <Link key={item.href} href={item.href} aria-current={active === item.key ? "page" : undefined} className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[10px] font-semibold leading-tight transition min-[400px]:text-[11px] sm:flex-row sm:gap-1.5 sm:justify-start sm:px-3 sm:py-2 sm:text-sm ${active === item.key ? "bg-brand-teal text-white" : "text-brand-600 hover:bg-brand-50"}`}>
