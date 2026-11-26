@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import type { Product } from "@/data/catalog";
 import { UI_COPY } from "@/lib/i18n";
 import { editionLocaleFor } from "@/lib/catalog";
@@ -21,10 +22,13 @@ export default function StickyBuyBar({
   product,
   label,
   options = [],
+  print,
 }: {
   product: Product;
   label?: string;
   options?: BarOption[];
+  /** Printed copy chosen on the book page: the bar links to its checkout instead of opening the e-book popup. */
+  print?: { href: string; label: string; price: number };
 }) {
   const { locale } = useLanguage();
 
@@ -65,15 +69,24 @@ export default function StickyBuyBar({
       </p>
       <div className="mx-auto mt-1 flex max-w-md items-center gap-3">
         <div className="shrink-0 leading-tight">
-          <span className="block text-xs text-brand-400 line-through">₹{product.mrp}</span>
-          <span className="block text-xl font-extrabold text-green-600">₹{product.price}</span>
+          {!print && <span className="block text-xs text-brand-400 line-through">₹{product.mrp}</span>}
+          <span className="block text-xl font-extrabold text-green-600">₹{print ? print.price : product.price}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <BuyButton
-            product={product}
-            label={label ?? UI_COPY[editionLocaleFor(product, locale)].downloadNow}
-            className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
-          />
+          {print ? (
+            <Link
+              href={print.href}
+              className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
+            >
+              {print.label}
+            </Link>
+          ) : (
+            <BuyButton
+              product={product}
+              label={label ?? UI_COPY[editionLocaleFor(product, locale)].downloadNow}
+              className="font-deva inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-sm font-extrabold text-brand-teal shadow-sm transition hover:brightness-95 active:scale-[0.98]"
+            />
+          )}
         </div>
       </div>
     </div>

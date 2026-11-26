@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { reconcileRecentOrders } from "@/lib/reconcile";
+import { reconcilePrintOrders } from "@/lib/print-orders";
 import { sendPaymentReminders } from "@/lib/reminders";
 import { sendLeadFollowups } from "@/lib/leads";
 import { backfillFailureReasons } from "@/lib/payment-failure";
@@ -37,6 +38,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "sweep failed" }, { status: 503 });
   }
 
+  // Printed-book orders paid online but never recorded (migration 018). Never fails the sweep.
+  let print: { pending: number; recovered: number } | { error: string };
+  try {
+    print = await reconcilePrintOrders();
+    if (print.recovered > 0) console.error("[print] reconcile", print);
+  } catch (error) {
+    console.error("[print] reconcile failed", String(error));
+    print = { error: "print reconcile failed" };
+  }
+
   // Reminders run only after a successful sweep, so a captured payment is
   // never reminded. A reminder failure never fails the payment sweep.
   let reminders: { due: number; sent: number } | { error: string };
@@ -67,5 +78,5 @@ export async function POST(req: NextRequest) {
     console.error("[payment-failure] backfill failed", String(error));
     failures = { error: "failure reasons failed" };
   }
-  return NextResponse.json({ ok: true, ...result, reminders, leads, failures });
+  return NextResponse.json({ ok: true, ...result, print, reminders, leads, failures });
 }

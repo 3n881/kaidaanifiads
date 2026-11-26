@@ -18,6 +18,8 @@ import {
   Circle,
   Check,
   Users,
+  Package,
+  Smartphone,
 } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import {
@@ -42,6 +44,7 @@ import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
 import { replaceProductAddress } from "@/lib/meta-pixel";
 import { PRODUCT_COPY } from "@/lib/product-copy";
+import { COD_FEE, PRINT_COPY, PRINT_PRICE } from "@/lib/print-copy";
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
 
@@ -66,6 +69,9 @@ export default function ProductDetail({
   // and switches in place to any book or set of its group — title, price,
   // preview, description, Buy and the address all follow the selection.
   const [selectedId, setSelectedId] = useState(openedProduct.id);
+  // E-book (default, unchanged flow) or printed copy for home delivery (client, 26 Nov).
+  const [format, setFormat] = useState<"ebook" | "print">("ebook");
+  const isPrint = format === "print";
   const sourceProduct = family.find((item) => item.id === selectedId) ?? openedProduct;
   const product = localizeProduct(sourceProduct, locale);
   // Every other title, each shown in its own edition (as on the previous site).
@@ -77,6 +83,8 @@ export default function ProductDetail({
   // Labels follow the edition on show (a Hindi-only book reads in Hindi).
   const copy = UI_COPY[editionLocale];
   const t = PRODUCT_COPY[editionLocale];
+  const pt = PRINT_COPY[editionLocale];
+  const printHref = `/print-order/${product.slug}`;
   const group = family.map((item) => localizeProduct(item, locale));
   const byId = new Map(group.map((item) => [item.id, item]));
   const sizeOf = (item: Product) => (item.isCombo ? item.setSize ?? members[item.id]?.length ?? 0 : 1);
@@ -89,14 +97,21 @@ export default function ProductDetail({
     replaceProductAddress(`/${item.isCombo ? "combos" : "ebooks"}/${item.slug}`);
   };
   // The same choice as buttons in the phone's bottom bar (seen without scrolling).
-  const barOptions = tiers.map((tier) => ({
-    key: String(tier.size),
-    label: t.pill(tier.size),
-    price: tier.shown.price,
-    best: tier.best,
-    selected: tier.selected,
-    onSelect: () => select(tier.shown),
-  }));
+  // Otherwise the bar carries the format choice (e-book / printed): on phones the
+  // preview fills the first screen, so the printed option is seen without scrolling.
+  const barOptions = tiers.length
+    ? tiers.map((tier) => ({
+        key: String(tier.size),
+        label: t.pill(tier.size),
+        price: tier.shown.price,
+        best: tier.best,
+        selected: tier.selected,
+        onSelect: () => select(tier.shown),
+      }))
+    : [
+        { key: "ebook", label: pt.ebook, price: product.price, selected: !isPrint, onSelect: () => setFormat("ebook") },
+        { key: "print", label: `📦 ${pt.print}`, price: PRINT_PRICE, selected: isPrint, onSelect: () => setFormat("print") },
+      ];
   // Keep the purchase action consistent for single books and combo packs.
   // The selected product's localized download text and current price always follow the selection.
   const buyLabel = `${copy.downloadNow} · ₹${product.price}`;
@@ -155,7 +170,12 @@ export default function ProductDetail({
   return (
     <div className="container-x py-6 lg:py-8">
       <TrackViewContent product={sourceProduct} />
-      <StickyBuyBar product={product} label={copy.downloadNow} options={barOptions} />
+      <StickyBuyBar
+        product={product}
+        label={copy.downloadNow}
+        options={barOptions}
+        print={isPrint ? { href: printHref, label: pt.printOrderShort, price: PRINT_PRICE } : undefined}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -212,11 +232,29 @@ export default function ProductDetail({
               📦 <strong className="text-gray-700">{SITE.stats.trust}</strong> {t.readersTrust}
             </span>
             <span className="text-gray-300">|</span>
-            <span className="font-medium text-green-600">{t.instantDelivery}</span>
+            <span className="font-medium text-green-600">{isPrint ? `✓ ${pt.printNote}` : t.instantDelivery}</span>
           </div>
 
+          {/* format: e-book (PDF) or printed copy */}
+          <FormatPicker format={format} onChange={setFormat} ebookPrice={product.price} pt={pt} />
+
           {/* price — or the offer cards on a book that is also sold in combos */}
-          {tiers.length > 0 ? (
+          {isPrint ? (
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3 md:p-4">
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-black tracking-tight text-green-600 sm:text-4xl md:text-5xl">₹{PRINT_PRICE}</span>
+                  <span className="font-deva text-[10px] font-bold text-gray-500 sm:text-xs">{pt.print}</span>
+                </div>
+                <span className="font-deva mt-0.5 text-[10px] font-semibold text-gray-500">
+                  {pt.online}: {pt.free} {pt.delivery} · COD +₹{COD_FEE}
+                </span>
+              </div>
+              <span className="font-deva ml-auto inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-bold text-blue-800 md:text-xs">
+                <Package className="h-3.5 w-3.5" aria-hidden="true" /> {pt.printNote}
+              </span>
+            </div>
+          ) : tiers.length > 0 ? (
             <OfferCards tiers={tiers} current={product} anchorId={anchorId} members={members} byId={byId} onSelect={select} t={t} />
           ) : (
           <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-green-100 bg-green-50/60 p-3 md:p-4">
@@ -253,11 +291,13 @@ export default function ProductDetail({
           {/* notices */}
           <div className="font-deva mb-3 space-y-1.5">
             <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-medium text-blue-800">
-              {t.digitalOnly}
+              {isPrint ? pt.printNotice : t.digitalOnly}
             </p>
-            <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-800">
-              {t.noRefund}
-            </p>
+            {!isPrint && (
+              <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-800">
+                {t.noRefund}
+              </p>
+            )}
           </div>
 
           {/* buy */}
@@ -268,16 +308,22 @@ export default function ProductDetail({
                 {t.purchases(purchases.toLocaleString("en-IN"))}
               </p>
             ) : null}
-            <BuyButton
-              product={product}
-              label={buyLabel}
-              className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
-            />
+            {isPrint ? (
+              <Link href={printHref} className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]">
+                <Package className="h-5 w-5 shrink-0" aria-hidden="true" /> {pt.printOrder(PRINT_PRICE)}
+              </Link>
+            ) : (
+              <BuyButton
+                product={product}
+                label={buyLabel}
+                className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
+              />
+            )}
             <p className="font-deva flex items-center justify-center gap-1 text-center text-[10px] text-brand-500">
               <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
-              {t.buyNote}
+              {isPrint ? pt.deliveryTime : t.buyNote}
             </p>
-            <WhatsAppHint text={t.whatsappHint} />
+            {!isPrint && <WhatsAppHint text={t.whatsappHint} />}
           </div>
 
           {/* Everything below Buy is under the first screen on phones: .cv-auto lets
@@ -289,13 +335,23 @@ export default function ProductDetail({
 
           {/* chips */}
           <div className="font-deva mb-4 flex flex-wrap gap-2 text-[10px] font-medium text-brand-500 md:text-xs">
-            <Chip icon={FileText} title={`PDF (${LANGUAGE_LABELS[product.language]})`} />
-            <Chip icon={BookOpen} title={`${product.pages} ${t.pages}`} />
-            <Chip icon={Zap} title={t.instantDownload} />
+            {isPrint ? (
+              <>
+                <Chip icon={Package} title={`${pt.print} (${LANGUAGE_LABELS[product.language]})`} />
+                <Chip icon={BookOpen} title={`${product.pages} ${t.pages}`} />
+                <Chip icon={Zap} title={pt.printNote} />
+              </>
+            ) : (
+              <>
+                <Chip icon={FileText} title={`PDF (${LANGUAGE_LABELS[product.language]})`} />
+                <Chip icon={BookOpen} title={`${product.pages} ${t.pages}`} />
+                <Chip icon={Zap} title={t.instantDownload} />
+              </>
+            )}
           </div>
 
-          {/* mini how to buy */}
-          <div className="mb-4 rounded-2xl border border-brand-teal/10 bg-brand-teal/5 p-3 sm:p-4">
+          {/* mini how to buy (e-book steps; the printed copy has its own checkout page) */}
+          <div className={`mb-4 rounded-2xl border border-brand-teal/10 bg-brand-teal/5 p-3 sm:p-4 ${isPrint ? "hidden" : ""}`}>
             <h4 className="font-deva mb-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-brand-teal/60 sm:text-[10px]">
               {t.howToBuy}
             </h4>
@@ -340,15 +396,21 @@ export default function ProductDetail({
           <div className="relative mt-6 w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-lg">
             <div className="pointer-events-none absolute right-0 top-0 -mr-10 -mt-10 h-28 w-28 rounded-full bg-brand-gold/10 blur-2xl" />
             <div className="relative z-10 flex flex-col gap-3">
-              <BuyButton
-                product={product}
-                label={buyLabel}
-                className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
-              />
+              {isPrint ? (
+                <Link href={printHref} className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]">
+                  <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {pt.printOrder(PRINT_PRICE)}
+                </Link>
+              ) : (
+                <BuyButton
+                  product={product}
+                  label={buyLabel}
+                  className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]"
+                />
+              )}
               <p className="font-deva flex items-center justify-center gap-1.5 text-center text-[10px] text-brand-500">
                 <ShieldCheck className="h-3.5 w-3.5 text-green-600" /> {t.securePayment}
               </p>
-              <WhatsAppHint text={t.whatsappHint} />
+              {!isPrint && <WhatsAppHint text={t.whatsappHint} />}
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {PAYMENT_METHODS.map((method) => (
                   <span key={method} className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
@@ -410,6 +472,65 @@ export default function ProductDetail({
       )}
       {/* room for the always-on mobile buy bar */}
       <div className={`${barOptions.length ? "h-36" : "h-20"} lg:hidden`} aria-hidden="true" />
+    </div>
+  );
+}
+
+/** E-book (PDF) or printed copy — two big cards above the price (client, 26 Nov). */
+function FormatPicker({
+  format,
+  onChange,
+  ebookPrice,
+  pt,
+}: {
+  format: "ebook" | "print";
+  onChange: (format: "ebook" | "print") => void;
+  ebookPrice: number;
+  pt: (typeof PRINT_COPY)["mr"];
+}) {
+  const options = [
+    { key: "ebook" as const, icon: Smartphone, title: pt.ebook, note: pt.ebookNote, price: ebookPrice, badge: null },
+    { key: "print" as const, icon: Package, title: pt.print, note: pt.printNote, price: PRINT_PRICE, badge: pt.printBadge },
+  ];
+  return (
+    <div className="mb-3">
+      <p className="font-deva mb-1.5 text-xs font-bold text-brand-700">{pt.formatTitle}</p>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={pt.formatTitle}>
+        {options.map(({ key, icon: Icon, title, note, price, badge }) => {
+          const selected = format === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(key)}
+              className={`font-deva relative flex items-start gap-2 rounded-2xl border-2 p-2.5 text-left transition sm:p-3 ${
+                selected ? "border-green-600 bg-green-50 shadow-sm" : "border-brand-100 bg-white hover:border-brand-200"
+              }`}
+            >
+              {badge && (
+                <span className="absolute -top-2 right-2 rounded-full bg-brand-gold px-2 py-0.5 text-[9px] font-extrabold text-brand-teal shadow-sm">
+                  {badge}
+                </span>
+              )}
+              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${selected ? "bg-green-600 text-white" : "bg-brand-50 text-brand-600"}`}>
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1 leading-tight">
+                <span className="block text-[13px] font-extrabold text-brand-900 sm:text-sm">{title}</span>
+                <span className="block text-[10px] font-semibold text-brand-500 sm:text-[11px]">{note}</span>
+                <span className="mt-0.5 block text-lg font-black text-green-600">₹{price}</span>
+              </span>
+              {selected ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
+              ) : (
+                <Circle className="h-4 w-4 shrink-0 text-brand-200" aria-hidden="true" />
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
