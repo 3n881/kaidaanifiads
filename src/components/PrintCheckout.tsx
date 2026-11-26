@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Banknote, Check, CheckCircle2, Circle, Loader2, MapPin, Package, ShieldCheck, Smartphone, Truck } from "lucide-react";
 import type { Product } from "@/data/catalog";
-import { editionLocaleFor, localizeProduct } from "@/lib/catalog";
+import { localizeProduct } from "@/lib/catalog";
 import { coverThumbSrc } from "@/lib/covers";
 import { loadSavedBuyer } from "@/lib/buyer";
 import { checkAddress, INDIAN_STATES, type AddressField, type PrintAddress } from "@/lib/print-address";
@@ -34,8 +34,9 @@ const EMPTY: PrintAddress = { name: "", phone: "", house: "", area: "", landmark
  */
 export default function PrintCheckout({ product: source }: { product: Product }) {
   const { locale } = useLanguage();
+  // Book title in the book's own edition; every form text follows the website language (owner, 26 Nov).
   const product = localizeProduct(source, locale);
-  const pt = PRINT_COPY[editionLocaleFor(source, locale)];
+  const pt = PRINT_COPY[locale];
   const [address, setAddress] = useState<PrintAddress>(EMPTY);
   const [touched, setTouched] = useState<Partial<Record<AddressField, boolean>>>({});
   const [showAll, setShowAll] = useState(false);
