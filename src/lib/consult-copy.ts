@@ -1,5 +1,4 @@
-// CLIENT-SAFE: paid consultation booking (/consultation, client 28 Nov). Given by
-// the client's guidance team (not advocates — decided 28 Nov), as general guidance.
+// CLIENT-SAFE: paid consultation booking (/consultation, client 28 Nov).
 // ₹999 per consultation, paid online; the team then calls / WhatsApps to fix
 // the exact time. Topics follow the books, so a buyer lands on their subject.
 import type { Locale } from "./i18n";
@@ -123,7 +122,7 @@ const MR: Copy = {
   consent: "मी दिलेली माहिती सल्ल्यासाठी वापरण्यास व WhatsApp वर संपर्कासाठी मी सहमत आहे. हा सामान्य मार्गदर्शनाचा सल्ला आहे, न्यायालयीन प्रतिनिधित्व नाही.",
   pay: (price) => `सल्ला बुक करा · ₹${price} भरा`,
   secure: "सुरक्षित पेमेंट · UPI / Card / Netbanking",
-  disclaimer: "हा सल्ला आमच्या मार्गदर्शन टीमकडून सामान्य माहिती व मार्गदर्शनासाठी आहे. तो न्यायालयीन प्रतिनिधित्व किंवा वकिलाची नेमणूक नाही. महत्त्वाचे निर्णय घेण्यापूर्वी आवश्यक तिथे स्थानिक वकिलांचा सल्ला घ्या.",
+  disclaimer: "हा सल्ला सामान्य माहिती व मार्गदर्शनासाठी आहे. तो न्यायालयीन प्रतिनिधित्व किंवा वकिलाची नेमणूक नाही. महत्त्वाचे निर्णय घेण्यापूर्वी आवश्यक तिथे स्थानिक वकिलांचा सल्ला घ्या.",
   faqTitle: "नेहमीचे प्रश्न",
   faq: [
     { q: "पेमेंटनंतर पुढे काय?", a: "24 तासांत आम्ही तुमच्या नंबरवर कॉल किंवा WhatsApp मेसेज करून सल्ल्याची नेमकी वेळ ठरवू." },
@@ -196,7 +195,7 @@ const HI: Copy = {
   consent: "मैं दी गई जानकारी सलाह के लिए उपयोग करने व WhatsApp पर संपर्क के लिए सहमत हूँ। यह सामान्य मार्गदर्शन है, अदालत में प्रतिनिधित्व नहीं।",
   pay: (price) => `सलाह बुक करें · ₹${price} दें`,
   secure: "सुरक्षित भुगतान · UPI / Card / Netbanking",
-  disclaimer: "यह सलाह हमारी मार्गदर्शन टीम द्वारा सामान्य जानकारी व मार्गदर्शन के लिए है। यह अदालत में प्रतिनिधित्व या वकील की नियुक्ति नहीं है। ज़रूरी निर्णय से पहले आवश्यक होने पर स्थानीय वकील से सलाह लें।",
+  disclaimer: "यह सलाह सामान्य जानकारी व मार्गदर्शन के लिए है। यह अदालत में प्रतिनिधित्व या वकील की नियुक्ति नहीं है। ज़रूरी निर्णय से पहले आवश्यक होने पर स्थानीय वकील से सलाह लें।",
   faqTitle: "अक्सर पूछे जाने वाले सवाल",
   faq: [
     { q: "भुगतान के बाद क्या होगा?", a: "24 घंटे में हम आपके नंबर पर कॉल या WhatsApp मैसेज करके सलाह का समय तय करेंगे।" },
@@ -269,7 +268,7 @@ const EN: Copy = {
   consent: "I agree that my details are used for the consultation and that you contact me on WhatsApp. This is general guidance, not representation in court.",
   pay: (price) => `Book consultation · pay ₹${price}`,
   secure: "Secure payment · UPI / Card / Netbanking",
-  disclaimer: "This consultation is general information and guidance from our guidance team. It is not representation in court or the appointment of a lawyer. Where needed, consult a local advocate before important decisions.",
+  disclaimer: "This consultation is general information and guidance. It is not representation in court or the appointment of a lawyer. Where needed, consult a local advocate before important decisions.",
   faqTitle: "Questions",
   faq: [
     { q: "What happens after payment?", a: "Within 24 hours we call or WhatsApp you on your number to fix the exact time." },
