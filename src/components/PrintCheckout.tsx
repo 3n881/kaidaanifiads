@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Banknote, Check, CheckCircle2, Circle, Loader2, MapPin, Package, ShieldCheck, Smartphone, Truck } from "lucide-react";
+import { ArrowLeft, Banknote, Check, Loader2, MapPin, Package, ShieldCheck, Truck } from "lucide-react";
 import type { Product } from "@/data/catalog";
 import { localizeProduct } from "@/lib/catalog";
 import { coverThumbSrc } from "@/lib/covers";
@@ -26,7 +26,8 @@ type OrderAnswer = {
 const EMPTY: PrintAddress = { name: "", phone: "", house: "", area: "", landmark: "", pincode: "", city: "", district: "", state: "Maharashtra" };
 
 /**
- * Printed-book checkout (client, 26 Nov): delivery address + payment choice
+ * Printed-book checkout (client, 26 Nov; COD only since 28 Nov): delivery address +
+ * Cash on Delivery
  * (online ₹399 with free delivery, or Cash on Delivery ₹399 + ₹50), then the
  * order is placed via /api/print-orders (phase 2). Phone: one column with the
  * total and the order button pinned at the bottom; computers: form left,
@@ -40,7 +41,8 @@ export default function PrintCheckout({ product: source }: { product: Product })
   const [address, setAddress] = useState<PrintAddress>(EMPTY);
   const [touched, setTouched] = useState<Partial<Record<AddressField, boolean>>>({});
   const [showAll, setShowAll] = useState(false);
-  const [payment, setPayment] = useState<PrintPayment>("online");
+  // Cash on Delivery only (client, 28 Nov). The online path below stays for later, switched off.
+  const payment = "cod" as PrintPayment;
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<{ orderNo: string; payment: PrintPayment; address: PrintAddress } | null>(null);
@@ -306,41 +308,17 @@ export default function PrintCheckout({ product: source }: { product: Product })
             </div>
           </section>
 
-          <section className="rounded-2xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5">
-            <h2 className="font-deva mb-3 text-sm font-extrabold text-brand-900">{pt.paymentTitle}</h2>
-            <div className="space-y-2.5" role="radiogroup" aria-label={pt.paymentTitle}>
-              {([
-                { key: "online", icon: Smartphone, title: pt.online, note: pt.onlineNote, price: printTotal("online"), badge: pt.recommended },
-                { key: "cod", icon: Truck, title: pt.cod, note: pt.codNote(COD_FEE), price: printTotal("cod"), badge: null },
-              ] as const).map(({ key, icon: Icon, title, note, price, badge }) => {
-                const selected = payment === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setPayment(key)}
-                    className={`font-deva relative flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left transition ${
-                      selected ? "border-green-600 bg-green-50" : "border-brand-100 bg-white hover:border-brand-200"
-                    }`}
-                  >
-                    {selected ? <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" aria-hidden="true" /> : <Circle className="h-5 w-5 shrink-0 text-brand-200" aria-hidden="true" />}
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${selected ? "bg-green-600 text-white" : "bg-brand-50 text-brand-600"}`}>
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1 leading-tight">
-                      <span className="flex flex-wrap items-center gap-1.5 text-sm font-extrabold text-brand-900">
-                        {title}
-                        {badge && <span className="rounded-full bg-green-600 px-2 py-0.5 text-[9px] font-extrabold text-white">{badge}</span>}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-brand-500">{note}</span>
-                    </span>
-                    <span className="shrink-0 text-lg font-black text-green-600">₹{price}</span>
-                  </button>
-                );
-              })}
+          {/* Cash on Delivery only (client, 28 Nov): no choice, just what the buyer pays and when. */}
+          <section className="flex items-start gap-3 rounded-2xl border-2 border-green-600 bg-green-50 p-4 sm:p-5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+              <Truck className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="font-deva min-w-0 flex-1 leading-snug">
+              <h2 className="text-sm font-extrabold text-brand-900">{pt.codOnlyTitle}</h2>
+              <p className="mt-1 text-[13px] font-semibold text-brand-700">{pt.codOnlyNote(total)}</p>
+              <p className="mt-1 text-[11px] text-brand-500">{pt.priceBreakdown(PRINT_PRICE, COD_FEE)}</p>
             </div>
+            <span className="shrink-0 text-xl font-black text-green-700">₹{total}</span>
           </section>
 
           {error && <p role="alert" className="font-deva rounded-xl border border-danger-500/30 bg-danger-500/5 px-3 py-2 text-sm font-semibold text-danger-600">{error}</p>}
@@ -359,7 +337,7 @@ export default function PrintCheckout({ product: source }: { product: Product })
             {summary}
             {button()}
             <p className="font-deva flex items-center justify-center gap-1 text-center text-[11px] text-brand-500">
-              <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" /> {payment === "cod" ? pt.codNote(COD_FEE) : pt.onlineNote}
+              <Truck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" /> {pt.codOnlyNote(total)}
             </p>
           </div>
         </aside>
