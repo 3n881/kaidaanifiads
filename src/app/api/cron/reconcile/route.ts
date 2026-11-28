@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { reconcileRecentOrders } from "@/lib/reconcile";
 import { reconcilePrintOrders } from "@/lib/print-orders";
+import { reconcileConsultations } from "@/lib/consultations";
 import { sendPaymentReminders } from "@/lib/reminders";
 import { sendLeadFollowups } from "@/lib/leads";
 import { backfillFailureReasons } from "@/lib/payment-failure";
@@ -42,6 +43,8 @@ export async function POST(req: NextRequest) {
   let print: { pending: number; recovered: number } | { error: string };
   try {
     print = await reconcilePrintOrders();
+    const consult = await reconcileConsultations();
+    if (consult.recovered > 0) console.error("[consult] reconcile", consult);
     if (print.recovered > 0) console.error("[print] reconcile", print);
   } catch (error) {
     console.error("[print] reconcile failed", String(error));

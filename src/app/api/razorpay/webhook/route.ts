@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { runReminderBurst } from "@/lib/reminders";
 import { isPrintRazorpayOrder, markPrintOrderFailed, markPrintOrderPaid } from "@/lib/print-orders";
+import { isConsultRazorpayOrder, markConsultFailed, markConsultPaid } from "@/lib/consultations";
 import { DatabaseUnavailableError, getSupabaseAdmin } from "@/lib/supabase/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { markOrderPaid, normalizePhone } from "@/lib/orders";
@@ -90,6 +91,14 @@ async function handle(req: NextRequest) {
       if (event.event === "payment.failed") await markPrintOrderFailed(rzpOrderId);
       else if ((event.event === "payment.captured" || event.event === "order.paid") && payment.id) {
         await markPrintOrderPaid({ razorpayOrderId: rzpOrderId, razorpayPaymentId: payment.id, amountPaise: payment.amount });
+      }
+      return NextResponse.json({ ok: true });
+    }
+    // Paid consultation bookings (migration 020).
+    if (await isConsultRazorpayOrder(rzpOrderId)) {
+      if (event.event === "payment.failed") await markConsultFailed(rzpOrderId);
+      else if ((event.event === "payment.captured" || event.event === "order.paid") && payment.id) {
+        await markConsultPaid({ razorpayOrderId: rzpOrderId, razorpayPaymentId: payment.id, amountPaise: payment.amount });
       }
       return NextResponse.json({ ok: true });
     }

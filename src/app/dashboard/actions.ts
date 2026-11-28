@@ -649,3 +649,19 @@ export async function updatePrintOrderAction(
   revalidatePath("/dashboard/print-orders");
   return { ok: true };
 }
+
+/** Consultation bookings: schedule (date + time), done, cancelled / refunded, notes. */
+export async function updateConsultationAction(
+  id: string,
+  change: { status?: import("@/lib/consultations").ConsultStatus; scheduledFor?: string | null; note?: string },
+): Promise<{ ok: boolean; message?: string }> {
+  const { updateConsultation, CONSULT_STATUSES } = await import("@/lib/consultations");
+  if (change.status && !(CONSULT_STATUSES as readonly string[]).includes(change.status)) return { ok: false, message: "Unknown status" };
+  try {
+    await updateConsultation(id, change);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Saving failed" };
+  }
+  revalidatePath("/dashboard/consultations");
+  return { ok: true };
+}

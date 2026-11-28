@@ -40,6 +40,7 @@ import ExpandableText from "./ExpandableText";
 import DisclaimerBanner from "./DisclaimerBanner";
 import Carousel from "./Carousel";
 import ProductGallery from "./ProductGallery";
+import ConsultCard from "./ConsultCard";
 import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
 import { replaceProductAddress } from "@/lib/meta-pixel";
@@ -383,6 +384,9 @@ export default function ProductDetail({
               ))}
             </div>
           </div>
+
+          {/* paid consultation on this book's topic (client, 28 Nov) */}
+          <ConsultCard productId={sourceProduct.id} locale={locale} className="mb-4" />
 
           {/* description */}
           <div className="mt-6">

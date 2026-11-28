@@ -16,6 +16,7 @@ import DownloadWhere from "@/components/order/DownloadWhere";
 import { ORDER_EXTRA } from "@/lib/order-copy";
 import { getAllProducts } from "@/lib/products";
 import Carousel from "@/components/Carousel";
+import ConsultCard from "@/components/ConsultCard";
 import { isLocale, localizedTitle, normalizeLocale, ORDER_COPY, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -217,6 +218,8 @@ export default async function OrderPage({
           delivered={Boolean(order.delivered || order.whatsapp_number)}
           waitForAutoMs={waitForAutoMs}
         />
+        {/* Paid consultation on this book's topic (client, 28 Nov). */}
+        <ConsultCard productId={order.product_id} locale={textLocale} className="mt-2" />
         <a href={supportHref} className="font-deva flex items-center justify-center gap-1.5 pt-2 text-xs font-semibold text-brand-teal hover:underline">
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {copy.help}
         </a>
