@@ -64,8 +64,11 @@ export default function ConsultationBooking({ initialTopic, bookId, bookTitle }:
   useEffect(() => {
     if (done) return;
     document.body.dataset.buybar = "on";
+    // Form page: the floating back-to-top button would cover fields (BackToTop hides itself).
+    document.body.dataset.form = "on";
     return () => {
       delete document.body.dataset.buybar;
+      delete document.body.dataset.form;
     };
   }, [done]);
 
