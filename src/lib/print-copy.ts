@@ -21,6 +21,7 @@ export const PRINT_COPY: Record<Locale, {
   printOrder: (price: number) => string;
   printOrderShort: string;
   printNotice: string;
+  payOnDelivery: string;
   priceBreakdown: (book: number, fee: number) => string;
   codOnlyTitle: string;
   codOnlyNote: (total: number) => string;
@@ -96,9 +97,10 @@ export const PRINT_COPY: Record<Locale, {
     print: "छापील पुस्तक",
     printNote: "घरपोच · कॅश ऑन डिलिव्हरी",
     printBadge: "नवीन",
-    printOrder: (price) => `छापील पुस्तक मागवा · ₹${price} (COD)`,
+    printOrder: (price) => `छापील पुस्तक मागवा · ₹${price}`,
     printOrderShort: "छापील पुस्तक मागवा",
-    printNotice: "📦 छापील पुस्तक तुमच्या पत्त्यावर पाठवले जाईल · फक्त कॅश ऑन डिलिव्हरी: पुस्तक हातात आल्यावर ₹449 रोख द्या (पुस्तक ₹399 + डिलिव्हरी ₹50). ऑर्डर कन्फर्म करण्यासाठी आम्ही तुम्हाला कॉल किंवा मेसेज करू.",
+    printNotice: "📦 छापील पुस्तक तुमच्या पत्त्यावर पाठवले जाईल · फक्त कॅश ऑन डिलिव्हरी: पुस्तक हातात आल्यावर पैसे द्या. ऑर्डर कन्फर्म करण्यासाठी आम्ही तुम्हाला कॉल किंवा मेसेज करू.",
+    payOnDelivery: "कॅश ऑन डिलिव्हरी · पुस्तक हातात आल्यावर पैसे द्या",
     priceBreakdown: (book, fee) => `पुस्तक ₹${book} + डिलिव्हरी ₹${fee} · कॅश ऑन डिलिव्हरी`,
     codOnlyTitle: "पेमेंट: कॅश ऑन डिलिव्हरी (COD)",
     codOnlyNote: (total) => `तुमची ऑर्डर कन्फर्म करण्यासाठी आम्ही तुम्हाला कॉल किंवा मेसेज करू. पुस्तक हातात आल्यावर कुरिअरवाल्याला ₹${total} रोख द्या.`,
@@ -172,9 +174,10 @@ export const PRINT_COPY: Record<Locale, {
     print: "छपी हुई किताब",
     printNote: "घर पर · कैश ऑन डिलीवरी",
     printBadge: "नया",
-    printOrder: (price) => `छपी किताब मंगवाएँ · ₹${price} (COD)`,
+    printOrder: (price) => `छपी किताब मंगवाएँ · ₹${price}`,
     printOrderShort: "छपी किताब मंगवाएँ",
-    printNotice: "📦 छपी किताब आपके पते पर भेजी जाएगी · केवल कैश ऑन डिलीवरी: किताब हाथ में आने पर ₹449 नकद दें (किताब ₹399 + डिलीवरी ₹50)। ऑर्डर कन्फर्म करने के लिए हम आपको कॉल या मैसेज करेंगे।",
+    printNotice: "📦 छपी किताब आपके पते पर भेजी जाएगी · केवल कैश ऑन डिलीवरी: किताब हाथ में आने पर भुगतान करें। ऑर्डर कन्फर्म करने के लिए हम आपको कॉल या मैसेज करेंगे।",
+    payOnDelivery: "कैश ऑन डिलीवरी · किताब हाथ में आने पर भुगतान करें",
     priceBreakdown: (book, fee) => `किताब ₹${book} + डिलीवरी ₹${fee} · कैश ऑन डिलीवरी`,
     codOnlyTitle: "भुगतान: कैश ऑन डिलीवरी (COD)",
     codOnlyNote: (total) => `आपका ऑर्डर कन्फर्म करने के लिए हम आपको कॉल या मैसेज करेंगे। किताब हाथ में आने पर कूरियर वाले को ₹${total} नकद दें।`,
@@ -248,9 +251,10 @@ export const PRINT_COPY: Record<Locale, {
     print: "Printed book",
     printNote: "Home delivery · Cash on Delivery",
     printBadge: "New",
-    printOrder: (price) => `Order printed book · ₹${price} (COD)`,
+    printOrder: (price) => `Order printed book · ₹${price}`,
     printOrderShort: "Order printed book",
-    printNotice: "📦 The printed book is shipped to your address · Cash on Delivery only: pay ₹449 in cash when it arrives (book ₹399 + delivery ₹50). We will call or message you to confirm your order.",
+    printNotice: "📦 The printed book is shipped to your address · Cash on Delivery only: pay when it arrives. We will call or message you to confirm your order.",
+    payOnDelivery: "Cash on Delivery · pay when the book arrives",
     priceBreakdown: (book, fee) => `Book ₹${book} + delivery ₹${fee} · Cash on Delivery`,
     codOnlyTitle: "Payment: Cash on Delivery (COD)",
     codOnlyNote: (total) => `We will call or message you to confirm your order. Pay ₹${total} in cash to the courier when the book arrives.`,
