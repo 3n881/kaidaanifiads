@@ -44,7 +44,11 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
-  const payment: PrintPayment | null = body.payment === "cod" ? "cod" : body.payment === "online" ? "online" : null;
+  // Cash on Delivery only (client, 28 Nov). Set to true to offer online payment again
+  // (the Razorpay path below, /confirm, the webhook and the 10-min check are all kept).
+  const ONLINE_PAYMENT = false;
+  const payment: PrintPayment | null =
+    body.payment === "cod" ? "cod" : body.payment === "online" && ONLINE_PAYMENT ? "online" : null;
   if (!payment) return NextResponse.json({ error: "payment" }, { status: 400 });
   const { address, bad } = checkAddress((body.address ?? {}) as Record<string, unknown>);
   if (bad.length) return NextResponse.json({ error: "address", fields: bad }, { status: 400 });

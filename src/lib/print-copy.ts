@@ -1,6 +1,8 @@
 // CLIENT-SAFE: the printed-book option (client, 26 Nov): every book can also
-// be ordered as a printed copy for home delivery. Online payment = ₹399 with
-// free delivery; Cash on Delivery = ₹399 + ₹50. Printed copy only (no PDF).
+// be ordered as a printed copy for home delivery. Cash on Delivery only (client,
+// 28 Nov): ₹399 book + ₹50 delivery = ₹449, paid in cash when the book arrives.
+// (Online payment was offered 26–28 Nov; the code path stays, switched off.)
+// Printed copy only (no PDF).
 import type { Locale } from "./i18n";
 
 export const PRINT_PRICE = 399;
@@ -19,6 +21,9 @@ export const PRINT_COPY: Record<Locale, {
   printOrder: (price: number) => string;
   printOrderShort: string;
   printNotice: string;
+  priceBreakdown: (book: number, fee: number) => string;
+  codOnlyTitle: string;
+  codOnlyNote: (total: number) => string;
   // checkout page
   pageTitle: string;
   back: string;
@@ -89,11 +94,14 @@ export const PRINT_COPY: Record<Locale, {
     ebook: "ई-बुक (PDF)",
     ebookNote: "लगेच WhatsApp वर",
     print: "छापील पुस्तक",
-    printNote: "घरपोच डिलिव्हरी",
+    printNote: "घरपोच · कॅश ऑन डिलिव्हरी",
     printBadge: "नवीन",
-    printOrder: (price) => `छापील पुस्तक मागवा · ₹${price}`,
+    printOrder: (price) => `छापील पुस्तक मागवा · ₹${price} (COD)`,
     printOrderShort: "छापील पुस्तक मागवा",
-    printNotice: "📦 छापील पुस्तक तुमच्या पत्त्यावर पाठवले जाईल · ऑनलाइन पेमेंटवर डिलिव्हरी मोफत · कॅश ऑन डिलिव्हरीवर ₹50 जास्त.",
+    printNotice: "📦 छापील पुस्तक तुमच्या पत्त्यावर पाठवले जाईल · फक्त कॅश ऑन डिलिव्हरी: पुस्तक हातात आल्यावर ₹449 रोख द्या (पुस्तक ₹399 + डिलिव्हरी ₹50). आता काहीही भरायचे नाही.",
+    priceBreakdown: (book, fee) => `पुस्तक ₹${book} + डिलिव्हरी ₹${fee} · कॅश ऑन डिलिव्हरी`,
+    codOnlyTitle: "पेमेंट: कॅश ऑन डिलिव्हरी (COD)",
+    codOnlyNote: (total) => `आता काहीही भरायचे नाही. पुस्तक हातात आल्यावर कुरिअरवाल्याला ₹${total} रोख द्या.`,
     pageTitle: "छापील पुस्तक ऑर्डर",
     back: "पुस्तकाकडे परत",
     steps: ["पत्ता", "पेमेंट", "ऑर्डर"],
@@ -162,11 +170,14 @@ export const PRINT_COPY: Record<Locale, {
     ebook: "ई-बुक (PDF)",
     ebookNote: "तुरंत WhatsApp पर",
     print: "छपी हुई किताब",
-    printNote: "घर पर डिलीवरी",
+    printNote: "घर पर · कैश ऑन डिलीवरी",
     printBadge: "नया",
-    printOrder: (price) => `छपी किताब मंगवाएँ · ₹${price}`,
+    printOrder: (price) => `छपी किताब मंगवाएँ · ₹${price} (COD)`,
     printOrderShort: "छपी किताब मंगवाएँ",
-    printNotice: "📦 छपी किताब आपके पते पर भेजी जाएगी · ऑनलाइन भुगतान पर डिलीवरी मुफ्त · कैश ऑन डिलीवरी पर ₹50 अतिरिक्त।",
+    printNotice: "📦 छपी किताब आपके पते पर भेजी जाएगी · केवल कैश ऑन डिलीवरी: किताब हाथ में आने पर ₹449 नकद दें (किताब ₹399 + डिलीवरी ₹50)। अभी कुछ नहीं देना है।",
+    priceBreakdown: (book, fee) => `किताब ₹${book} + डिलीवरी ₹${fee} · कैश ऑन डिलीवरी`,
+    codOnlyTitle: "भुगतान: कैश ऑन डिलीवरी (COD)",
+    codOnlyNote: (total) => `अभी कुछ नहीं देना है। किताब हाथ में आने पर कूरियर वाले को ₹${total} नकद दें।`,
     pageTitle: "छपी किताब ऑर्डर",
     back: "किताब पर वापस",
     steps: ["पता", "भुगतान", "ऑर्डर"],
@@ -235,11 +246,14 @@ export const PRINT_COPY: Record<Locale, {
     ebook: "E-book (PDF)",
     ebookNote: "Instantly on WhatsApp",
     print: "Printed book",
-    printNote: "Home delivery",
+    printNote: "Home delivery · Cash on Delivery",
     printBadge: "New",
-    printOrder: (price) => `Order printed book · ₹${price}`,
+    printOrder: (price) => `Order printed book · ₹${price} (COD)`,
     printOrderShort: "Order printed book",
-    printNotice: "📦 The printed book is shipped to your address · free delivery with online payment · Cash on Delivery ₹50 extra.",
+    printNotice: "📦 The printed book is shipped to your address · Cash on Delivery only: pay ₹449 in cash when it arrives (book ₹399 + delivery ₹50). Nothing to pay now.",
+    priceBreakdown: (book, fee) => `Book ₹${book} + delivery ₹${fee} · Cash on Delivery`,
+    codOnlyTitle: "Payment: Cash on Delivery (COD)",
+    codOnlyNote: (total) => `Nothing to pay now. Pay ₹${total} in cash to the courier when the book arrives.`,
     pageTitle: "Printed book order",
     back: "Back to the book",
     steps: ["Address", "Payment", "Order"],

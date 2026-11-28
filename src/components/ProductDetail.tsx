@@ -44,7 +44,9 @@ import { useLanguage } from "./LanguageProvider";
 import { UI_COPY } from "@/lib/i18n";
 import { replaceProductAddress } from "@/lib/meta-pixel";
 import { PRODUCT_COPY } from "@/lib/product-copy";
-import { COD_FEE, PRINT_COPY, PRINT_PRICE } from "@/lib/print-copy";
+import { COD_FEE, PRINT_COPY, PRINT_PRICE, printTotal } from "@/lib/print-copy";
+// Printed copy = Cash on Delivery only (client, 28 Nov): the buyer pays ₹399 + ₹50 delivery.
+const PRINT_TOTAL = printTotal("cod");
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Paytm", "Visa / MC", "NetBanking"];
 
@@ -110,7 +112,7 @@ export default function ProductDetail({
       }))
     : [
         { key: "ebook", label: pt.ebook, price: product.price, selected: !isPrint, onSelect: () => setFormat("ebook") },
-        { key: "print", label: `📦 ${pt.print}`, price: PRINT_PRICE, selected: isPrint, onSelect: () => setFormat("print") },
+        { key: "print", label: `📦 ${pt.print} (COD)`, price: PRINT_TOTAL, selected: isPrint, onSelect: () => setFormat("print") },
       ];
   // Keep the purchase action consistent for single books and combo packs.
   // The selected product's localized download text and current price always follow the selection.
@@ -174,7 +176,7 @@ export default function ProductDetail({
         product={product}
         label={copy.downloadNow}
         options={barOptions}
-        print={isPrint ? { href: printHref, label: pt.printOrderShort, price: PRINT_PRICE } : undefined}
+        print={isPrint ? { href: printHref, label: pt.printOrderShort, price: PRINT_TOTAL } : undefined}
       />
       <script
         type="application/ld+json"
@@ -243,11 +245,11 @@ export default function ProductDetail({
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3 md:p-4">
               <div className="flex flex-col">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black tracking-tight text-green-600 sm:text-4xl md:text-5xl">₹{PRINT_PRICE}</span>
+                  <span className="text-3xl font-black tracking-tight text-green-600 sm:text-4xl md:text-5xl">₹{PRINT_TOTAL}</span>
                   <span className="font-deva text-[10px] font-bold text-gray-500 sm:text-xs">{pt.print}</span>
                 </div>
                 <span className="font-deva mt-0.5 text-[10px] font-semibold text-gray-500">
-                  {pt.online}: {pt.free} {pt.delivery} · COD +₹{COD_FEE}
+                  {pt.priceBreakdown(PRINT_PRICE, COD_FEE)}
                 </span>
               </div>
               <span className="font-deva ml-auto inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-bold text-blue-800 md:text-xs">
@@ -310,7 +312,7 @@ export default function ProductDetail({
             ) : null}
             {isPrint ? (
               <Link href={printHref} className="font-deva flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-center text-lg leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]">
-                <Package className="h-5 w-5 shrink-0" aria-hidden="true" /> {pt.printOrder(PRINT_PRICE)}
+                <Package className="h-5 w-5 shrink-0" aria-hidden="true" /> {pt.printOrder(PRINT_TOTAL)}
               </Link>
             ) : (
               <BuyButton
@@ -398,7 +400,7 @@ export default function ProductDetail({
             <div className="relative z-10 flex flex-col gap-3">
               {isPrint ? (
                 <Link href={printHref} className="font-deva flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-gold px-6 py-2 text-center leading-tight font-extrabold text-brand-teal shadow-lg transition-all hover:-translate-y-0.5 hover:bg-brand-gold/90 active:scale-[0.98]">
-                  <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {pt.printOrder(PRINT_PRICE)}
+                  <Package className="h-4 w-4 shrink-0" aria-hidden="true" /> {pt.printOrder(PRINT_TOTAL)}
                 </Link>
               ) : (
                 <BuyButton
@@ -490,7 +492,7 @@ function FormatPicker({
 }) {
   const options = [
     { key: "ebook" as const, icon: Smartphone, title: pt.ebook, note: pt.ebookNote, price: ebookPrice, badge: null },
-    { key: "print" as const, icon: Package, title: pt.print, note: pt.printNote, price: PRINT_PRICE, badge: pt.printBadge },
+    { key: "print" as const, icon: Package, title: pt.print, note: pt.printNote, price: PRINT_TOTAL, badge: pt.printBadge },
   ];
   return (
     <div className="mb-3">
