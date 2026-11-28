@@ -235,7 +235,6 @@ export default function ConsultationBooking({ initialTopic, bookId, bookTitle }:
           </details>
         ))}
       </div>
-      <p className="font-deva rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">{c.disclaimer}</p>
     </div>
   );
 
